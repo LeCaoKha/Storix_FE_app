@@ -21,6 +21,11 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
 
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+        <Stack.Screen name="orders" options={{ headerShown: false }} />
+        <Stack.Screen name="outbound-order" options={{ headerShown: false }} />
+        <Stack.Screen name="inbound-order" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

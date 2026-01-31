@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Feather, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { COLORS } from '@/constants/color';
@@ -25,8 +25,18 @@ export default function HomeScreen() {
     return (
         <ScrollView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.greeting}>Hello, Staff</Text>
-                <Text style={styles.date}>{new Date().toLocaleDateString()}</Text>
+                <View style={styles.headerRow}>
+                    <View>
+                        <Text style={styles.greeting}>Hello, Staff</Text>
+                        <Text style={styles.date}>{new Date().toLocaleDateString()}</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.profileButton}
+                        onPress={() => router.push('/profile' as any)}
+                    >
+                        <Feather name="user" size={24} color={COLORS.text} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={styles.section}>
@@ -106,6 +116,14 @@ export default function HomeScreen() {
                             <Text style={styles.gridValue}>68</Text>
                         </Card>
                     </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/orders' as any)}>
+                        <Card style={styles.gridCard}>
+                            <Feather name="clipboard" size={24} color="#F59E0B" />
+                            <Text style={styles.gridLabel}>Order Tickets</Text>
+                            <Text style={styles.gridValue}>4 Active</Text>
+                        </Card>
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -123,6 +141,19 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#fff',
         paddingTop: 60, // Safe area roughly
+    },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    profileButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     greeting: {
         fontSize: 24,

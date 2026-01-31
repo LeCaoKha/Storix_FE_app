@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useState } from 'react';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -19,82 +19,91 @@ export default function LoginScreen() {
         setIsLoading(true);
         setTimeout(() => {
             setIsLoading(false);
-            router.replace('/(tabs)');
+            router.replace('/(tabs)/tasks');
         }, 1000);
     };
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.container}
+        >
             <StatusBar style="light" />
 
-            <LinearGradient
-                colors={[COLORS.primaryLight, COLORS.primary, COLORS.primaryDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.headerBackground}
+            <ScrollView
+                contentContainerStyle={{ flexGrow: 1 }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
             >
-                <View style={styles.headerContent}>
-                    <Image
-                        source={require('@/assets/images/Logo.png')}
-                        style={{ width: 150, height: 150, marginBottom: 16 }}
-                        resizeMode="contain"
-                    />
-                    <Text style={styles.appTagline}>Warehouse Management System</Text>
-                </View>
-            </LinearGradient>
-
-            <View style={styles.contentContainer}>
-                <View style={styles.formCard}>
-                    <Text style={styles.formTitle}>Staff Access</Text>
-                    <Text style={styles.formSubtitle}>Enter your credentials to continue</Text>
-
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Employee ID / Email</Text>
-                        <Input
-                            placeholder="e.g. staff@storix.com"
-                            value={email}
-                            onChangeText={setEmail}
-                            autoCapitalize="none"
-                            keyboardType="email-address"
-                            style={styles.input}
-                            leftIcon={<Feather name="user" size={20} color={COLORS.slate500} />}
+                <LinearGradient
+                    colors={[COLORS.primaryLight, COLORS.primary, COLORS.primaryDark]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.headerBackground}
+                >
+                    <View style={styles.headerContent}>
+                        <Image
+                            source={require('@/assets/images/Logo.png')}
+                            style={{ width: 150, height: 150, marginBottom: 16 }}
+                            resizeMode="contain"
                         />
+                        <Text style={styles.appTagline}>Warehouse Management System</Text>
                     </View>
+                </LinearGradient>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Password</Text>
-                        <Input
-                            placeholder="Enter password"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                            style={styles.input}
-                            leftIcon={<Feather name="lock" size={20} color={COLORS.slate500} />}
+                <View style={styles.contentContainer}>
+                    <View style={styles.formCard}>
+                        <Text style={styles.formTitle}>Staff Access</Text>
+                        <Text style={styles.formSubtitle}>Enter your credentials to continue</Text>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Employee ID / Email</Text>
+                            <Input
+                                placeholder="e.g. staff@storix.com"
+                                value={email}
+                                onChangeText={setEmail}
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                style={styles.input}
+                                leftIcon={<Feather name="user" size={20} color={COLORS.slate500} />}
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Password</Text>
+                            <Input
+                                placeholder="Enter password"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                style={styles.input}
+                                leftIcon={<Feather name="lock" size={20} color={COLORS.slate500} />}
+                            />
+                        </View>
+
+                        <TouchableOpacity style={styles.forgotPass}>
+                            <Text style={styles.forgotPassText}>Reset Password</Text>
+                        </TouchableOpacity>
+
+                        <Button
+                            title="Login"
+                            onPress={handleLogin}
+                            isLoading={isLoading}
+                            style={styles.loginButton}
                         />
+
+                        <View style={styles.divider} />
+
+                        <View style={styles.helpSection}>
+                            <Feather name="help-circle" size={16} color={COLORS.slate500} />
+                            <Text style={styles.helpText}>Need help? Contact System Admin</Text>
+                        </View>
                     </View>
 
-                    <TouchableOpacity style={styles.forgotPass}>
-                        <Text style={styles.forgotPassText}>Reset Password</Text>
-                    </TouchableOpacity>
-
-                    <Button
-                        title="Login"
-                        onPress={handleLogin}
-                        isLoading={isLoading}
-                        style={styles.loginButton}
-                    />
-
-                    <View style={styles.divider} />
-
-                    <View style={styles.helpSection}>
-                        <Feather name="help-circle" size={16} color={COLORS.slate500} />
-                        <Text style={styles.helpText}>Need help? Contact System Admin</Text>
-                    </View>
+                    <Text style={styles.versionText}>v2.4.0 • Enterprise Edition</Text>
                 </View>
-
-                <Text style={styles.versionText}>v2.4.0 • Enterprise Edition</Text>
-            </View>
-        </View>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 };
 
