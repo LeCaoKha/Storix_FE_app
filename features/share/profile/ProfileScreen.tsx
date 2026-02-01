@@ -5,14 +5,17 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 
 import { Card } from '@/components/ui/Card';
 import { COLORS } from '@/constants/color';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfileScreen() {
     const router = useRouter();
+    const { user, logout } = useAuth();
 
-    const user = {
+    // Use user from AuthContext or fallback to mock data
+    const userData = user || {
         name: 'Nguyen Van A',
         email: 'nguyenvana@storix.com',
-        role: 'Warehouse Staff',
+        role: 'staff',
         employeeId: 'WS-2024-001',
         warehouse: 'WH-HCM-01',
         phone: '+84 987 654 321',
@@ -31,9 +34,9 @@ export default function ProfileScreen() {
                 {
                     text: 'Logout',
                     style: 'destructive',
-                    onPress: () => {
-                        // TODO: Clear authentication token/session
-                        router.replace('/');
+                    onPress: async () => {
+                        await logout();
+                        router.replace('/login' as any);
                     },
                 },
             ]
@@ -98,8 +101,8 @@ export default function ProfileScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.userName}>{user.name}</Text>
-                    <Text style={styles.userRole}>{user.role}</Text>
+                    <Text style={styles.userName}>{userData.name}</Text>
+                    <Text style={styles.userRole}>{userData.role === 'staff' ? 'Warehouse Staff' : 'Warehouse Manager'}</Text>
 
                     <View style={styles.userStats}>
                         <View style={styles.statItem}>
@@ -130,7 +133,7 @@ export default function ProfileScreen() {
                             <Feather name="credit-card" size={18} color={COLORS.textMuted} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Employee ID</Text>
-                                <Text style={styles.infoValue}>{user.employeeId}</Text>
+                                <Text style={styles.infoValue}>{userData.employeeId}</Text>
                             </View>
                         </View>
                         <View style={styles.divider} />
@@ -138,7 +141,7 @@ export default function ProfileScreen() {
                             <Feather name="mail" size={18} color={COLORS.textMuted} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Email</Text>
-                                <Text style={styles.infoValue}>{user.email}</Text>
+                                <Text style={styles.infoValue}>{userData.email}</Text>
                             </View>
                         </View>
                         <View style={styles.divider} />
@@ -146,7 +149,7 @@ export default function ProfileScreen() {
                             <Feather name="phone" size={18} color={COLORS.textMuted} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Phone</Text>
-                                <Text style={styles.infoValue}>{user.phone}</Text>
+                                <Text style={styles.infoValue}>{userData.phone}</Text>
                             </View>
                         </View>
                         <View style={styles.divider} />
@@ -154,7 +157,7 @@ export default function ProfileScreen() {
                             <Feather name="home" size={18} color={COLORS.textMuted} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Warehouse</Text>
-                                <Text style={styles.infoValue}>{user.warehouse}</Text>
+                                <Text style={styles.infoValue}>{userData.warehouse}</Text>
                             </View>
                         </View>
                         <View style={styles.divider} />
@@ -162,7 +165,7 @@ export default function ProfileScreen() {
                             <Feather name="calendar" size={18} color={COLORS.textMuted} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Join Date</Text>
-                                <Text style={styles.infoValue}>{user.joinDate}</Text>
+                                <Text style={styles.infoValue}>{userData.joinDate}</Text>
                             </View>
                         </View>
                     </Card>

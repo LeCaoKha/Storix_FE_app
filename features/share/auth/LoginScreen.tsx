@@ -8,19 +8,32 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, To
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { COLORS } from '@/constants/color';
+import { useAuth } from '@/contexts/AuthContext';
+import type { UserRole } from '@/types/auth';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const { login } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [role, setRole] = useState<UserRole>('staff');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         setIsLoading(true);
-        setTimeout(() => {
+        try {
+            await login(email, password, role);
+            // Navigate based on role
+            if (role === 'staff') {
+                router.replace('/(staff-tabs)' as any);
+            } else {
+                router.replace('/(manager-tabs)' as any);
+            }
+        } catch (error) {
+            console.error('Login failed:', error);
+        } finally {
             setIsLoading(false);
-            router.replace('/(tabs)/tasks');
-        }, 1000);
+        }
     };
 
     return (
@@ -53,11 +66,42 @@ export default function LoginScreen() {
 
                 <View style={styles.contentContainer}>
                     <View style={styles.formCard}>
-                        <Text style={styles.formTitle}>Staff Access</Text>
+                        <Text style={styles.formTitle}>Login</Text>
                         <Text style={styles.formSubtitle}>Enter your credentials to continue</Text>
 
+                        {/* Role Selection Dropdown */}
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Employee ID / Email</Text>
+                            <Text style={styles.label}>Login As</Text>
+                            <View style={styles.rolePickerContainer}>
+                                <TouchableOpacity
+                                    style={[styles.roleOption, role === 'staff' && styles.roleOptionActive]}
+                                    onPress={() => setRole('staff')}
+                                >
+                                    <View style={[styles.roleRadio, role === 'staff' && styles.roleRadioActive]}>
+                                        {role === 'staff' && <View style={styles.roleRadioDot} />}
+                                    </View>
+                                    <Feather name="users" size={18} color={role === 'staff' ? COLORS.primary : COLORS.slate500} />
+                                    <Text style={[styles.roleOptionText, role === 'staff' && styles.roleOptionTextActive]}>
+                                        Staff
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.roleOption, role === 'manager' && styles.roleOptionActive]}
+                                    onPress={() => setRole('manager')}
+                                >
+                                    <View style={[styles.roleRadio, role === 'manager' && styles.roleRadioActive]}>
+                                        {role === 'manager' && <View style={styles.roleRadioDot} />}
+                                    </View>
+                                    <Feather name="briefcase" size={18} color={role === 'manager' ? COLORS.primary : COLORS.slate500} />
+                                    <Text style={[styles.roleOptionText, role === 'manager' && styles.roleOptionTextActive]}>
+                                        Manager
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Email</Text>
                             <Input
                                 placeholder="e.g. staff@storix.com"
                                 value={email}
@@ -151,6 +195,53 @@ const styles = StyleSheet.create({
         flex: 1,
         marginTop: -60,
         paddingHorizontal: 24,
+    },
+    rolePickerContainer: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    roleOption: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        backgroundColor: COLORS.slate50,
+        borderWidth: 2,
+        borderColor: COLORS.slate200,
+    },
+    roleOptionActive: {
+        backgroundColor: '#CCFBF120',
+        borderColor: COLORS.primary,
+    },
+    roleRadio: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: COLORS.slate500,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    roleRadioActive: {
+        borderColor: COLORS.primary,
+    },
+    roleRadioDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: COLORS.primary,
+    },
+    roleOptionText: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.slate700,
+    },
+    roleOptionTextActive: {
+        color: COLORS.primary,
     },
     formCard: {
         backgroundColor: '#fff',

@@ -8,6 +8,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
+import { AuthProvider } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 
@@ -16,18 +17,21 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
+    <AuthProvider>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
 
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {/* Staff tabs */}
+          <Stack.Screen name="(staff-tabs)" options={{ headerShown: false }} />
 
-        <Stack.Screen name="orders" options={{ headerShown: false }} />
-        <Stack.Screen name="outbound-order" options={{ headerShown: false }} />
-        <Stack.Screen name="inbound-order" options={{ headerShown: false }} />
-        <Stack.Screen name="profile" options={{ headerShown: false }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+          {/* Manager tabs */}
+          <Stack.Screen name="(manager-tabs)" options={{ headerShown: false }} />
+
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </AuthProvider>
   );
 }

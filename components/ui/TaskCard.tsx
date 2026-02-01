@@ -66,15 +66,6 @@ export function TaskCard({ task }: TaskCardProps) {
         }
     };
 
-    const getPriorityColor = (priority: Task['priority']) => {
-        switch (priority) {
-            case 'low': return '#64748B';
-            case 'medium': return '#F59E0B';
-            case 'high': return '#EF4444';
-            case 'urgent': return '#DC2626';
-        }
-    };
-
     const typeConfig = getTaskTypeConfig(task.type);
     const statusConfig = getStatusConfig(task.status);
 
@@ -92,9 +83,6 @@ export function TaskCard({ task }: TaskCardProps) {
                         {task.customerOrSupplier && (
                             <Text style={styles.customerOrSupplier}>{task.customerOrSupplier}</Text>
                         )}
-                    </View>
-                    <View style={[styles.priorityBadge, { borderColor: getPriorityColor(task.priority) }]}>
-                        <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(task.priority) }]} />
                     </View>
                 </View>
 
@@ -175,19 +163,6 @@ const styles = StyleSheet.create({
     customerOrSupplier: {
         fontSize: 13,
         color: COLORS.textMuted,
-    },
-    priorityBadge: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        borderWidth: 2,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    priorityDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
     },
     meta: {
         flexDirection: 'row',
