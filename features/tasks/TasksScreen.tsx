@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { HorizontalFilterBar, type FilterOption } from '@/components/ui/HorizontalFilterBar';
 import { TaskCard } from '@/components/ui/TaskCard';
 import { COLORS } from '@/constants/color';
 import type { Task, TaskType } from '@/types/order';
@@ -99,6 +100,16 @@ export default function TasksScreen() {
 
     const summary = getTaskSummary();
 
+    // Prepare filter options with counts
+    const filterOptions = useMemo<FilterOption<'all' | TaskType>[]>(() => {
+        const filters: ('all' | TaskType)[] = ['all', 'outbound', 'inbound', 'putaway', 'count'];
+        return filters.map(filter => ({
+            value: filter,
+            label: getFilterLabel(filter),
+            count: filter === 'all' ? tasks.length : tasks.filter(t => t.type === filter).length,
+        }));
+    }, [tasks]);
+
     return (
         <View style={styles.container}>
             {/* Header */}
@@ -131,65 +142,34 @@ export default function TasksScreen() {
             </View>
 
             {/* Filter Tabs */}
-            <View style={styles.content}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.filterScroll}
-                    contentContainerStyle={styles.filterContainer}
-                >
-                    {(['all', 'outbound', 'inbound', 'putaway', 'count'] as const).map((filter) => (
-                        <TouchableOpacity
-                            key={filter}
-                            style={[
-                                styles.filterButton,
-                                activeFilter === filter && styles.filterButtonActive,
-                            ]}
-                            onPress={() => setActiveFilter(filter)}
-                        >
-                            <Text
-                                style={activeFilter === filter ? styles.filterTextActive : styles.filterText}
-                            >
-                                {getFilterLabel(filter)}
-                            </Text>
-                            <View style={[
-                                styles.filterCount,
-                                activeFilter === filter && styles.filterCountActive,
-                            ]}>
-                                <Text style={[
-                                    styles.filterCountText,
-                                    activeFilter === filter && styles.filterCountTextActive,
-                                ]}>
-                                    {filter === 'all' ? tasks.length : tasks.filter(t => t.type === filter).length}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
+            <HorizontalFilterBar
+                options={filterOptions}
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+            />
 
-                {/* Tasks List */}
-                <ScrollView
-                    style={styles.tasksList}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {filteredTasks.length > 0 ? (
-                        filteredTasks.map((task) => (
-                            <TaskCard key={task.id} task={task} />
-                        ))
-                    ) : (
-                        <View style={styles.emptyState}>
-                            <Feather name="inbox" size={48} color={COLORS.textMuted} />
-                            <Text style={styles.emptyText}>Không có nhiệm vụ nào</Text>
-                            <Text style={styles.emptySubtext}>
-                                {activeFilter === 'all'
-                                    ? 'Bạn chưa có nhiệm vụ nào được giao'
-                                    : `Không có nhiệm vụ ${getFilterLabel(activeFilter).toLowerCase()} nào`}
-                            </Text>
-                        </View>
-                    )}
-                    <View style={{ height: 20 }} />
-                </ScrollView>
-            </View>
+            {/* Tasks List */}
+            <ScrollView
+                style={styles.tasksList}
+                showsVerticalScrollIndicator={false}
+            >
+                {filteredTasks.length > 0 ? (
+                    filteredTasks.map((task) => (
+                        <TaskCard key={task.id} task={task} />
+                    ))
+                ) : (
+                    <View style={styles.emptyState}>
+                        <Feather name="inbox" size={48} color={COLORS.textMuted} />
+                        <Text style={styles.emptyText}>Không có nhiệm vụ nào</Text>
+                        <Text style={styles.emptySubtext}>
+                            {activeFilter === 'all'
+                                ? 'Bạn chưa có nhiệm vụ nào được giao'
+                                : `Không có nhiệm vụ ${getFilterLabel(activeFilter).toLowerCase()} nào`}
+                        </Text>
+                    </View>
+                )}
+                <View style={{ height: 20 }} />
+            </ScrollView>
         </View>
     );
 }
@@ -220,16 +200,17 @@ const styles = StyleSheet.create({
     summaryContainer: {
         flexDirection: 'row',
         paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingTop: 12,
+        paddingBottom: 0,
         gap: 12,
         backgroundColor: '#fff',
     },
     summaryCard: {
         flex: 1,
-        padding: 12,
+        padding: 8,
         borderRadius: 12,
         alignItems: 'center',
-        gap: 4,
+        gap: 2,
     },
     summaryNumber: {
         fontSize: 24,
@@ -239,61 +220,6 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: COLORS.textMuted,
         textAlign: 'center',
-    },
-    content: {
-        flex: 1,
-    },
-    filterScroll: {
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    filterContainer: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        gap: 6,
-    },
-    filterButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 4,
-        paddingHorizontal: 12,
-        borderRadius: 16,
-        backgroundColor: COLORS.background,
-        gap: 4,
-    },
-    filterButtonActive: {
-        backgroundColor: COLORS.primary,
-    },
-    filterText: {
-        fontSize: 12,
-        color: COLORS.text,
-        fontWeight: '500',
-    },
-    filterTextActive: {
-        fontSize: 12,
-        color: '#fff',
-        fontWeight: '600',
-    },
-    filterCount: {
-        minWidth: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 5,
-    },
-    filterCountActive: {
-        backgroundColor: 'rgba(255,255,255,0.3)',
-    },
-    filterCountText: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: COLORS.text,
-    },
-    filterCountTextActive: {
-        color: '#fff',
     },
     tasksList: {
         flex: 1,
