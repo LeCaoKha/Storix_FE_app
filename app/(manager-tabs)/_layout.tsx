@@ -32,13 +32,6 @@ export default function ManagerTabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="orders"
-                options={{
-                    title: "Đơn Hàng",
-                    tabBarIcon: ({ color }) => <Feather name="inbox" size={28} color={color} />,
-                }}
-            />
-            <Tabs.Screen
                 name="analytics"
                 options={{
                     title: "Analytics",

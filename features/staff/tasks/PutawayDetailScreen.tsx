@@ -28,8 +28,23 @@ export default function PutawayDetailScreen() {
     };
 
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isLocationScanned, setIsLocationScanned] = useState(false);
+
+    const handleScanLocation = () => {
+        setIsProcessing(true);
+        // Simulate scanning delay
+        setTimeout(() => {
+            setIsProcessing(false);
+            setIsLocationScanned(true);
+            Alert.alert('Thành công', 'Đã xác nhận đúng vị trí ' + mockTask.targetLocation);
+        }, 800);
+    };
 
     const handleComplete = () => {
+        if (!isLocationScanned) {
+            Alert.alert('Lưu ý', 'Vui lòng quét mã vị trí trước khi xác nhận');
+            return;
+        }
         setIsProcessing(true);
         // Simulate API call
         setTimeout(() => {
@@ -59,7 +74,7 @@ export default function PutawayDetailScreen() {
                         <Feather name="arrow-right" size={20} color={COLORS.textMuted} />
                         <View style={styles.locationBox}>
                             <Text style={styles.locationLabel}>Đến vị trí</Text>
-                            <Text style={styles.locationValue}>{mockTask.targetLocation}</Text>
+                            <Text style={[styles.locationValue, isLocationScanned && { color: '#059669' }]}>{mockTask.targetLocation}</Text>
                         </View>
                     </View>
                 </Card>
@@ -81,20 +96,29 @@ export default function PutawayDetailScreen() {
                     </Card>
                 ))}
 
-                <TouchableOpacity style={styles.scanLocationBtn}>
-                    <Feather name="maximize" size={20} color={COLORS.primary} />
-                    <Text style={styles.scanLocationText}>Quét mã vị trí đích (Rack/Bin)</Text>
+                <TouchableOpacity
+                    style={[styles.scanLocationBtn, isLocationScanned && styles.scanLocationBtnSuccess]}
+                    onPress={handleScanLocation}
+                    disabled={isLocationScanned || isProcessing}
+                >
+                    <Feather name={isLocationScanned ? "check-circle" : "maximize"} size={20} color={isLocationScanned ? "#059669" : COLORS.primary} />
+                    <Text style={[styles.scanLocationText, isLocationScanned && { color: '#059669' }]}>
+                        {isLocationScanned ? "Đã quét vị trí khớp" : "Quét mã vị trí đích (Rack/Bin)"}
+                    </Text>
                 </TouchableOpacity>
             </ScrollView>
 
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[styles.completeBtn, isProcessing && styles.disabledBtn]}
+                    style={[
+                        styles.completeBtn,
+                        (isProcessing || !isLocationScanned) && styles.disabledBtn
+                    ]}
                     onPress={handleComplete}
-                    disabled={isProcessing}
+                    disabled={isProcessing || !isLocationScanned}
                 >
                     <Text style={styles.completeBtnText}>
-                        {isProcessing ? 'Đang lý...' : 'Xác nhận đã xếp hàng'}
+                        {isProcessing ? 'Đang xử lý...' : 'Xác nhận đã xếp hàng'}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -204,6 +228,11 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderRadius: 12,
         marginTop: 20,
+    },
+    scanLocationBtnSuccess: {
+        backgroundColor: '#05966910',
+        borderColor: '#059669',
+        borderStyle: 'solid',
     },
     scanLocationText: {
         fontSize: 15,

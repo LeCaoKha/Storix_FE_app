@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export default function StaffOutboundDetailScreen() {
+export default function OutboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const { getOutboundOrderById, updatePickedQuantities, updateOutboundStatus } = useOutboundOrders();
@@ -262,28 +262,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: COLORS.text,
     },
-    actionRow: {
-        marginBottom: 20,
-    },
-    pathBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        backgroundColor: COLORS.primary,
-        paddingVertical: 14,
-        borderRadius: 12,
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    pathBtnText: {
-        fontSize: 15,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -303,6 +281,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         backgroundColor: '#fff',
         padding: 16,
+        borderRadius: 12,
     },
     itemHeader: {
         flexDirection: 'row',

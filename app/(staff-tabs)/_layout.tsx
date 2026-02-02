@@ -25,13 +25,6 @@ export default function StaffTabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="orders"
-                options={{
-                    title: "Orders",
-                    tabBarIcon: ({ color }) => <Feather name="package" size={28} color={color} />,
-                }}
-            />
-            <Tabs.Screen
                 name="profile"
                 options={{
                     title: "Profile",

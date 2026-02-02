@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { COLORS } from '@/constants/color';
+import React from 'react';
+import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
 interface CardProps {
     title?: string;
     children: React.ReactNode;
-    style?: ViewStyle;
+    style?: StyleProp<ViewStyle>;
 }
 
 export const Card: React.FC<CardProps> = ({ title, children, style }) => {

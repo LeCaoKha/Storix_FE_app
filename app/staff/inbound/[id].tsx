@@ -1,2 +1,2 @@
-import StaffInboundDetailScreen from '@/features/staff/orders/StaffInboundDetailScreen';
-export default StaffInboundDetailScreen;
+import InboundDetailScreen from '@/features/staff/tasks/InboundDetailScreen';
+export default InboundDetailScreen;

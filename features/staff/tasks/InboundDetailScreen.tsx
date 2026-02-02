@@ -1,33 +1,28 @@
 import { Card } from '@/components/ui/Card';
 import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { COLORS } from '@/constants/color';
-import { useOutboundOrders } from '@/contexts/OutboundOrderContext';
+import { useInboundOrders } from '@/contexts/InboundOrderContext';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-export default function StaffOutboundDetailScreen() {
+export default function InboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { getOutboundOrderById, updatePickedQuantities, updateOutboundStatus } = useOutboundOrders();
+    const { getInboundOrderById, updateReceivedQuantities, updateInboundStatus } = useInboundOrders();
 
-    const order = getOutboundOrderById(id);
+    const order = getInboundOrderById(id);
     const [localQuantities, setLocalQuantities] = useState<Record<string, number>>(
-        order?.items.reduce((acc, item) => ({ ...acc, [item.id]: item.qtyPicked }), {}) || {}
+        order?.items.reduce((acc, item) => ({ ...acc, [item.id]: item.receivedQty }), {}) || {}
     );
-    const [verifiedItems, setVerifiedItems] = useState<Record<string, boolean>>({});
+    const [localItemData, setLocalItemData] = useState<Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>(
+        order?.items.reduce((acc, item) => ({
+            ...acc,
+            [item.id]: { batch: '', expiry: '', qc: 'good' }
+        }), {}) || {}
+    );
     const [isSaving, setIsSaving] = useState(false);
-
-    // Business Logic: Sort items by location code for optimized path
-    const sortedItems = React.useMemo(() => {
-        if (!order) return [];
-        return [...order.items].sort((a, b) => {
-            const locA = a.pickLocations[0]?.locationCode || '';
-            const locB = b.pickLocations[0]?.locationCode || '';
-            return locA.localeCompare(locB);
-        });
-    }, [order]);
 
     if (!order) {
         return (
@@ -46,52 +41,48 @@ export default function StaffOutboundDetailScreen() {
         );
     }
 
-    const handleVerifyItem = (itemId: string) => {
-        setIsSaving(true);
-        // Simulate scanning delay
-        setTimeout(() => {
-            setIsSaving(false);
-            setVerifiedItems(prev => ({ ...prev, [itemId]: true }));
-            Alert.alert('Thành công', 'Đã xác nhận đúng sản phẩm');
-        }, 600);
-    };
-
     const handleUpdateQty = (itemId: string, increment: boolean) => {
-        if (!verifiedItems[itemId]) {
-            Alert.alert('Lưu ý', 'Vui lòng quét mã sản phẩm để xác minh trước khi lấy hàng');
-            return;
-        }
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
             const item = order.items.find(i => i.id === itemId);
             const newValue = increment
-                ? Math.min(current + 1, item?.qtyToPick || 9999)
+                ? Math.min(current + 1, item?.expectedQty || 9999)
                 : Math.max(current - 1, 0);
             return { ...prev, [itemId]: newValue };
         });
     };
 
+    const handleUpdateItemData = (itemId: string, field: string, value: string) => {
+        setLocalItemData(prev => ({
+            ...prev,
+            [itemId]: { ...prev[itemId], [field]: value }
+        }));
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const updates = Object.entries(localQuantities).map(([itemId, qtyPicked]) => ({
+            const updates = Object.entries(localQuantities).map(([itemId, receivedQty]) => ({
                 itemId,
-                qtyPicked,
+                receivedQty,
+                ...localItemData[itemId],
             }));
-            await updatePickedQuantities(order.id, updates);
 
-            // Check if all items picked
-            const allPicked = order.items.every(item =>
-                (localQuantities[item.id] || 0) >= item.qtyToPick
+            // In a real app, updateReceivedQuantities would be updated to take these fields
+            await updateReceivedQuantities(order.id, updates as any);
+
+            // Check if all items received
+            const allReceived = order.items.every(item =>
+                (localQuantities[item.id] || 0) >= item.expectedQty
             );
 
-            if (allPicked && order.status !== 'ready') {
-                await updateOutboundStatus(order.id, 'ready');
-            } else if (order.status === 'open') {
-                await updateOutboundStatus(order.id, 'picking');
+            if (allReceived && order.status !== 'completed') {
+                await updateInboundStatus(order.id, 'completed');
+            } else if (order.status === 'scheduled') {
+                await updateInboundStatus(order.id, 'receiving');
             }
 
-            Alert.alert('Thành công', 'Đã cập nhật số lượng lấy hàng');
+            Alert.alert('Thành công', 'Đã lưu thông tin nhận hàng và số lô/hạn sử dụng');
             router.back();
         } catch (error) {
             Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
@@ -105,96 +96,113 @@ export default function StaffOutboundDetailScreen() {
             <StatusBar barStyle="dark-content" />
             <SafeAreaHeader showBackButton backgroundColor="#fff" style={styles.header}>
                 <View>
-                    <Text style={styles.headerTitle}>Xuất Kho</Text>
-                    <Text style={styles.headerSubtitle}>{order.outboundNumber}</Text>
+                    <Text style={styles.headerTitle}>Nhập Kho</Text>
+                    <Text style={styles.headerSubtitle}>{order.inboundNumber}</Text>
                 </View>
             </SafeAreaHeader>
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
-                        <Feather name="user" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Khách hàng: <Text style={styles.boldText}>{order.customer}</Text></Text>
+                        <Feather name="truck" size={16} color={COLORS.textMuted} />
+                        <Text style={styles.infoText}>Nhà cung cấp: <Text style={styles.boldText}>{order.supplier}</Text></Text>
                     </View>
-                    <View style={styles.infoRow}>
-                        <Feather name="map-pin" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Giao đến: <Text style={styles.boldText}>{order.destination}</Text></Text>
-                    </View>
+                    {order.poReference && (
+                        <View style={styles.infoRow}>
+                            <Feather name="file-text" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.infoText}>Mã PO: <Text style={styles.boldText}>{order.poReference}</Text></Text>
+                        </View>
+                    )}
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Lộ trình lấy hàng tối ưu</Text>
+                    <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
                     <Text style={styles.sectionSubtitle}>{order.items.length} mặt hàng</Text>
                 </View>
 
-                {sortedItems.map(item => (
-                    <Card key={item.id} style={[styles.itemCard, verifiedItems[item.id] && styles.itemCardVerified]}>
+                {order.items.map(item => (
+                    <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
                                 <Text style={styles.productName}>{item.productName}</Text>
-                                <View style={styles.skuRow}>
-                                    <View style={styles.skuBadge}>
-                                        <Text style={styles.skuText}>{item.sku}</Text>
-                                    </View>
-                                    {item.pickLocations.map(loc => (
-                                        <View key={loc.locationCode} style={styles.locationBadge}>
-                                            <Feather name="layers" size={10} color={COLORS.primary} />
-                                            <Text style={styles.locationText}>{loc.locationCode}</Text>
-                                        </View>
-                                    ))}
-                                </View>
+                                <Text style={styles.skuText}>SKU: {item.sku}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
-                                backgroundColor: (localQuantities[item.id] || 0) >= item.qtyToPick ? '#D1FAE5' : '#FEF3C7'
+                                backgroundColor: (localQuantities[item.id] || 0) >= item.expectedQty ? '#D1FAE5' : '#FEF3C7'
                             }]}>
                                 <Text style={[styles.statusBadgeText, {
-                                    color: (localQuantities[item.id] || 0) >= item.qtyToPick ? '#059669' : '#D97706'
+                                    color: (localQuantities[item.id] || 0) >= item.expectedQty ? '#059669' : '#D97706'
                                 }]}>
-                                    {(localQuantities[item.id] || 0) >= item.qtyToPick ? 'Xong' : 'Chờ'}
+                                    {(localQuantities[item.id] || 0) >= item.expectedQty ? 'Đủ' : 'Chờ'}
                                 </Text>
                             </View>
                         </View>
 
                         <View style={styles.counterRow}>
-                            <View style={styles.qtyLabelContainer}>
-                                <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
-                                {!verifiedItems[item.id] && (
-                                    <Text style={styles.verificationPrompt}>Quét để xác minh</Text>
-                                )}
-                            </View>
-                            <View style={[styles.counter, !verifiedItems[item.id] && styles.disabledCounter]}>
+                            <Text style={styles.qtyLabel}>Số lượng đã nhận:</Text>
+                            <View style={styles.counter}>
                                 <TouchableOpacity
                                     style={styles.counterBtn}
                                     onPress={() => handleUpdateQty(item.id, false)}
-                                    disabled={!verifiedItems[item.id]}
                                 >
-                                    <Feather name="minus" size={20} color={verifiedItems[item.id] ? COLORS.primary : COLORS.border} />
+                                    <Feather name="minus" size={20} color={COLORS.primary} />
                                 </TouchableOpacity>
                                 <View style={styles.qtyDisplay}>
-                                    <Text style={[styles.qtyValue, !verifiedItems[item.id] && { color: COLORS.border }]}>
-                                        {localQuantities[item.id] || 0}
-                                    </Text>
-                                    <Text style={styles.qtyTotal}>/ {item.qtyToPick}</Text>
+                                    <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
+                                    <Text style={styles.qtyTotal}>/ {item.expectedQty}</Text>
                                 </View>
                                 <TouchableOpacity
                                     style={styles.counterBtn}
                                     onPress={() => handleUpdateQty(item.id, true)}
-                                    disabled={!verifiedItems[item.id]}
                                 >
-                                    <Feather name="plus" size={20} color={verifiedItems[item.id] ? COLORS.primary : COLORS.border} />
+                                    <Feather name="plus" size={20} color={COLORS.primary} />
                                 </TouchableOpacity>
                             </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={[styles.scanItemBtn, verifiedItems[item.id] && styles.scanItemBtnSuccess]}
-                            onPress={() => handleVerifyItem(item.id)}
-                            disabled={verifiedItems[item.id] || isSaving}
-                        >
-                            <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? "#059669" : COLORS.primary} />
-                            <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: '#059669' }]}>
-                                {verifiedItems[item.id] ? 'Đã xác minh sản phẩm' : 'Verify Scan (Quét mã xác nhận)'}
-                            </Text>
+                        {/* Business Logic: Batch & Expiry & QC */}
+                        <View style={styles.businessLogicSection}>
+                            <View style={styles.dataGrid}>
+                                <View style={styles.dataField}>
+                                    <Text style={styles.dataLabel}>Số lô (Batch)</Text>
+                                    <TextInput
+                                        style={styles.dataInput}
+                                        placeholder="Nhập số lô"
+                                        value={localItemData[item.id]?.batch}
+                                        onChangeText={(v) => handleUpdateItemData(item.id, 'batch', v)}
+                                    />
+                                </View>
+                                <View style={styles.dataField}>
+                                    <Text style={styles.dataLabel}>Hạn dùng (Exp)</Text>
+                                    <TextInput
+                                        style={styles.dataInput}
+                                        placeholder="DD/MM/YYYY"
+                                        value={localItemData[item.id]?.expiry}
+                                        onChangeText={(v) => handleUpdateItemData(item.id, 'expiry', v)}
+                                    />
+                                </View>
+                            </View>
+
+                            <Text style={styles.dataLabel}>Tình trạng QC</Text>
+                            <View style={styles.qcOptions}>
+                                <TouchableOpacity
+                                    style={[styles.qcOption, localItemData[item.id]?.qc === 'good' && styles.qcOptionActive]}
+                                    onPress={() => handleUpdateItemData(item.id, 'qc', 'good')}
+                                >
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'good' && styles.qcOptionTextActive]}>Hàng tốt</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.qcOption, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionActiveDanger]}
+                                    onPress={() => handleUpdateItemData(item.id, 'qc', 'damaged')}
+                                >
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActive]}>Lỗi/Hỏng</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity style={styles.scanItemBtn}>
+                            <Feather name="maximize" size={16} color={COLORS.primary} />
+                            <Text style={styles.scanItemBtnText}>Scan mã vạch sản phẩm này</Text>
                         </TouchableOpacity>
                     </Card>
                 ))}
@@ -211,7 +219,7 @@ export default function StaffOutboundDetailScreen() {
                     disabled={isSaving}
                 >
                     <Text style={styles.saveBtnText}>
-                        {isSaving ? 'Đang lưu...' : 'Hoàn tất lấy hàng'}
+                        {isSaving ? 'Đang lưu...' : 'Hoàn tất nhận hàng'}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -245,7 +253,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     infoCard: {
-        marginBottom: 16,
+        marginBottom: 20,
         backgroundColor: '#fff',
         gap: 8,
     },
@@ -261,28 +269,6 @@ const styles = StyleSheet.create({
     boldText: {
         fontWeight: '600',
         color: COLORS.text,
-    },
-    actionRow: {
-        marginBottom: 20,
-    },
-    pathBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        backgroundColor: COLORS.primary,
-        paddingVertical: 14,
-        borderRadius: 12,
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    pathBtnText: {
-        fontSize: 15,
-        fontWeight: 'bold',
-        color: '#fff',
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -303,6 +289,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         backgroundColor: '#fff',
         padding: 16,
+        borderRadius: 12,
     },
     itemHeader: {
         flexDirection: 'row',
@@ -317,39 +304,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: COLORS.text,
-        marginBottom: 6,
-    },
-    skuRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    skuBadge: {
-        backgroundColor: '#F3F4F6',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
+        marginBottom: 4,
     },
     skuText: {
-        fontSize: 11,
+        fontSize: 12,
         color: COLORS.textMuted,
-        fontWeight: '600',
-    },
-    locationBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: COLORS.primary + '10',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: COLORS.primary + '30',
-    },
-    locationText: {
-        fontSize: 11,
-        color: COLORS.primary,
-        fontWeight: 'bold',
     },
     statusBadge: {
         paddingHorizontal: 8,
@@ -365,9 +324,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 16,
-    },
-    qtyLabelContainer: {
-        flex: 1,
     },
     qtyLabel: {
         fontSize: 14,
@@ -409,6 +365,67 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.textMuted,
         marginLeft: 4,
+    },
+    businessLogicSection: {
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    dataGrid: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
+    },
+    dataField: {
+        flex: 1,
+    },
+    dataLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+        marginBottom: 6,
+    },
+    dataInput: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: COLORS.text,
+    },
+    qcOptions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    qcOption: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+    qcOptionActive: {
+        borderColor: COLORS.primary,
+        backgroundColor: COLORS.primary + '10',
+    },
+    qcOptionActiveDanger: {
+        borderColor: COLORS.danger,
+        backgroundColor: COLORS.danger + '10',
+    },
+    qcOptionText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+    },
+    qcOptionTextActive: {
+        color: COLORS.primary,
     },
     scanItemBtn: {
         flexDirection: 'row',
@@ -457,23 +474,11 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    itemCardVerified: {
-        borderColor: '#059669',
-        borderWidth: 1,
-    },
-    verificationPrompt: {
-        fontSize: 11,
-        color: COLORS.danger,
-        fontWeight: 'bold',
-        marginTop: 2,
-    },
-    disabledCounter: {
-        opacity: 0.5,
-    },
-    scanItemBtnSuccess: {
-        backgroundColor: '#05966910',
-        borderColor: '#059669',
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     saveBtnText: {
         fontSize: 16,

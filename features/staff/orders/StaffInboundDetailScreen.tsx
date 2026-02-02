@@ -5,7 +5,7 @@ import { useInboundOrders } from '@/contexts/InboundOrderContext';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function StaffInboundDetailScreen() {
     const router = useRouter();
@@ -15,6 +15,12 @@ export default function StaffInboundDetailScreen() {
     const order = getInboundOrderById(id);
     const [localQuantities, setLocalQuantities] = useState<Record<string, number>>(
         order?.items.reduce((acc, item) => ({ ...acc, [item.id]: item.receivedQty }), {}) || {}
+    );
+    const [localItemData, setLocalItemData] = useState<Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>(
+        order?.items.reduce((acc, item) => ({
+            ...acc,
+            [item.id]: { batch: '', expiry: '', qc: 'good' }
+        }), {}) || {}
     );
     const [isSaving, setIsSaving] = useState(false);
 
@@ -46,14 +52,24 @@ export default function StaffInboundDetailScreen() {
         });
     };
 
+    const handleUpdateItemData = (itemId: string, field: string, value: string) => {
+        setLocalItemData(prev => ({
+            ...prev,
+            [itemId]: { ...prev[itemId], [field]: value }
+        }));
+    };
+
     const handleSave = async () => {
         setIsSaving(true);
         try {
             const updates = Object.entries(localQuantities).map(([itemId, receivedQty]) => ({
                 itemId,
                 receivedQty,
+                ...localItemData[itemId],
             }));
-            await updateReceivedQuantities(order.id, updates);
+
+            // In a real app, updateReceivedQuantities would be updated to take these fields
+            await updateReceivedQuantities(order.id, updates as any);
 
             // Check if all items received
             const allReceived = order.items.every(item =>
@@ -66,7 +82,7 @@ export default function StaffInboundDetailScreen() {
                 await updateInboundStatus(order.id, 'receiving');
             }
 
-            Alert.alert('Thành công', 'Đã cập nhật số lượng nhận hàng');
+            Alert.alert('Thành công', 'Đã lưu thông tin nhận hàng và số lô/hạn sử dụng');
             router.back();
         } catch (error) {
             Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
@@ -140,6 +156,46 @@ export default function StaffInboundDetailScreen() {
                                     onPress={() => handleUpdateQty(item.id, true)}
                                 >
                                     <Feather name="plus" size={20} color={COLORS.primary} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Business Logic: Batch & Expiry & QC */}
+                        <View style={styles.businessLogicSection}>
+                            <View style={styles.dataGrid}>
+                                <View style={styles.dataField}>
+                                    <Text style={styles.dataLabel}>Số lô (Batch)</Text>
+                                    <TextInput
+                                        style={styles.dataInput}
+                                        placeholder="Nhập số lô"
+                                        value={localItemData[item.id]?.batch}
+                                        onChangeText={(v) => handleUpdateItemData(item.id, 'batch', v)}
+                                    />
+                                </View>
+                                <View style={styles.dataField}>
+                                    <Text style={styles.dataLabel}>Hạn dùng (Exp)</Text>
+                                    <TextInput
+                                        style={styles.dataInput}
+                                        placeholder="DD/MM/YYYY"
+                                        value={localItemData[item.id]?.expiry}
+                                        onChangeText={(v) => handleUpdateItemData(item.id, 'expiry', v)}
+                                    />
+                                </View>
+                            </View>
+
+                            <Text style={styles.dataLabel}>Tình trạng QC</Text>
+                            <View style={styles.qcOptions}>
+                                <TouchableOpacity
+                                    style={[styles.qcOption, localItemData[item.id]?.qc === 'good' && styles.qcOptionActive]}
+                                    onPress={() => handleUpdateItemData(item.id, 'qc', 'good')}
+                                >
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'good' && styles.qcOptionTextActive]}>Hàng tốt</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.qcOption, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionActiveDanger]}
+                                    onPress={() => handleUpdateItemData(item.id, 'qc', 'damaged')}
+                                >
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActive]}>Lỗi/Hỏng</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -233,6 +289,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         backgroundColor: '#fff',
         padding: 16,
+        borderRadius: 12,
     },
     itemHeader: {
         flexDirection: 'row',
@@ -308,6 +365,67 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.textMuted,
         marginLeft: 4,
+    },
+    businessLogicSection: {
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    dataGrid: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
+    },
+    dataField: {
+        flex: 1,
+    },
+    dataLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+        marginBottom: 6,
+    },
+    dataInput: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: COLORS.text,
+    },
+    qcOptions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    qcOption: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+    qcOptionActive: {
+        borderColor: COLORS.primary,
+        backgroundColor: COLORS.primary + '10',
+    },
+    qcOptionActiveDanger: {
+        borderColor: COLORS.danger,
+        backgroundColor: COLORS.danger + '10',
+    },
+    qcOptionText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+    },
+    qcOptionTextActive: {
+        color: COLORS.primary,
     },
     scanItemBtn: {
         flexDirection: 'row',
