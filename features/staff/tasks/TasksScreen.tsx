@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { HorizontalFilterBar, type FilterOption } from '@/components/ui/HorizontalFilterBar';
+import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { TaskCard } from '@/components/ui/TaskCard';
 import { COLORS } from '@/constants/color';
 import type { Task, TaskType } from '@/types/order';
@@ -16,36 +17,36 @@ export default function TasksScreen() {
             id: '1',
             type: 'outbound',
             orderNumber: 'OUT-2026-001',
-            orderId: '1',
+            orderId: 'out-001',
             status: 'in_progress',
             priority: 'high',
-            itemCount: 3,
+            itemCount: 2,
             assignedDateTime: new Date('2026-01-30T10:00:00'),
             warehouse: 'WH-HCM-01',
             customerOrSupplier: 'ABC Electronics Co.',
-            progress: 43,
+            progress: 100,
         },
         {
             id: '2',
             type: 'inbound',
             orderNumber: 'IN-2026-002',
-            orderId: '2',
+            orderId: 'inb-002',
             status: 'in_progress',
             priority: 'medium',
-            itemCount: 3,
+            itemCount: 2,
             assignedDateTime: new Date('2026-01-30T09:00:00'),
             warehouse: 'WH-HCM-01',
             customerOrSupplier: 'Tech Supplies Vietnam',
-            progress: 14,
+            progress: 0,
         },
         {
             id: '3',
             type: 'outbound',
-            orderNumber: 'OUT-2026-003',
-            orderId: '3',
+            orderNumber: 'OUT-2026-002',
+            orderId: 'out-002',
             status: 'pending',
             priority: 'medium',
-            itemCount: 5,
+            itemCount: 2,
             assignedDateTime: new Date('2026-01-30T08:00:00'),
             warehouse: 'WH-HCM-01',
             customerOrSupplier: 'XYZ Retail Ltd.',
@@ -54,10 +55,10 @@ export default function TasksScreen() {
             id: '4',
             type: 'putaway',
             orderNumber: 'PUT-2026-001',
-            orderId: '4',
+            orderId: 'put-001',
             status: 'pending',
             priority: 'low',
-            itemCount: 12,
+            itemCount: 2,
             assignedDateTime: new Date('2026-01-30T07:00:00'),
             warehouse: 'WH-HCM-01',
             location: 'Zone A',
@@ -66,10 +67,10 @@ export default function TasksScreen() {
             id: '5',
             type: 'count',
             orderNumber: 'CNT-2026-001',
-            orderId: '5',
+            orderId: 'cnt-001',
             status: 'completed',
             priority: 'high',
-            itemCount: 45,
+            itemCount: 3,
             assignedDateTime: new Date('2026-01-29T15:00:00'),
             warehouse: 'WH-HCM-01',
             location: 'Zone C',
@@ -113,14 +114,14 @@ export default function TasksScreen() {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <SafeAreaHeader backgroundColor="#fff" style={styles.header}>
                 <View>
                     <Text style={styles.title}>Nhiệm Vụ Của Tôi</Text>
                     <Text style={styles.subtitle}>
                         {summary.total} tasks • {summary.inProgress} đang làm • {summary.pending} chờ xử lý
                     </Text>
                 </View>
-            </View>
+            </SafeAreaHeader>
 
             {/* Summary Cards and Filter */}
             <View style={styles.summaryAndFilterContainer}>
@@ -183,11 +184,6 @@ const styles = StyleSheet.create({
     },
     header: {
         backgroundColor: '#fff',
-        paddingTop: 60,
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
     },
     title: {
         fontSize: 28,

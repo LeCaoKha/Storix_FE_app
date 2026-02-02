@@ -1,11 +1,12 @@
 import { Card } from '@/components/ui/Card';
+import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { COLORS } from '@/constants/color';
 import { useOutboundOrders } from '@/contexts/OutboundOrderContext';
 import { OutboundStatus } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const STATUS_CONFIG: Record<OutboundStatus, { label: string; color: string; bgColor: string }> = {
     open: { label: 'Mới tạo', color: '#3B82F6', bgColor: '#DBEAFE' },
@@ -52,16 +53,12 @@ export default function OutboundOrderDetailScreen() {
 
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
             {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Feather name="arrow-left" size={24} color={COLORS.text} />
-                </TouchableOpacity>
-                <View style={styles.headerContent}>
-                    <Text style={styles.headerTitle}>Chi Tiết Đơn Xuất</Text>
-                    <Text style={styles.headerSubtitle}>{order.outboundNumber}</Text>
-                </View>
-            </View>
+            <SafeAreaHeader backgroundColor="#fff" showBackButton style={styles.header}>
+                <Text style={styles.headerTitle}>Chi Tiết Đơn Xuất</Text>
+                <Text style={styles.headerSubtitle}>{order.outboundNumber}</Text>
+            </SafeAreaHeader>
 
             <ScrollView style={styles.content}>
                 {/* Status Card */}
@@ -227,20 +224,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        paddingTop: 60,
-        paddingHorizontal: 20,
         paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    backButton: {
-        marginRight: 12,
-    },
-    headerContent: {
-        flex: 1,
     },
     headerTitle: {
         fontSize: 18,

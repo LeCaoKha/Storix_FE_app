@@ -1,11 +1,12 @@
 import { RequisitionCard } from '@/components/requisitions/RequisitionCard';
+import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { COLORS } from '@/constants/color';
 import { useRequisitions } from '@/contexts/RequisitionContext';
 import type { RequisitionStatus } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type TabType = 'all' | RequisitionStatus;
 
@@ -47,13 +48,14 @@ export default function RequisitionsScreen() {
     };
 
     const handleRequisitionPress = (id: string) => {
-        router.push(`/manager/requisitions/${id}`);
+        router.push(`/manager/requisitions/${id}` as any);
     };
 
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
             {/* Header */}
-            <View style={styles.header}>
+            <SafeAreaHeader backgroundColor="#fff" style={styles.header}>
                 <View style={styles.headerTop}>
                     <View>
                         <Text style={styles.title}>Phiếu Đề Xuất</Text>
@@ -115,7 +117,7 @@ export default function RequisitionsScreen() {
                         );
                     })}
                 </ScrollView>
-            </View>
+            </SafeAreaHeader>
 
             {/* Requisitions List */}
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
@@ -160,10 +162,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
     },
     header: {
-        backgroundColor: '#fff',
-        paddingTop: 60,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        paddingBottom: 0,
     },
     headerTop: {
         flexDirection: 'row',

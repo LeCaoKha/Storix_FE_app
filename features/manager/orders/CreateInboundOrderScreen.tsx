@@ -1,12 +1,12 @@
 import { Card } from '@/components/ui/Card';
+import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { COLORS } from '@/constants/color';
 import { useInboundOrders } from '@/contexts/InboundOrderContext';
 import { useRequisitions } from '@/contexts/RequisitionContext';
 import { InboundOrder } from '@/types/inbound-order';
-import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateInboundOrderScreen() {
     const router = useRouter();
@@ -83,14 +83,11 @@ export default function CreateInboundOrderScreen() {
 
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
             {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Feather name="arrow-left" size={24} color={COLORS.text} />
-                </TouchableOpacity>
+            <SafeAreaHeader backgroundColor="#fff" showBackButton style={styles.header}>
                 <Text style={styles.title}>Tạo Đơn Nhập Kho</Text>
-                <View style={{ width: 24 }} />
-            </View>
+            </SafeAreaHeader>
 
             <ScrollView style={styles.content}>
                 {requisition && (
@@ -185,18 +182,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
     },
     header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        paddingTop: 60,
         paddingHorizontal: 20,
         paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    backButton: {
-        padding: 4,
     },
     title: {
         fontSize: 18,

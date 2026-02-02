@@ -15,11 +15,14 @@ export function TaskCard({ task }: TaskCardProps) {
 
     const handlePress = () => {
         if (task.type === 'outbound') {
-            router.push('/outbound-order' as any);
+            router.push(`/staff/outbound/${task.orderId}` as any);
         } else if (task.type === 'inbound') {
-            router.push('/inbound-order' as any);
+            router.push(`/staff/inbound/${task.orderId}` as any);
+        } else if (task.type === 'putaway') {
+            router.push(`/staff/putaway/${task.orderId}` as any);
+        } else if (task.type === 'count') {
+            router.push(`/staff/count/${task.orderId}` as any);
         }
-        // For putaway and count, we'll need to create those screens later
     };
 
     const getTaskTypeConfig = (type: Task['type']) => {

@@ -119,7 +119,7 @@ export default function OutboundOrdersScreen() {
                         return (
                             <TouchableOpacity
                                 key={order.id}
-                                onPress={() => router.push(`/manager/orders/outbound/${order.id}`)}
+                                onPress={() => router.push(`/manager/orders/outbound/${order.id}` as any)}
                             >
                                 <Card style={styles.orderCard}>
                                     <View style={styles.cardHeader}>

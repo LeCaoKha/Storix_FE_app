@@ -38,6 +38,9 @@ export default function RootLayout() {
                 {/* Manager screens */}
                 <Stack.Screen name="manager" options={{ headerShown: false }} />
 
+                {/* Staff screens */}
+                <Stack.Screen name="staff" options={{ headerShown: false }} />
+
               </Stack>
               <StatusBar style="auto" />
             </ThemeProvider>
