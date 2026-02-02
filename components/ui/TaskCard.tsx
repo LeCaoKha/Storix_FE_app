@@ -29,31 +29,27 @@ export function TaskCard({ task }: TaskCardProps) {
         switch (type) {
             case 'outbound':
                 return {
-                    label: 'Xuất Kho',
+                    label: 'OUTBOUND',
                     icon: 'arrow-up-circle',
                     color: '#EF4444',
-                    bgColor: '#FEE2E2',
                 };
             case 'inbound':
                 return {
-                    label: 'Nhập Kho',
+                    label: 'INBOUND',
                     icon: 'arrow-down-circle',
                     color: '#10B981',
-                    bgColor: '#D1FAE5',
                 };
             case 'putaway':
                 return {
-                    label: 'Xếp Hàng',
+                    label: 'PUTAWAY',
                     icon: 'package',
                     color: '#3B82F6',
-                    bgColor: '#DBEAFE',
                 };
             case 'count':
                 return {
-                    label: 'Kiểm Kê',
+                    label: 'COUNT',
                     icon: 'clipboard',
                     color: '#F59E0B',
-                    bgColor: '#FEF3C7',
                 };
         }
     };
@@ -61,60 +57,54 @@ export function TaskCard({ task }: TaskCardProps) {
     const getStatusConfig = (status: Task['status']) => {
         switch (status) {
             case 'pending':
-                return { label: 'Chờ xử lý', color: COLORS.textMuted };
+                return { label: 'Pending', color: '#B45309', bgColor: '#FEF3C7' };
             case 'in_progress':
-                return { label: 'Đang thực hiện', color: '#F59E0B' };
+                return { label: 'In Progress', color: '#0D9488', bgColor: '#CCFBF1' };
             case 'completed':
-                return { label: 'Hoàn thành', color: '#10B981' };
+                return { label: 'Completed', color: '#065F46', bgColor: '#D1FAE5' };
         }
     };
 
     const typeConfig = getTaskTypeConfig(task.type);
     const statusConfig = getStatusConfig(task.status);
 
+    // Format date: dd/m/yyyy to match image
+    const date = new Date(task.assignedDateTime);
+    const formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+
     return (
         <TouchableOpacity onPress={handlePress} style={styles.container}>
-            <View style={[styles.typeIndicator, { backgroundColor: typeConfig.bgColor }]}>
-                <Feather name={typeConfig.icon as any} size={20} color={typeConfig.color} />
-                <Text style={[styles.typeLabel, { color: typeConfig.color }]}>{typeConfig.label}</Text>
+            <View style={styles.header}>
+                <View style={styles.typeContainer}>
+                    <Feather name={typeConfig.icon as any} size={18} color={typeConfig.color} />
+                    <Text style={[styles.typeLabel, { color: typeConfig.color }]}>{typeConfig.label}</Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                    <Text style={[styles.statusText, { color: statusConfig.color }]}>{statusConfig.label}</Text>
+                </View>
             </View>
 
             <View style={styles.content}>
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <Text style={styles.orderNumber}>{task.orderNumber}</Text>
-                        {task.customerOrSupplier && (
-                            <Text style={styles.customerOrSupplier}>{task.customerOrSupplier}</Text>
-                        )}
-                    </View>
-                </View>
+                <Text style={styles.orderNumber}>{task.orderNumber}</Text>
+                {task.customerOrSupplier && (
+                    <Text style={styles.customerOrSupplier}>{task.customerOrSupplier}</Text>
+                )}
+            </View>
 
-                <View style={styles.meta}>
+            <View style={styles.divider} />
+
+            <View style={styles.footer}>
+                <View style={styles.footerInfo}>
                     <View style={styles.metaItem}>
-                        <Feather name="package" size={14} color={COLORS.textMuted} />
+                        <Feather name="package" size={16} color={COLORS.textMuted} />
                         <Text style={styles.metaText}>{task.itemCount} items</Text>
                     </View>
                     <View style={styles.metaItem}>
-                        <Feather name="home" size={14} color={COLORS.textMuted} />
-                        <Text style={styles.metaText}>{task.warehouse}</Text>
+                        <Feather name="clock" size={16} color={COLORS.textMuted} />
+                        <Text style={styles.metaText}>{formattedDate}</Text>
                     </View>
                 </View>
-
-                {task.progress !== undefined && task.status === 'in_progress' && (
-                    <View style={styles.progressContainer}>
-                        <View style={styles.progressBar}>
-                            <View style={[styles.progressFill, { width: `${task.progress}%` }]} />
-                        </View>
-                        <Text style={styles.progressText}>{Math.round(task.progress)}%</Text>
-                    </View>
-                )}
-
-                <View style={styles.footer}>
-                    <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '20' }]}>
-                        <Text style={[styles.statusText, { color: statusConfig.color }]}>{statusConfig.label}</Text>
-                    </View>
-                    <Feather name="chevron-right" size={18} color={COLORS.textMuted} />
-                </View>
+                <Feather name="chevron-right" size={18} color={COLORS.textMuted} />
             </View>
         </TouchableOpacity>
     );
@@ -123,54 +113,69 @@ export function TaskCard({ task }: TaskCardProps) {
 const styles = StyleSheet.create({
     container: {
         backgroundColor: '#fff',
-        borderRadius: 12,
-        marginBottom: 12,
-        overflow: 'hidden',
+        borderRadius: 16,
+        marginBottom: 16,
+        padding: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    typeIndicator: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-    },
-    typeLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        textTransform: 'uppercase',
-    },
-    content: {
-        padding: 16,
-        paddingTop: 12,
+        shadowRadius: 10,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         marginBottom: 12,
     },
-    headerLeft: {
-        flex: 1,
+    typeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    typeLabel: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        letterSpacing: 0.5,
+    },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    statusText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    content: {
+        marginBottom: 16,
     },
     orderNumber: {
-        fontSize: 18,
+        fontSize: 22,
         fontWeight: 'bold',
         color: COLORS.text,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     customerOrSupplier: {
-        fontSize: 13,
+        fontSize: 14,
         color: COLORS.textMuted,
+        fontWeight: '400',
     },
-    meta: {
+    divider: {
+        height: 1,
+        backgroundColor: '#F3F4F6',
+        marginBottom: 12,
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    footerInfo: {
         flexDirection: 'row',
         gap: 16,
-        marginBottom: 12,
     },
     metaItem: {
         flexDirection: 'row',
@@ -178,49 +183,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     metaText: {
-        fontSize: 12,
+        fontSize: 14,
         color: COLORS.textMuted,
-    },
-    progressContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 12,
-    },
-    progressBar: {
-        flex: 1,
-        height: 6,
-        backgroundColor: COLORS.background,
-        borderRadius: 3,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        backgroundColor: COLORS.primary,
-        borderRadius: 3,
-    },
-    progressText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: COLORS.text,
-        width: 40,
-        textAlign: 'right',
-    },
-    footer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-    },
-    statusBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    statusText: {
-        fontSize: 12,
-        fontWeight: '600',
     },
 });

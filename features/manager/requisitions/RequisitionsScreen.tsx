@@ -1,5 +1,4 @@
 import { RequisitionCard } from '@/components/requisitions/RequisitionCard';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { COLORS } from '@/constants/color';
 import { useRequisitions } from '@/contexts/RequisitionContext';
 import type { RequisitionStatus } from '@/types/requisition';
@@ -55,7 +54,7 @@ export default function RequisitionsScreen() {
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
             {/* Header */}
-            <SafeAreaHeader backgroundColor="#fff" style={styles.header}>
+            <View style={styles.header}>
                 <View style={styles.headerTop}>
                     <View>
                         <Text style={styles.title}>Phiếu Đề Xuất</Text>
@@ -117,9 +116,7 @@ export default function RequisitionsScreen() {
                         );
                     })}
                 </ScrollView>
-            </SafeAreaHeader>
-
-            {/* Requisitions List */}
+                </View>
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
                 {filteredRequisitions.length === 0 ? (
                     <View style={styles.emptyState}>
@@ -162,6 +159,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
     },
     header: {
+        backgroundColor: '#fff',
         paddingBottom: 0,
     },
     headerTop: {
@@ -169,10 +167,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         paddingHorizontal: 20,
+        paddingTop: 60,
         marginBottom: 16,
     },
     title: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: 'bold',
         color: COLORS.text,
         marginBottom: 4,

@@ -1,3 +1,4 @@
+import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { COLORS } from '@/constants/color';
 import InboundOrdersScreen from '@/features/manager/orders/InboundOrdersScreen';
 import OutboundOrdersScreen from '@/features/manager/orders/OutboundOrdersScreen';
@@ -9,25 +10,27 @@ export default function OrdersScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Tab Header */}
-            <View style={styles.tabHeader}>
-                <TouchableOpacity
-                    style={[styles.tabButton, activeTab === 'inbound' && styles.tabButtonActive]}
-                    onPress={() => setActiveTab('inbound')}
-                >
-                    <Text style={[styles.tabButtonText, activeTab === 'inbound' && styles.tabButtonTextActive]}>
-                        Đơn Nhập Kho
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tabButton, activeTab === 'outbound' && styles.tabButtonActive]}
-                    onPress={() => setActiveTab('outbound')}
-                >
-                    <Text style={[styles.tabButtonText, activeTab === 'outbound' && styles.tabButtonTextActive]}>
-                        Đơn Xuất Kho
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            {/* Tab Header with SafeArea */}
+            <SafeAreaHeader backgroundColor="#fff" style={styles.tabHeader}>
+                <View style={styles.headerContent}>
+                    <TouchableOpacity
+                        style={[styles.tabButton, activeTab === 'inbound' && styles.tabButtonActive]}
+                        onPress={() => setActiveTab('inbound')}
+                    >
+                        <Text style={[styles.tabButtonText, activeTab === 'inbound' && styles.tabButtonTextActive]}>
+                            Đơn Nhập Kho
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tabButton, activeTab === 'outbound' && styles.tabButtonActive]}
+                        onPress={() => setActiveTab('outbound')}
+                    >
+                        <Text style={[styles.tabButtonText, activeTab === 'outbound' && styles.tabButtonTextActive]}>
+                            Đơn Xuất Kho
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaHeader>
 
             {/* Tab Content */}
             {activeTab === 'inbound' ? <InboundOrdersScreen /> : <OutboundOrdersScreen />}
@@ -41,12 +44,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
     },
     tabHeader: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        paddingTop: 60,
-        paddingHorizontal: 20,
+        paddingBottom: 0,
+        paddingHorizontal: 0, // Remove default padding since tab buttons handle it
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
+    },
+    headerContent: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
     },
     tabButton: {
         flex: 1,

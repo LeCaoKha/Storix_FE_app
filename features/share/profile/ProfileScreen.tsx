@@ -4,6 +4,7 @@ import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
+import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { COLORS } from '@/constants/color';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -83,131 +84,130 @@ export default function ProfileScreen() {
     ];
 
     return (
-        <ScrollView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
+        <View style={styles.container}>
+            <SafeAreaHeader backgroundColor="#fff" style={styles.safeHeader}>
                 <Text style={styles.headerTitle}>Account</Text>
-            </View>
+            </SafeAreaHeader>
 
-            <View style={styles.content}>
-                {/* Profile Card */}
-                <Card style={styles.profileCard}>
-                    <View style={styles.avatarContainer}>
-                        <View style={styles.avatar}>
-                            <Feather name="user" size={40} color={COLORS.primary} />
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.content}>
+                    {/* Profile Card */}
+                    <Card style={styles.profileCard}>
+                        <View style={styles.avatarContainer}>
+                            <View style={styles.avatar}>
+                                <Feather name="user" size={40} color={COLORS.primary} />
+                            </View>
+                            <TouchableOpacity style={styles.editAvatarButton}>
+                                <Feather name="camera" size={16} color="#fff" />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity style={styles.editAvatarButton}>
-                            <Feather name="camera" size={16} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
 
-                    <Text style={styles.userName}>{userData.name}</Text>
-                    <Text style={styles.userRole}>{userData.role === 'staff' ? 'Warehouse Staff' : 'Warehouse Manager'}</Text>
+                        <Text style={styles.userName}>{userData.name}</Text>
+                        <Text style={styles.userRole}>{userData.role === 'staff' ? 'Warehouse Staff' : 'Warehouse Manager'}</Text>
 
-                    <View style={styles.userStats}>
-                        <View style={styles.statItem}>
-                            <Feather name="package" size={20} color={COLORS.primary} />
-                            <Text style={styles.statValue}>127</Text>
-                            <Text style={styles.statLabel}>Completed</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Feather name="clock" size={20} color={COLORS.primary} />
-                            <Text style={styles.statValue}>95%</Text>
-                            <Text style={styles.statLabel}>Efficiency</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Feather name="award" size={20} color={COLORS.primary} />
-                            <Text style={styles.statValue}>12</Text>
-                            <Text style={styles.statLabel}>Months</Text>
-                        </View>
-                    </View>
-                </Card>
-
-                {/* User Information */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Employee Information</Text>
-                    <Card>
-                        <View style={styles.infoRow}>
-                            <Feather name="credit-card" size={18} color={COLORS.textMuted} />
-                            <View style={styles.infoContent}>
-                                <Text style={styles.infoLabel}>Employee ID</Text>
-                                <Text style={styles.infoValue}>{userData.employeeId}</Text>
+                        <View style={styles.userStats}>
+                            <View style={styles.statItem}>
+                                <Feather name="package" size={20} color={COLORS.primary} />
+                                <Text style={styles.statValue}>127</Text>
+                                <Text style={styles.statLabel}>Completed</Text>
                             </View>
-                        </View>
-                        <View style={styles.divider} />
-                        <View style={styles.infoRow}>
-                            <Feather name="mail" size={18} color={COLORS.textMuted} />
-                            <View style={styles.infoContent}>
-                                <Text style={styles.infoLabel}>Email</Text>
-                                <Text style={styles.infoValue}>{userData.email}</Text>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Feather name="clock" size={20} color={COLORS.primary} />
+                                <Text style={styles.statValue}>95%</Text>
+                                <Text style={styles.statLabel}>Efficiency</Text>
                             </View>
-                        </View>
-                        <View style={styles.divider} />
-                        <View style={styles.infoRow}>
-                            <Feather name="phone" size={18} color={COLORS.textMuted} />
-                            <View style={styles.infoContent}>
-                                <Text style={styles.infoLabel}>Phone</Text>
-                                <Text style={styles.infoValue}>{userData.phone}</Text>
-                            </View>
-                        </View>
-                        <View style={styles.divider} />
-                        <View style={styles.infoRow}>
-                            <Feather name="home" size={18} color={COLORS.textMuted} />
-                            <View style={styles.infoContent}>
-                                <Text style={styles.infoLabel}>Warehouse</Text>
-                                <Text style={styles.infoValue}>{userData.warehouse}</Text>
-                            </View>
-                        </View>
-                        <View style={styles.divider} />
-                        <View style={styles.infoRow}>
-                            <Feather name="calendar" size={18} color={COLORS.textMuted} />
-                            <View style={styles.infoContent}>
-                                <Text style={styles.infoLabel}>Join Date</Text>
-                                <Text style={styles.infoValue}>{userData.joinDate}</Text>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Feather name="award" size={20} color={COLORS.primary} />
+                                <Text style={styles.statValue}>12</Text>
+                                <Text style={styles.statLabel}>Months</Text>
                             </View>
                         </View>
                     </Card>
+
+                    {/* Employee Information */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Employee Information</Text>
+                        <Card>
+                            <View style={styles.infoRow}>
+                                <Feather name="credit-card" size={18} color={COLORS.textMuted} />
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Employee ID</Text>
+                                    <Text style={styles.infoValue}>{userData.employeeId}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.infoRow}>
+                                <Feather name="mail" size={18} color={COLORS.textMuted} />
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Email</Text>
+                                    <Text style={styles.infoValue}>{userData.email}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.infoRow}>
+                                <Feather name="phone" size={18} color={COLORS.textMuted} />
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Phone</Text>
+                                    <Text style={styles.infoValue}>{userData.phone}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.infoRow}>
+                                <Feather name="home" size={18} color={COLORS.textMuted} />
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Warehouse</Text>
+                                    <Text style={styles.infoValue}>{userData.warehouse}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.infoRow}>
+                                <Feather name="calendar" size={18} color={COLORS.textMuted} />
+                                <View style={styles.infoContent}>
+                                    <Text style={styles.infoLabel}>Join Date</Text>
+                                    <Text style={styles.infoValue}>{userData.joinDate}</Text>
+                                </View>
+                            </View>
+                        </Card>
+                    </View>
+
+                    {/* Settings Menu */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Settings</Text>
+                        <Card style={styles.menuCard}>
+                            {menuItems.map((item, index) => (
+                                <React.Fragment key={index}>
+                                    <TouchableOpacity
+                                        style={styles.menuItem}
+                                        onPress={item.onPress}
+                                    >
+                                        <View style={styles.menuIconContainer}>
+                                            <Feather name={item.icon as any} size={20} color={COLORS.primary} />
+                                        </View>
+                                        <View style={styles.menuContent}>
+                                            <Text style={styles.menuTitle}>{item.title}</Text>
+                                            <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                                        </View>
+                                        <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+                                    </TouchableOpacity>
+                                    {index < menuItems.length - 1 && <View style={styles.divider} />}
+                                </React.Fragment>
+                            ))}
+                        </Card>
+                    </View>
+
+                    {/* Logout Button */}
+                    <TouchableOpacity
+                        style={styles.logoutButton}
+                        onPress={handleLogout}
+                    >
+                        <Feather name="log-out" size={20} color="#EF4444" />
+                        <Text style={styles.logoutText}>Logout</Text>
+                    </TouchableOpacity>
                 </View>
-
-                {/* Settings Menu */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Settings</Text>
-                    <Card style={styles.menuCard}>
-                        {menuItems.map((item, index) => (
-                            <React.Fragment key={index}>
-                                <TouchableOpacity
-                                    style={styles.menuItem}
-                                    onPress={item.onPress}
-                                >
-                                    <View style={styles.menuIconContainer}>
-                                        <Feather name={item.icon as any} size={20} color={COLORS.primary} />
-                                    </View>
-                                    <View style={styles.menuContent}>
-                                        <Text style={styles.menuTitle}>{item.title}</Text>
-                                        <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                                    </View>
-                                    <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
-                                </TouchableOpacity>
-                                {index < menuItems.length - 1 && <View style={styles.divider} />}
-                            </React.Fragment>
-                        ))}
-                    </Card>
-                </View>
-
-                {/* Logout Button */}
-                <TouchableOpacity
-                    style={styles.logoutButton}
-                    onPress={handleLogout}
-                >
-                    <Feather name="log-out" size={20} color="#EF4444" />
-                    <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={{ height: 40 }} />
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 }
 
@@ -216,11 +216,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f5f5f5',
     },
-    header: {
-        backgroundColor: '#fff',
-        paddingTop: 60,
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+    safeHeader: {
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },
@@ -228,6 +224,9 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
         color: COLORS.text,
+    },
+    scrollContent: {
+        paddingBottom: 40,
     },
     content: {
         padding: 20,

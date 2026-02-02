@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HorizontalFilterBar, type FilterOption } from '@/components/ui/HorizontalFilterBar';
 import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
@@ -20,7 +20,7 @@ export default function TasksScreen() {
             orderId: 'out-001',
             status: 'in_progress',
             priority: 'high',
-            itemCount: 2,
+            itemCount: 3,
             assignedDateTime: new Date('2026-01-30T10:00:00'),
             warehouse: 'WH-HCM-01',
             customerOrSupplier: 'ABC Electronics Co.',
@@ -33,7 +33,7 @@ export default function TasksScreen() {
             orderId: 'inb-002',
             status: 'in_progress',
             priority: 'medium',
-            itemCount: 2,
+            itemCount: 3,
             assignedDateTime: new Date('2026-01-30T09:00:00'),
             warehouse: 'WH-HCM-01',
             customerOrSupplier: 'Tech Supplies Vietnam',
@@ -42,39 +42,51 @@ export default function TasksScreen() {
         {
             id: '3',
             type: 'outbound',
-            orderNumber: 'OUT-2026-002',
-            orderId: 'out-002',
+            orderNumber: 'OUT-2026-003',
+            orderId: 'out-003',
             status: 'pending',
             priority: 'medium',
-            itemCount: 2,
+            itemCount: 5,
             assignedDateTime: new Date('2026-01-30T08:00:00'),
             warehouse: 'WH-HCM-01',
             customerOrSupplier: 'XYZ Retail Ltd.',
         },
         {
             id: '4',
+            type: 'count',
+            orderNumber: 'CNT-2026-001',
+            orderId: 'cnt-001',
+            status: 'in_progress',
+            priority: 'high',
+            itemCount: 3,
+            assignedDateTime: new Date('2026-01-31T14:00:00'),
+            warehouse: 'WH-HCM-01',
+            location: 'Zone A - Rack 04',
+        },
+        {
+            id: '5',
+            type: 'inbound',
+            orderNumber: 'IN-2026-004',
+            orderId: 'inb-004',
+            status: 'completed',
+            priority: 'low',
+            itemCount: 8,
+            assignedDateTime: new Date('2026-01-29T07:00:00'),
+            warehouse: 'WH-HCM-01',
+            customerOrSupplier: 'Global Imports Inc.',
+            progress: 100,
+        },
+        {
+            id: '6',
             type: 'putaway',
             orderNumber: 'PUT-2026-001',
             orderId: 'put-001',
             status: 'pending',
             priority: 'low',
-            itemCount: 2,
-            assignedDateTime: new Date('2026-01-30T07:00:00'),
+            itemCount: 12,
+            assignedDateTime: new Date('2026-01-28T15:00:00'),
             warehouse: 'WH-HCM-01',
-            location: 'Zone A',
-        },
-        {
-            id: '5',
-            type: 'count',
-            orderNumber: 'CNT-2026-001',
-            orderId: 'cnt-001',
-            status: 'completed',
-            priority: 'high',
-            itemCount: 3,
-            assignedDateTime: new Date('2026-01-29T15:00:00'),
-            warehouse: 'WH-HCM-01',
-            location: 'Zone C',
-            progress: 100,
+            location: 'Zone B - Rack 12',
         },
     ];
 
@@ -115,32 +127,33 @@ export default function TasksScreen() {
         <View style={styles.container}>
             {/* Header */}
             <SafeAreaHeader backgroundColor="#fff" style={styles.header}>
-                <View>
-                    <Text style={styles.title}>Nhiệm Vụ Của Tôi</Text>
-                    <Text style={styles.subtitle}>
-                        {summary.total} tasks • {summary.inProgress} đang làm • {summary.pending} chờ xử lý
-                    </Text>
-                </View>
+                <Text style={styles.title}>Nhiệm Vụ Của Tôi</Text>
             </SafeAreaHeader>
 
             {/* Summary Cards and Filter */}
             <View style={styles.summaryAndFilterContainer}>
                 <View style={styles.summaryContainer}>
-                    <View style={[styles.summaryCard, { backgroundColor: '#FEF3C7' }]}>
-                        <Feather name="clock" size={20} color="#F59E0B" />
+                    <TouchableOpacity
+                        style={[styles.summaryCard, { backgroundColor: '#FFFBEB' }]}
+                        activeOpacity={0.7}
+                    >
                         <Text style={[styles.summaryNumber, { color: '#F59E0B' }]}>{summary.pending}</Text>
                         <Text style={styles.summaryLabel}>Chờ xử lý</Text>
-                    </View>
-                    <View style={[styles.summaryCard, { backgroundColor: '#DBEAFE' }]}>
-                        <Feather name="activity" size={20} color="#3B82F6" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.summaryCard, { backgroundColor: '#EFF6FF' }]}
+                        activeOpacity={0.7}
+                    >
                         <Text style={[styles.summaryNumber, { color: '#3B82F6' }]}>{summary.inProgress}</Text>
                         <Text style={styles.summaryLabel}>Đang làm</Text>
-                    </View>
-                    <View style={[styles.summaryCard, { backgroundColor: '#D1FAE5' }]}>
-                        <Feather name="check-circle" size={20} color="#10B981" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.summaryCard, { backgroundColor: '#F0FDF4' }]}
+                        activeOpacity={0.7}
+                    >
                         <Text style={[styles.summaryNumber, { color: '#10B981' }]}>{summary.completed}</Text>
                         <Text style={styles.summaryLabel}>Hoàn thành</Text>
-                    </View>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Filter Tabs */}
@@ -201,23 +214,28 @@ const styles = StyleSheet.create({
     summaryContainer: {
         flexDirection: 'row',
         paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 12,
-        gap: 12,
+        paddingTop: 8,
+        paddingBottom: 16,
+        gap: 10,
     },
     summaryCard: {
         flex: 1,
-        padding: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 4,
         borderRadius: 12,
         alignItems: 'center',
-        gap: 2,
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'transparent',
     },
     summaryNumber: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: 'bold',
+        marginBottom: 2,
     },
     summaryLabel: {
         fontSize: 11,
+        fontWeight: '500',
         color: COLORS.textMuted,
         textAlign: 'center',
     },

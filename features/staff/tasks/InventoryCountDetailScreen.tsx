@@ -29,7 +29,9 @@ export default function InventoryCountDetailScreen() {
     const [isProcessing, setIsProcessing] = useState(false);
 
     const handleCountChange = (itemId: string, value: string) => {
-        setCounts(prev => ({ ...prev, [itemId]: value }));
+        // Only allow numbers
+        const cleanValue = value.replace(/[^0-9]/g, '');
+        setCounts(prev => ({ ...prev, [itemId]: cleanValue }));
     };
 
     const handleConfirmItem = (item: typeof mockTask.items[0]) => {
@@ -73,24 +75,39 @@ export default function InventoryCountDetailScreen() {
             <StatusBar barStyle="dark-content" />
             <SafeAreaHeader showBackButton backgroundColor="#fff" style={styles.header}>
                 <View>
-                    <Text style={styles.headerTitle}>Kiểm kê (Inventory Count)</Text>
+                    <Text style={styles.headerTitle}>Kiểm kê (Physical Count)</Text>
                     <Text style={styles.headerSubtitle}>{mockTask.taskNumber}</Text>
                 </View>
             </SafeAreaHeader>
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
-                        <Feather name="layers" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Vị trí: <Text style={styles.boldText}>{mockTask.location}</Text></Text>
+                        <View style={styles.infoIconContainer}>
+                            <Feather name="map-pin" size={16} color={COLORS.primary} />
+                        </View>
+                        <View>
+                            <Text style={styles.infoLabel}>Vị trí đếm</Text>
+                            <Text style={styles.infoValue}>{mockTask.location}</Text>
+                        </View>
                     </View>
+                    <View style={styles.divider} />
                     <View style={styles.infoRow}>
-                        <Feather name="calendar" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Ngày: <Text style={styles.boldText}>{mockTask.date}</Text></Text>
+                        <View style={styles.infoIconContainer}>
+                            <Feather name="calendar" size={16} color={COLORS.primary} />
+                        </View>
+                        <View>
+                            <Text style={styles.infoLabel}>Ngày thực hiện</Text>
+                            <Text style={styles.infoValue}>{mockTask.date}</Text>
+                        </View>
                     </View>
+
                     <View style={styles.blindCountingBox}>
-                        <Feather name="eye-off" size={16} color="#B45309" />
-                        <Text style={styles.blindCountingText}>Đang bật chế độ Blind Count: Vui lòng đếm thực tế trước khi xem số liệu hệ thống.</Text>
+                        <View style={styles.blindHeader}>
+                            <Feather name="eye-off" size={14} color="#B45309" />
+                            <Text style={styles.blindTitle}>Chế độ Blind Count đang bật</Text>
+                        </View>
+                        <Text style={styles.blindCountingText}>Bạn cần nhập số lượng đếm thực tế trước khi hệ thống hiển thị số liệu tồn kho đối soát.</Text>
                     </View>
                 </Card>
 
@@ -104,18 +121,25 @@ export default function InventoryCountDetailScreen() {
                     const diff = count - item.systemQty;
 
                     return (
-                        <Card key={item.id} style={styles.itemCard}>
+                        <Card key={item.id} style={[styles.itemCard, isRevealed && styles.itemCardRevealed]}>
                             <View style={styles.itemHeader}>
                                 <View style={styles.itemInfo}>
                                     <Text style={styles.productName}>{item.productName}</Text>
-                                    <Text style={styles.skuText}>SKU: {item.sku}</Text>
+                                    <View style={styles.skuBadge}>
+                                        <Text style={styles.skuText}>{item.sku}</Text>
+                                    </View>
                                 </View>
                                 {isRevealed && (
                                     <View style={[styles.diffBadge, {
-                                        backgroundColor: diff === 0 ? '#D1FAE5' : '#FEE2E2'
+                                        backgroundColor: diff === 0 ? '#DCFCE7' : '#FEE2E2'
                                     }]}>
+                                        <Feather
+                                            name={diff === 0 ? "check-circle" : (diff > 0 ? "arrow-up" : "arrow-down")}
+                                            size={12}
+                                            color={diff === 0 ? '#166534' : '#991B1B'}
+                                        />
                                         <Text style={[styles.diffBadgeText, {
-                                            color: diff === 0 ? '#059669' : '#DC2626'
+                                            color: diff === 0 ? '#166534' : '#991B1B'
                                         }]}>
                                             {diff === 0 ? 'Khớp' : `${diff > 0 ? '+' : ''}${diff}`}
                                         </Text>
@@ -123,27 +147,29 @@ export default function InventoryCountDetailScreen() {
                                 )}
                             </View>
 
-                            <View style={styles.countRow}>
-                                <View style={styles.countField}>
+                            <View style={styles.countGrid}>
+                                <View style={styles.countColumn}>
                                     <Text style={styles.countLabel}>Số hệ thống</Text>
-                                    <View style={styles.qtyBox}>
+                                    <View style={[styles.qtyBox, isRevealed && styles.qtyBoxRevealed]}>
                                         <Text style={isRevealed ? styles.systemQtyValue : styles.hiddenQtyValue}>
                                             {isRevealed ? item.systemQty : '??'}
                                         </Text>
-                                        {!isRevealed && <Feather name="lock" size={12} color={COLORS.textMuted} />}
+                                        {!isRevealed && <Feather name="lock" size={14} color={COLORS.textMuted} />}
                                     </View>
                                 </View>
 
-                                <View style={styles.countField}>
-                                    <Text style={styles.countLabel}>Số thực đếm</Text>
-                                    <TextInput
-                                        style={[styles.countInput, isRevealed && styles.revealedInput]}
-                                        keyboardType="numeric"
-                                        placeholder="0"
-                                        value={counts[item.id] || ''}
-                                        onChangeText={(v) => handleCountChange(item.id, v)}
-                                        editable={!isRevealed}
-                                    />
+                                <View style={styles.countColumn}>
+                                    <Text style={styles.countLabel}>Thực tế đếm</Text>
+                                    <View style={[styles.inputContainer, isRevealed && styles.inputContainerDisabled]}>
+                                        <TextInput
+                                            style={[styles.countInput, isRevealed && styles.revealedInput]}
+                                            keyboardType="numeric"
+                                            placeholder="0"
+                                            value={counts[item.id] || ''}
+                                            onChangeText={(v) => handleCountChange(item.id, v)}
+                                            editable={!isRevealed}
+                                        />
+                                    </View>
                                 </View>
                             </View>
 
@@ -152,24 +178,28 @@ export default function InventoryCountDetailScreen() {
                                     style={styles.confirmItemBtn}
                                     onPress={() => handleConfirmItem(item)}
                                 >
-                                    <Text style={styles.confirmItemBtnText}>Xác nhận số lượng</Text>
+                                    <Feather name="check" size={18} color="#fff" />
+                                    <Text style={styles.confirmItemBtnText}>Xác nhận kết quả đếm</Text>
                                 </TouchableOpacity>
                             ) : (
                                 <View style={styles.revealedFooter}>
-                                    <Feather name="check" size={16} color="#059669" />
-                                    <Text style={styles.revealedText}>Đã ghi nhận kết quả</Text>
+                                    <View style={styles.checkBadge}>
+                                        <Feather name="check" size={14} color="#059669" />
+                                    </View>
+                                    <Text style={styles.revealedText}>Đã hoàn thành đối soát</Text>
                                 </View>
                             )}
                         </Card>
                     );
                 })}
+                <View style={{ height: 40 }} />
             </ScrollView>
 
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[styles.completeBtn, isProcessing && styles.disabledBtn]}
+                    style={[styles.completeBtn, (isProcessing || !mockTask.items.every(i => revealedItems[i.id])) && styles.disabledBtn]}
                     onPress={handleComplete}
-                    disabled={isProcessing}
+                    disabled={isProcessing || !mockTask.items.every(i => revealedItems[i.id])}
                 >
                     <Text style={styles.completeBtnText}>
                         {isProcessing ? 'Đang lưu...' : 'Hoàn thành đợt kiểm kê'}
@@ -187,6 +217,8 @@ const styles = StyleSheet.create({
     },
     header: {
         backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
         paddingBottom: 16,
     },
     headerTitle: {
@@ -206,151 +238,221 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     infoCard: {
-        marginBottom: 20,
+        marginBottom: 24,
         backgroundColor: '#fff',
-        gap: 8,
+        padding: 16,
+        borderRadius: 16,
     },
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 12,
+        paddingVertical: 4,
     },
-    infoText: {
-        fontSize: 14,
+    infoIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: COLORS.primary + '10',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoLabel: {
+        fontSize: 12,
         color: COLORS.textMuted,
+        marginBottom: 2,
     },
-    boldText: {
-        fontWeight: '600',
+    infoValue: {
+        fontSize: 15,
+        fontWeight: 'bold',
         color: COLORS.text,
     },
+    divider: {
+        height: 1,
+        backgroundColor: '#F3F4F6',
+        marginVertical: 12,
+    },
     blindCountingBox: {
-        flexDirection: 'row',
-        gap: 10,
         backgroundColor: '#FFFBEB',
         padding: 12,
-        borderRadius: 8,
-        marginTop: 4,
+        borderRadius: 12,
+        marginTop: 16,
         borderWidth: 1,
         borderColor: '#FEF3C7',
     },
-    blindCountingText: {
-        flex: 1,
-        fontSize: 12,
+    blindHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 6,
+    },
+    blindTitle: {
+        fontSize: 13,
+        fontWeight: 'bold',
         color: '#B45309',
+    },
+    blindCountingText: {
+        fontSize: 12,
+        color: '#92400E',
         lineHeight: 18,
     },
     sectionHeader: {
-        marginBottom: 12,
+        marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
         color: COLORS.text,
     },
     itemCard: {
-        marginBottom: 12,
+        marginBottom: 16,
         backgroundColor: '#fff',
         padding: 16,
-        borderRadius: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    itemCardRevealed: {
+        borderColor: '#E5E7EB',
+        backgroundColor: '#FBFBFC',
     },
     itemHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 16,
+        marginBottom: 20,
     },
     itemInfo: {
         flex: 1,
     },
     productName: {
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 16,
+        fontWeight: '700',
         color: COLORS.text,
-        marginBottom: 4,
+        marginBottom: 6,
     },
-    skuText: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-    },
-    diffBadge: {
+    skuBadge: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#F3F4F6',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 6,
     },
-    diffBadgeText: {
+    skuText: {
         fontSize: 11,
+        color: COLORS.textMuted,
+        fontWeight: '600',
+    },
+    diffBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    diffBadgeText: {
+        fontSize: 12,
         fontWeight: 'bold',
     },
-    countRow: {
+    countGrid: {
         flexDirection: 'row',
         gap: 16,
-        marginBottom: 16,
+        marginBottom: 20,
     },
-    countField: {
+    countColumn: {
         flex: 1,
     },
     countLabel: {
         fontSize: 12,
         color: COLORS.textMuted,
-        marginBottom: 6,
+        marginBottom: 8,
         fontWeight: '600',
+        textAlign: 'center',
     },
     qtyBox: {
-        height: 44,
+        height: 52,
         backgroundColor: '#F3F4F6',
-        borderRadius: 8,
+        borderRadius: 12,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    qtyBoxRevealed: {
+        backgroundColor: '#fff',
     },
     systemQtyValue: {
-        fontSize: 16,
+        fontSize: 20,
         fontWeight: 'bold',
         color: COLORS.text,
     },
     hiddenQtyValue: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
         color: COLORS.textMuted,
     },
-    countInput: {
-        height: 44,
+    inputContainer: {
+        height: 52,
         backgroundColor: '#fff',
-        borderWidth: 1,
+        borderRadius: 12,
+        borderWidth: 2,
         borderColor: COLORS.primary,
-        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    inputContainerDisabled: {
+        borderColor: '#E5E7EB',
+        backgroundColor: '#F9FAFB',
+    },
+    countInput: {
+        flex: 1,
         paddingHorizontal: 12,
-        fontSize: 16,
+        fontSize: 20,
         fontWeight: 'bold',
         textAlign: 'center',
         color: COLORS.primary,
     },
     revealedInput: {
-        backgroundColor: '#F9FAFB',
-        borderColor: COLORS.border,
         color: COLORS.text,
     },
     confirmItemBtn: {
         backgroundColor: COLORS.primary,
-        paddingVertical: 12,
-        borderRadius: 8,
+        paddingVertical: 14,
+        borderRadius: 12,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     confirmItemBtnText: {
         color: '#fff',
         fontWeight: 'bold',
-        fontSize: 14,
+        fontSize: 15,
     },
     revealedFooter: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 8,
+        gap: 8,
+        paddingVertical: 4,
+    },
+    checkBadge: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#DCFCE7',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     revealedText: {
-        fontSize: 13,
+        fontSize: 14,
         color: '#059669',
         fontWeight: '600',
     },
@@ -358,14 +460,19 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#fff',
         borderTopWidth: 1,
-        borderTopColor: COLORS.border,
+        borderTopColor: '#F3F4F6',
     },
     completeBtn: {
         height: 56,
         backgroundColor: COLORS.primary,
-        borderRadius: 12,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 5,
     },
     completeBtnText: {
         fontSize: 16,
@@ -373,6 +480,8 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
     disabledBtn: {
-        opacity: 0.6,
+        backgroundColor: '#E5E7EB',
+        shadowOpacity: 0,
+        elevation: 0,
     },
 });

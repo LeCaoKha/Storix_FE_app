@@ -18,13 +18,6 @@ export default function ManagerTabLayout() {
             }}
         >
             <Tabs.Screen
-                name="index"
-                options={{
-                    title: "Dashboard",
-                    tabBarIcon: ({ color }) => <Feather name="activity" size={28} color={color} />,
-                }}
-            />
-            <Tabs.Screen
                 name="requisitions"
                 options={{
                     title: "Đề Xuất",
@@ -32,17 +25,10 @@ export default function ManagerTabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="analytics"
+                name="orders"
                 options={{
-                    title: "Analytics",
-                    tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={28} color={color} />,
-                }}
-            />
-            <Tabs.Screen
-                name="team"
-                options={{
-                    title: "Team",
-                    tabBarIcon: ({ color }) => <Feather name="users" size={28} color={color} />,
+                    title: "Orders",
+                    tabBarIcon: ({ color }) => <Feather name="package" size={28} color={color} />,
                 }}
             />
             <Tabs.Screen
