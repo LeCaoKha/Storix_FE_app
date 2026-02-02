@@ -60,6 +60,10 @@ export interface Order {
     notes?: string;
     assignedTo?: string;
 
+    // Requisition Reference
+    requisitionId?: string;
+    requisitionNumber?: string;
+
     // Progress Tracking
     totalQuantity: number;
     pickedQuantity?: number;

@@ -122,31 +122,33 @@ export default function TasksScreen() {
                 </View>
             </View>
 
-            {/* Summary Cards */}
-            <View style={styles.summaryContainer}>
-                <View style={[styles.summaryCard, { backgroundColor: '#FEF3C7' }]}>
-                    <Feather name="clock" size={20} color="#F59E0B" />
-                    <Text style={[styles.summaryNumber, { color: '#F59E0B' }]}>{summary.pending}</Text>
-                    <Text style={styles.summaryLabel}>Chờ xử lý</Text>
+            {/* Summary Cards and Filter */}
+            <View style={styles.summaryAndFilterContainer}>
+                <View style={styles.summaryContainer}>
+                    <View style={[styles.summaryCard, { backgroundColor: '#FEF3C7' }]}>
+                        <Feather name="clock" size={20} color="#F59E0B" />
+                        <Text style={[styles.summaryNumber, { color: '#F59E0B' }]}>{summary.pending}</Text>
+                        <Text style={styles.summaryLabel}>Chờ xử lý</Text>
+                    </View>
+                    <View style={[styles.summaryCard, { backgroundColor: '#DBEAFE' }]}>
+                        <Feather name="activity" size={20} color="#3B82F6" />
+                        <Text style={[styles.summaryNumber, { color: '#3B82F6' }]}>{summary.inProgress}</Text>
+                        <Text style={styles.summaryLabel}>Đang làm</Text>
+                    </View>
+                    <View style={[styles.summaryCard, { backgroundColor: '#D1FAE5' }]}>
+                        <Feather name="check-circle" size={20} color="#10B981" />
+                        <Text style={[styles.summaryNumber, { color: '#10B981' }]}>{summary.completed}</Text>
+                        <Text style={styles.summaryLabel}>Hoàn thành</Text>
+                    </View>
                 </View>
-                <View style={[styles.summaryCard, { backgroundColor: '#DBEAFE' }]}>
-                    <Feather name="activity" size={20} color="#3B82F6" />
-                    <Text style={[styles.summaryNumber, { color: '#3B82F6' }]}>{summary.inProgress}</Text>
-                    <Text style={styles.summaryLabel}>Đang làm</Text>
-                </View>
-                <View style={[styles.summaryCard, { backgroundColor: '#D1FAE5' }]}>
-                    <Feather name="check-circle" size={20} color="#10B981" />
-                    <Text style={[styles.summaryNumber, { color: '#10B981' }]}>{summary.completed}</Text>
-                    <Text style={styles.summaryLabel}>Hoàn thành</Text>
-                </View>
-            </View>
 
-            {/* Filter Tabs */}
-            <HorizontalFilterBar
-                options={filterOptions}
-                activeFilter={activeFilter}
-                onFilterChange={setActiveFilter}
-            />
+                {/* Filter Tabs */}
+                <HorizontalFilterBar
+                    options={filterOptions}
+                    activeFilter={activeFilter}
+                    onFilterChange={setActiveFilter}
+                />
+            </View>
 
             {/* Tasks List */}
             <ScrollView
@@ -197,13 +199,15 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: COLORS.textMuted,
     },
+    summaryAndFilterContainer: {
+        backgroundColor: '#fff',
+    },
     summaryContainer: {
         flexDirection: 'row',
         paddingHorizontal: 20,
         paddingTop: 12,
-        paddingBottom: 0,
+        paddingBottom: 12,
         gap: 12,
-        backgroundColor: '#fff',
     },
     summaryCard: {
         flex: 1,

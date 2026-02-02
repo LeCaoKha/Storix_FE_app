@@ -25,17 +25,24 @@ export default function ManagerTabLayout() {
                 }}
             />
             <Tabs.Screen
+                name="requisitions"
+                options={{
+                    title: "Đề Xuất",
+                    tabBarIcon: ({ color }) => <Feather name="file-text" size={28} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="orders"
+                options={{
+                    title: "Đơn Hàng",
+                    tabBarIcon: ({ color }) => <Feather name="inbox" size={28} color={color} />,
+                }}
+            />
+            <Tabs.Screen
                 name="analytics"
                 options={{
                     title: "Analytics",
                     tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={28} color={color} />,
-                }}
-            />
-            <Tabs.Screen
-                name="team"
-                options={{
-                    title: "Team",
-                    tabBarIcon: ({ color }) => <Feather name="users" size={28} color={color} />,
                 }}
             />
             <Tabs.Screen

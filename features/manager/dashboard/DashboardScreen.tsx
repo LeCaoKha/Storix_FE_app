@@ -1,17 +1,28 @@
 import { Feather } from '@expo/vector-icons';
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import React, { useMemo } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { COLORS } from '@/constants/color';
+import { useRequisitions } from '@/contexts/RequisitionContext';
 
 export default function DashboardScreen() {
-    const stats = [
-        { label: 'Active Orders', value: '48', icon: 'package', color: '#3B82F6', bgColor: '#DBEAFE' },
-        { label: 'Total Staff', value: '23', icon: 'users', color: '#10B981', bgColor: '#D1FAE5' },
-        { label: 'Inventory Items', value: '1,247', icon: 'database', color: '#F59E0B', bgColor: '#FEF3C7' },
-        { label: 'Efficiency', value: '94%', icon: 'trending-up', color: '#8B5CF6', bgColor: '#EDE9FE' },
-    ];
+    const router = useRouter();
+    const { requisitions } = useRequisitions();
+
+    const stats = useMemo(() => {
+        const pending = requisitions.filter(r => r.status === 'pending').length;
+        const approved = requisitions.filter(r => r.status === 'approved' && !r.linkedOrderId).length;
+        const activeOrders = requisitions.filter(r => r.linkedOrderId).length;
+
+        return [
+            { label: 'Đề xuất chờ duyệt', value: String(pending), icon: 'clock', color: '#F59E0B', bgColor: '#FEF3C7' },
+            { label: 'Sẵn sàng tạo đơn', value: String(approved), icon: 'check-circle', color: '#10B981', bgColor: '#D1FAE5' },
+            { label: 'Đơn hàng đã tạo', value: String(activeOrders), icon: 'package', color: '#3B82F6', bgColor: '#DBEAFE' },
+            { label: 'Tổng đề xuất', value: String(requisitions.length), icon: 'file-text', color: '#8B5CF6', bgColor: '#EDE9FE' },
+        ];
+    }, [requisitions]);
 
     const recentActivities = [
         { id: '1', action: 'Order OUT-2026-001 completed', time: '5 min ago', icon: 'check-circle', color: '#10B981' },
@@ -60,6 +71,52 @@ export default function DashboardScreen() {
                             </View>
                         ))}
                     </Card>
+                </View>
+
+                {/* Quick Actions */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
+                    <View style={styles.actionsGrid}>
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => router.push('/manager/requisitions/create')}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#10B98120' }]}>
+                                <Feather name="plus-circle" size={24} color="#10B981" />
+                            </View>
+                            <Text style={styles.actionLabel}>Tạo đề xuất</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => router.push('/(manager-tabs)/requisitions')}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#3B82F620' }]}>
+                                <Feather name="file-text" size={24} color="#3B82F6" />
+                            </View>
+                            <Text style={styles.actionLabel}>Xem đề xuất</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => router.push('/(manager-tabs)/orders')}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#8B5CF620' }]}>
+                                <Feather name="inbox" size={24} color="#8B5CF6" />
+                            </View>
+                            <Text style={styles.actionLabel}>Đơn hàng</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => router.push('/(manager-tabs)/analytics')}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#F59E0B20' }]}>
+                                <Feather name="bar-chart-2" size={24} color="#F59E0B" />
+                            </View>
+                            <Text style={styles.actionLabel}>Thống kê</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
 
@@ -163,5 +220,34 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: COLORS.border,
         marginVertical: 12,
+    },
+    actionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    actionCard: {
+        flex: 1,
+        minWidth: '47%',
+        backgroundColor: '#fff',
+        padding: 20,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        alignItems: 'center',
+        gap: 12,
+    },
+    actionIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    actionLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.text,
+        textAlign: 'center',
     },
 });

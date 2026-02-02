@@ -71,17 +71,14 @@ export function HorizontalFilterBar<T extends string>({
 
 const styles = StyleSheet.create({
     filterScroll: {
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-        height: 40, // Fix: prevent extra vertical whitespace
+        // backgroundColor removed to inherit from parent
     },
     filterContainer: {
         flexDirection: 'row',
         paddingHorizontal: 16,
+        paddingVertical: 8,
         gap: 6,
-        alignItems: 'center', // Fix: prevent buttons from stretching in horizontal ScrollView
-        justifyContent: 'center',
+        alignItems: 'center',
     },
     filterButton: {
         flexDirection: 'row',
