@@ -1,11 +1,11 @@
 import { RequisitionCard } from '@/components/requisitions/RequisitionCard';
 import { COLORS } from '@/constants/color';
-import { useRequisitions } from '@/contexts/RequisitionContext';
 import type { RequisitionStatus } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useRequisitions } from './requisition.hooks';
 
 type TabType = 'all' | RequisitionStatus;
 
@@ -16,11 +16,24 @@ const TABS: { key: TabType; label: string }[] = [
     { key: 'rejected', label: 'Từ chối' },
 ];
 
+
 export default function RequisitionsScreen() {
     const router = useRouter();
-    const { requisitions, searchRequisitions } = useRequisitions();
+    const { data: requisitions = [], isLoading } = useRequisitions();
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
+
+    const searchRequisitionsLocal = (query: string) => {
+        const lowerQuery = query.toLowerCase();
+        return requisitions.filter(req =>
+            req.requisitionNumber.toLowerCase().includes(lowerQuery) ||
+            req.purpose.toLowerCase().includes(lowerQuery) ||
+            req.items.some(item =>
+                item.sku.toLowerCase().includes(lowerQuery) ||
+                item.productName.toLowerCase().includes(lowerQuery)
+            )
+        );
+    };
 
     // Filter requisitions
     const filteredRequisitions = useMemo(() => {
@@ -28,7 +41,7 @@ export default function RequisitionsScreen() {
 
         // Apply search
         if (searchQuery.trim()) {
-            results = searchRequisitions(searchQuery);
+            results = searchRequisitionsLocal(searchQuery);
         }
 
         // Apply status filter
@@ -37,10 +50,18 @@ export default function RequisitionsScreen() {
         }
 
         // Sort by date (newest first)
-        return results.sort((a, b) =>
+        return [...results].sort((a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-    }, [requisitions, activeTab, searchQuery, searchRequisitions]);
+    }, [requisitions, activeTab, searchQuery]);
+
+    if (isLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text>Đang tải...</Text>
+            </View>
+        );
+    }
 
     const handleCreateNew = () => {
         router.push('/manager/requisitions/create');
@@ -116,7 +137,7 @@ export default function RequisitionsScreen() {
                         );
                     })}
                 </ScrollView>
-                </View>
+            </View>
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
                 {filteredRequisitions.length === 0 ? (
                     <View style={styles.emptyState}>

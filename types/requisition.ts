@@ -1,61 +1,35 @@
-export type RequisitionStatus = 'pending' | 'approved' | 'rejected';
+export type RequisitionStatus = 'Pending' | 'Approved' | 'Rejected' | 'Created';
 export type RequisitionType = 'inbound' | 'outbound';
 
 export interface RequisitionItem {
-    id: string;
+    id: number; // ProductId
     sku: string;
     productName: string;
     quantity: number;
     unit: string;
-    notes?: string;
-
-    // Batch/Lot tracking
-    batchNumber?: string;
-    lotNumber?: string;
-    expiryDate?: Date;
-    serialNumbers?: string[];
 }
 
 export interface GoodsRequisition {
-    id: string;
+    id: number;
     requisitionNumber: string;
     type: RequisitionType;
     status: RequisitionStatus;
 
-    // Business context
-    purpose: string;
-    department?: string;
-    project?: string;
-    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    // Backend compatible fields
+    warehouseId: number;
+    supplierId: number;
+    requestedBy: number;
 
     // Dates
-    expectedDate: Date;
-    expectedDeliveryDate?: Date;
     createdAt: Date;
-
-    // Warehouse
-    warehouse: string;
+    approvedAt?: Date;
 
     // Items
     items: RequisitionItem[];
 
-    // Partner info
-    supplier?: string;
-    customer?: string;
-
-    // Creator
-    createdBy: string;
-    createdByName: string;
-
-    // Approval
-    reviewedBy?: string;
-    reviewedByName?: string;
-    reviewedAt?: Date;
-    rejectionReason?: string;
-
-    // Order linking
-    linkedOrderId?: string;
-    linkedOrderNumber?: string;
-
-    notes?: string;
+    // Display fields (optional for BE)
+    warehouseName?: string;
+    supplierName?: string;
+    requestedByName?: string;
 }
+

@@ -1,7 +1,6 @@
 import { Card } from '@/components/ui/Card';
 import { COLORS } from '@/constants/color';
-import { useRequisitions } from '@/contexts/RequisitionContext';
-import { mockProducts, type Product } from '@/mock/products';
+import { useProducts } from '@/features/share/products/product.hooks';
 import type { RequisitionItem, RequisitionType } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,36 +16,38 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useCreateRequisition } from './requisition.hooks';
 
 export default function CreateRequisitionScreen() {
     const router = useRouter();
-    const { createRequisition, loading } = useRequisitions();
+    const { mutateAsync: createRequisition, isPending: loading } = useCreateRequisition();
+    const { data: products = [], isLoading: loadingProducts } = useProducts();
+
     const [type, setType] = useState<RequisitionType>('inbound');
-    const [purpose, setPurpose] = useState('');
-    const [expectedDate, setExpectedDate] = useState('');
-    const [notes, setNotes] = useState('');
+    const [warehouseId, setWarehouseId] = useState('1');
+    const [supplierId, setSupplierId] = useState('1');
     const [items, setItems] = useState<RequisitionItem[]>([]);
     const [showProductPicker, setShowProductPicker] = useState(false);
     const [productSearch, setProductSearch] = useState('');
 
-    const filteredProducts = mockProducts.filter(p =>
+    const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-        p.sku.toLowerCase().includes(productSearch.toLowerCase())
+        (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase()))
     );
 
-    const handleAddProduct = (product: Product) => {
+    const handleAddProduct = (product: any) => {
         // Check if already added
-        if (items.some(item => item.sku === product.sku)) {
+        if (items.some(item => item.id === product.id)) {
             Alert.alert('Thông báo', 'Sản phẩm đã có trong danh sách');
             return;
         }
 
         const newItem: RequisitionItem = {
-            id: `item-${Date.now()}`,
+            id: product.id,
             sku: product.sku,
             productName: product.name,
             quantity: 1,
-            unit: product.unit,
+            unit: product.unit || 'Cái',
         };
 
         setItems([...items, newItem]);
@@ -54,11 +55,11 @@ export default function CreateRequisitionScreen() {
         setProductSearch('');
     };
 
-    const handleRemoveItem = (id: string) => {
+    const handleRemoveItem = (id: number) => {
         setItems(items.filter(item => item.id !== id));
     };
 
-    const handleUpdateQuantity = (id: string, quantity: string) => {
+    const handleUpdateQuantity = (id: number, quantity: string) => {
         const numQuantity = parseInt(quantity) || 0;
         setItems(items.map(item =>
             item.id === id ? { ...item, quantity: numQuantity } : item
@@ -66,14 +67,18 @@ export default function CreateRequisitionScreen() {
     };
 
     const handleSubmit = async () => {
-        // Validation
-        if (!purpose.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập mục đích');
+        if (type === 'outbound') {
+            Alert.alert('Thông báo', 'Backend hiện chưa hỗ trợ tạo phiếu xuất kho. Vui lòng liên hệ Admin.');
             return;
         }
 
-        if (!expectedDate.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập ngày dự kiến');
+        if (!warehouseId) {
+            Alert.alert('Lỗi', 'Vui lòng nhập ID kho');
+            return;
+        }
+
+        if (!supplierId) {
+            Alert.alert('Lỗi', 'Vui lòng nhập ID nhà cung cấp');
             return;
         }
 
@@ -87,56 +92,26 @@ export default function CreateRequisitionScreen() {
             return;
         }
 
-        // Check stock for outbound
-        if (type === 'outbound') {
-            const insufficientStock = items.filter(item => {
-                const product = mockProducts.find(p => p.sku === item.sku);
-                return product && product.stockLevel < item.quantity;
-            });
-
-            if (insufficientStock.length > 0) {
-                Alert.alert(
-                    'Cảnh báo tồn kho',
-                    `Một số sản phẩm không đủ tồn kho:\n${insufficientStock
-                        .map(item => `- ${item.productName}`)
-                        .join('\n')}\n\nBạn có muốn tiếp tục?`,
-                    [
-                        { text: 'Hủy', style: 'cancel' },
-                        { text: 'Tiếp tục', onPress: () => submitRequisition() },
-                    ]
-                );
-                return;
-            }
-        }
-
         submitRequisition();
     };
 
     const submitRequisition = async () => {
         try {
-            // Parse date (simplified - in production use a date picker)
-            const parsedDate = new Date(expectedDate);
-            if (isNaN(parsedDate.getTime())) {
-                Alert.alert('Lỗi', 'Ngày dự kiến không hợp lệ. Định dạng: YYYY-MM-DD');
-                return;
-            }
-
             await createRequisition({
-                type,
-                purpose: purpose.trim(),
-                expectedDate: parsedDate,
-                warehouse: 'Warehouse Central',
-                items,
-                notes: notes.trim() || undefined,
-                createdBy: 'mgr-001',
-                createdByName: 'Nguyen Van A',
+                warehouseId: parseInt(warehouseId),
+                supplierId: parseInt(supplierId),
+                items: items.map(i => ({
+                    productId: i.id,
+                    expectedQuantity: i.quantity
+                })),
             });
 
-            Alert.alert('Thành công', 'Phiếu đề xuất đã được tạo', [
+            Alert.alert('Thành công', 'Phiếu đề xuất nhập kho đã được tạo', [
                 { text: 'OK', onPress: () => router.back() },
             ]);
         } catch (error) {
-            Alert.alert('Lỗi', 'Không thể tạo phiếu đề xuất');
+            console.error('Create requisition error:', error);
+            Alert.alert('Lỗi', 'Không thể tạo phiếu đề xuất. Vui lòng kiểm tra lại ID kho/NCC.');
         }
     };
 
@@ -189,54 +164,54 @@ export default function CreateRequisitionScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.typeCard, type === 'outbound' && styles.typeCardActive]}
-                            onPress={() => setType('outbound')}
+                            style={[
+                                styles.typeCard,
+                                type === 'outbound' && styles.typeCardActive,
+                                { opacity: 0.5 }
+                            ]}
+                            onPress={() => {
+                                Alert.alert('Thông báo', 'Tính năng xuất kho đang được Backend phát triển.');
+                            }}
                         >
-                            <View style={[styles.typeCardIcon, type === 'outbound' && styles.typeCardIconActive]}>
+                            <View style={[styles.typeCardIcon, type === 'outbound' && styles.typeCardIconActive, { backgroundColor: '#ccc' }]}>
                                 <Feather
-                                    name="arrow-up-circle"
-                                    size={28}
-                                    color={type === 'outbound' ? '#fff' : '#8B5CF6'}
+                                    name="lock"
+                                    size={24}
+                                    color="#fff"
                                 />
                             </View>
                             <Text style={[styles.typeCardTitle, type === 'outbound' && styles.typeCardTitleActive]}>
                                 Xuất kho
                             </Text>
                             <Text style={styles.typeCardDescription}>
-                                Đề xuất xuất hàng cho khách hàng
+                                (Đang phát triển backend)
                             </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Purpose */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Mục đích *</Text>
-                    <TextInput
-                        style={styles.textArea}
-                        placeholder="Nhập mục đích của phiếu đề xuất..."
-                        value={purpose}
-                        onChangeText={setPurpose}
-                        multiline
-                        numberOfLines={3}
-                        placeholderTextColor={COLORS.textMuted}
-                    />
-                </View>
-
-                {/* Expected Date */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Ngày dự kiến *</Text>
-                    <View style={styles.inputContainer}>
-                        <Feather name="calendar" size={18} color={COLORS.textMuted} />
+                {/* Warehouse & Supplier */}
+                <View style={styles.row}>
+                    <View style={[styles.section, { flex: 1, marginRight: 8 }]}>
+                        <Text style={styles.sectionTitle}>ID Kho *</Text>
                         <TextInput
-                            style={styles.input}
-                            placeholder="YYYY-MM-DD (VD: 2026-02-15)"
-                            value={expectedDate}
-                            onChangeText={setExpectedDate}
-                            placeholderTextColor={COLORS.textMuted}
+                            style={styles.inputField}
+                            value={warehouseId}
+                            onChangeText={setWarehouseId}
+                            keyboardType="number-pad"
+                            placeholder="VD: 1"
                         />
                     </View>
-                    <Text style={styles.hint}>Định dạng: YYYY-MM-DD</Text>
+                    <View style={[styles.section, { flex: 1, marginLeft: 8 }]}>
+                        <Text style={styles.sectionTitle}>ID Nhà CC *</Text>
+                        <TextInput
+                            style={styles.inputField}
+                            value={supplierId}
+                            onChangeText={setSupplierId}
+                            keyboardType="number-pad"
+                            placeholder="VD: 1"
+                        />
+                    </View>
                 </View>
 
                 {/* Items */}
@@ -256,7 +231,7 @@ export default function CreateRequisitionScreen() {
                         <Card style={styles.emptyCard}>
                             <Feather name="package" size={48} color={COLORS.border} />
                             <Text style={styles.emptyText}>Chưa có sản phẩm nào</Text>
-                            <Text style={styles.emptyHint}>Nhấn "Thêm SP" để thêm sản phẩm</Text>
+                            <Text style={styles.emptyHint}>Nhấn "Thêm SP" để lấy hàng từ kho</Text>
                         </Card>
                     ) : (
                         <Card style={styles.itemsCard}>
@@ -292,20 +267,6 @@ export default function CreateRequisitionScreen() {
                     )}
                 </View>
 
-                {/* Notes */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Ghi chú</Text>
-                    <TextInput
-                        style={styles.textArea}
-                        placeholder="Nhập ghi chú bổ sung (tùy chọn)..."
-                        value={notes}
-                        onChangeText={setNotes}
-                        multiline
-                        numberOfLines={3}
-                        placeholderTextColor={COLORS.textMuted}
-                    />
-                </View>
-
                 <View style={{ height: 40 }} />
             </ScrollView>
 
@@ -334,29 +295,35 @@ export default function CreateRequisitionScreen() {
                         />
                     </View>
 
-                    <FlatList
-                        data={filteredProducts}
-                        keyExtractor={item => item.id}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={styles.productItem}
-                                onPress={() => handleAddProduct(item)}
-                            >
-                                <View style={styles.productIcon}>
-                                    <Feather name="package" size={20} color={COLORS.primary} />
-                                </View>
-                                <View style={styles.productInfo}>
-                                    <Text style={styles.productName}>{item.name}</Text>
-                                    <Text style={styles.productSku}>SKU: {item.sku}</Text>
-                                    <Text style={styles.productStock}>
-                                        Tồn kho: {item.stockLevel} {item.unit}
-                                    </Text>
-                                </View>
-                                <Feather name="plus-circle" size={24} color={COLORS.primary} />
-                            </TouchableOpacity>
-                        )}
-                        contentContainerStyle={styles.productList}
-                    />
+                    {loadingProducts ? (
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <Text>Đang tải sản phẩm...</Text>
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={filteredProducts}
+                            keyExtractor={item => String(item.id)}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={styles.productItem}
+                                    onPress={() => handleAddProduct(item)}
+                                >
+                                    <View style={styles.productIcon}>
+                                        <Feather name="package" size={20} color={COLORS.primary} />
+                                    </View>
+                                    <View style={styles.productInfo}>
+                                        <Text style={styles.productName}>{item.name}</Text>
+                                        <Text style={styles.productSku}>SKU: {item.sku || 'N/A'}</Text>
+                                        <Text style={styles.productStock}>
+                                            Đơn vị: {item.unit || 'Cái'}
+                                        </Text>
+                                    </View>
+                                    <Feather name="plus-circle" size={24} color={COLORS.primary} />
+                                </TouchableOpacity>
+                            )}
+                            contentContainerStyle={styles.productList}
+                        />
+                    )}
                 </View>
             </Modal>
         </View>
@@ -412,11 +379,23 @@ const styles = StyleSheet.create({
     section: {
         marginBottom: 24,
     },
+    row: {
+        flexDirection: 'row',
+    },
     sectionTitle: {
         fontSize: 15,
         fontWeight: '700',
         color: COLORS.text,
         marginBottom: 12,
+    },
+    inputField: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 14,
+        color: COLORS.text,
     },
     typeCards: {
         flexDirection: 'row',
@@ -460,39 +439,6 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: COLORS.textMuted,
         textAlign: 'center',
-    },
-    textArea: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        borderRadius: 12,
-        padding: 16,
-        fontSize: 14,
-        color: COLORS.text,
-        textAlignVertical: 'top',
-        minHeight: 100,
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        gap: 12,
-    },
-    input: {
-        flex: 1,
-        paddingVertical: 14,
-        fontSize: 14,
-        color: COLORS.text,
-    },
-    hint: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-        marginTop: 6,
-        fontStyle: 'italic',
     },
     itemsHeader: {
         flexDirection: 'row',
@@ -656,3 +602,4 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
     },
 });
+

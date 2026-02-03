@@ -2,18 +2,25 @@ import { RequisitionItemList } from '@/components/requisitions/ItemList';
 import { StatusBadge } from '@/components/requisitions/StatusBadge';
 import { Card } from '@/components/ui/Card';
 import { COLORS } from '@/constants/color';
-import { useRequisitions } from '@/contexts/RequisitionContext';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useRequisition } from './requisition.hooks';
+
 export default function RequisitionDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { getRequisitionById } = useRequisitions();
+    const { data: requisition, isLoading } = useRequisition(id!);
 
-    const requisition = getRequisitionById(id);
+    if (isLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text>Đang tải...</Text>
+            </View>
+        );
+    }
 
     if (!requisition) {
         return (

@@ -1,17 +1,19 @@
-import React from 'react';
-import { TextInput, View, Text, StyleSheet, TextInputProps } from 'react-native';
 import { COLORS } from '@/constants/color';
+import React from 'react';
+import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
 interface InputProps extends TextInputProps {
     label?: string;
     error?: string;
     leftIcon?: React.ReactNode;
+    rightIcon?: React.ReactNode;
 }
 
 export const Input: React.FC<InputProps> = ({
     label,
     error,
     leftIcon,
+    rightIcon,
     style,
     ...props
 }) => {
@@ -21,10 +23,11 @@ export const Input: React.FC<InputProps> = ({
             <View style={[styles.inputContainer, error ? styles.inputError : null]}>
                 {leftIcon && <View style={styles.iconContainer}>{leftIcon}</View>}
                 <TextInput
-                    style={[styles.input, leftIcon ? styles.inputWithIcon : null, style]}
+                    style={[styles.input, leftIcon ? styles.inputWithIcon : null, rightIcon ? styles.inputWithRightIcon : null, style]}
                     placeholderTextColor={COLORS.textMuted}
                     {...props}
                 />
+                {rightIcon && <View style={styles.rightIconContainer}>{rightIcon}</View>}
             </View>
             {error && <Text style={styles.errorText}>{error}</Text>}
         </View>
@@ -59,8 +62,14 @@ const styles = StyleSheet.create({
     inputWithIcon: {
         paddingLeft: 8,
     },
+    inputWithRightIcon: {
+        paddingRight: 8,
+    },
     iconContainer: {
         paddingLeft: 16,
+    },
+    rightIconContainer: {
+        paddingRight: 16,
     },
     inputError: {
         borderColor: COLORS.danger,

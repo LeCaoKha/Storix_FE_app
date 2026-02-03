@@ -6,94 +6,15 @@ import { HorizontalFilterBar, type FilterOption } from '@/components/ui/Horizont
 import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { TaskCard } from '@/components/ui/TaskCard';
 import { COLORS } from '@/constants/color';
-import type { Task, TaskType } from '@/types/order';
+import type { TaskType } from '@/types/order';
+
+import { useTasks } from './task.hooks';
 
 export default function TasksScreen() {
     const [activeFilter, setActiveFilter] = useState<'all' | TaskType>('all');
+    const { data: tasks = [], isLoading } = useTasks();
 
-    // Mock data - sẽ được thay thế bằng API call thực tế
-    const tasks: Task[] = [
-        {
-            id: '1',
-            type: 'outbound',
-            orderNumber: 'OUT-2026-001',
-            orderId: 'out-001',
-            status: 'in_progress',
-            priority: 'high',
-            itemCount: 3,
-            assignedDateTime: new Date('2026-01-30T10:00:00'),
-            warehouse: 'WH-HCM-01',
-            customerOrSupplier: 'ABC Electronics Co.',
-            progress: 100,
-        },
-        {
-            id: '2',
-            type: 'inbound',
-            orderNumber: 'IN-2026-002',
-            orderId: 'inb-002',
-            status: 'in_progress',
-            priority: 'medium',
-            itemCount: 3,
-            assignedDateTime: new Date('2026-01-30T09:00:00'),
-            warehouse: 'WH-HCM-01',
-            customerOrSupplier: 'Tech Supplies Vietnam',
-            progress: 0,
-        },
-        {
-            id: '3',
-            type: 'outbound',
-            orderNumber: 'OUT-2026-003',
-            orderId: 'out-003',
-            status: 'pending',
-            priority: 'medium',
-            itemCount: 5,
-            assignedDateTime: new Date('2026-01-30T08:00:00'),
-            warehouse: 'WH-HCM-01',
-            customerOrSupplier: 'XYZ Retail Ltd.',
-        },
-        {
-            id: '4',
-            type: 'count',
-            orderNumber: 'CNT-2026-001',
-            orderId: 'cnt-001',
-            status: 'in_progress',
-            priority: 'high',
-            itemCount: 3,
-            assignedDateTime: new Date('2026-01-31T14:00:00'),
-            warehouse: 'WH-HCM-01',
-            location: 'Zone A - Rack 04',
-        },
-        {
-            id: '5',
-            type: 'inbound',
-            orderNumber: 'IN-2026-004',
-            orderId: 'inb-004',
-            status: 'completed',
-            priority: 'low',
-            itemCount: 8,
-            assignedDateTime: new Date('2026-01-29T07:00:00'),
-            warehouse: 'WH-HCM-01',
-            customerOrSupplier: 'Global Imports Inc.',
-            progress: 100,
-        },
-        {
-            id: '6',
-            type: 'putaway',
-            orderNumber: 'PUT-2026-001',
-            orderId: 'put-001',
-            status: 'pending',
-            priority: 'low',
-            itemCount: 12,
-            assignedDateTime: new Date('2026-01-28T15:00:00'),
-            warehouse: 'WH-HCM-01',
-            location: 'Zone B - Rack 12',
-        },
-    ];
-
-    const filteredTasks = tasks.filter(task =>
-        activeFilter === 'all' || task.type === activeFilter
-    );
-
+    // Helper functions
     const getFilterLabel = (type: 'all' | TaskType) => {
         switch (type) {
             case 'all': return 'Tất cả';
@@ -104,16 +25,7 @@ export default function TasksScreen() {
         }
     };
 
-    const getTaskSummary = () => {
-        const pending = tasks.filter(t => t.status === 'pending').length;
-        const inProgress = tasks.filter(t => t.status === 'in_progress').length;
-        const completed = tasks.filter(t => t.status === 'completed').length;
-        return { pending, inProgress, completed, total: tasks.length };
-    };
-
-    const summary = getTaskSummary();
-
-    // Prepare filter options with counts
+    // Prepare filter options with counts - MUST be before early return
     const filterOptions = useMemo<FilterOption<'all' | TaskType>[]>(() => {
         const filters: ('all' | TaskType)[] = ['all', 'outbound', 'inbound', 'putaway', 'count'];
         return filters.map(filter => ({
@@ -122,6 +34,28 @@ export default function TasksScreen() {
             count: filter === 'all' ? tasks.length : tasks.filter(t => t.type === filter).length,
         }));
     }, [tasks]);
+
+    // Early return AFTER all hooks
+    if (isLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text>Đang tải...</Text>
+            </View>
+        );
+    }
+
+    const filteredTasks = tasks.filter(task =>
+        activeFilter === 'all' || task.type === activeFilter
+    );
+
+    const getTaskSummary = () => {
+        const pending = tasks.filter(t => t.status === 'pending').length;
+        const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+        const completed = tasks.filter(t => t.status === 'completed').length;
+        return { pending, inProgress, completed, total: tasks.length };
+    };
+
+    const summary = getTaskSummary();
 
     return (
         <View style={styles.container}>

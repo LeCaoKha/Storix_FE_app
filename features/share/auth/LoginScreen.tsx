@@ -8,33 +8,32 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, To
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { COLORS } from '@/constants/color';
-import { useAuth } from '@/contexts/AuthContext';
-import type { UserRole } from '@/types/auth';
+import { useLogin } from '@/features/auth/auth.hooks';
 
 export default function LoginScreen() {
     const router = useRouter();
-    const { login } = useAuth();
+    const { mutateAsync: login, isPending: isLoading } = useLogin();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<UserRole>('staff');
-    const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleLogin = async () => {
-        setIsLoading(true);
         try {
-            await login(email, password, role);
-            // Navigate based on role
-            if (role === 'staff') {
-                router.replace('/(staff-tabs)' as any);
+            const data = await login({ email, password });
+
+            // Navigate based on roleId
+            // 2: Company Admin, 3: Manager
+            if (data.roleId === 2 || data.roleId === 3) {
+                router.replace('/(manager-tabs)/requisitions' as any);
             } else {
-                router.replace('/(manager-tabs)' as any);
+                // 4: Staff or others
+                router.replace('/(staff-tabs)' as any);
             }
         } catch (error) {
             console.error('Login failed:', error);
-        } finally {
-            setIsLoading(false);
         }
     };
+
 
     return (
         <KeyboardAvoidingView
@@ -69,37 +68,6 @@ export default function LoginScreen() {
                         <Text style={styles.formTitle}>Login</Text>
                         <Text style={styles.formSubtitle}>Enter your credentials to continue</Text>
 
-                        {/* Role Selection Dropdown */}
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Login As</Text>
-                            <View style={styles.rolePickerContainer}>
-                                <TouchableOpacity
-                                    style={[styles.roleOption, role === 'staff' && styles.roleOptionActive]}
-                                    onPress={() => setRole('staff')}
-                                >
-                                    <View style={[styles.roleRadio, role === 'staff' && styles.roleRadioActive]}>
-                                        {role === 'staff' && <View style={styles.roleRadioDot} />}
-                                    </View>
-                                    <Feather name="users" size={18} color={role === 'staff' ? COLORS.primary : COLORS.slate500} />
-                                    <Text style={[styles.roleOptionText, role === 'staff' && styles.roleOptionTextActive]}>
-                                        Staff
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.roleOption, role === 'manager' && styles.roleOptionActive]}
-                                    onPress={() => setRole('manager')}
-                                >
-                                    <View style={[styles.roleRadio, role === 'manager' && styles.roleRadioActive]}>
-                                        {role === 'manager' && <View style={styles.roleRadioDot} />}
-                                    </View>
-                                    <Feather name="briefcase" size={18} color={role === 'manager' ? COLORS.primary : COLORS.slate500} />
-                                    <Text style={[styles.roleOptionText, role === 'manager' && styles.roleOptionTextActive]}>
-                                        Manager
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Email</Text>
                             <Input
@@ -119,9 +87,18 @@ export default function LoginScreen() {
                                 placeholder="Enter password"
                                 value={password}
                                 onChangeText={setPassword}
-                                secureTextEntry
+                                secureTextEntry={!showPassword}
                                 style={styles.input}
                                 leftIcon={<Feather name="lock" size={20} color={COLORS.slate500} />}
+                                rightIcon={
+                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                        <Feather
+                                            name={showPassword ? "eye-off" : "eye"}
+                                            size={20}
+                                            color={COLORS.slate500}
+                                        />
+                                    </TouchableOpacity>
+                                }
                             />
                         </View>
 

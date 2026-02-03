@@ -6,22 +6,23 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { Card } from '@/components/ui/Card';
 import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
 import { COLORS } from '@/constants/color';
-import { useAuth } from '@/contexts/AuthContext';
+import { useLogout } from '@/features/auth/auth.hooks';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ProfileScreen() {
     const router = useRouter();
-    const { user, logout } = useAuth();
+    const { user } = useAuthStore();
+    const { mutateAsync: logout } = useLogout();
 
     // Use user from AuthContext or fallback to mock data
-    const userData = user || {
-        name: 'Nguyen Van A',
-        email: 'nguyenvana@storix.com',
-        role: 'staff',
-        employeeId: 'WS-2024-001',
-        warehouse: 'WH-HCM-01',
-        phone: '+84 987 654 321',
-        joinDate: '03/15/2024',
+    const userData = {
+        name: user?.roleId === 3 ? 'Manager' : user?.roleId === 2 ? 'Admin' : 'Staff',
+        email: user?.email || 'No email',
+        roleId: user?.roleId,
+        id: user?.id,
+        companyId: user?.companyId,
     };
+
 
     const handleLogout = () => {
         Alert.alert(
@@ -103,7 +104,7 @@ export default function ProfileScreen() {
                         </View>
 
                         <Text style={styles.userName}>{userData.name}</Text>
-                        <Text style={styles.userRole}>{userData.role === 'staff' ? 'Warehouse Staff' : 'Warehouse Manager'}</Text>
+                        <Text style={styles.userRole}>{userData.roleId === 2 ? 'Warehouse Manager' : 'Warehouse Staff'}</Text>
 
                         <View style={styles.userStats}>
                             <View style={styles.statItem}>
@@ -133,8 +134,8 @@ export default function ProfileScreen() {
                             <View style={styles.infoRow}>
                                 <Feather name="credit-card" size={18} color={COLORS.textMuted} />
                                 <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Employee ID</Text>
-                                    <Text style={styles.infoValue}>{userData.employeeId}</Text>
+                                    <Text style={styles.infoLabel}>User ID</Text>
+                                    <Text style={styles.infoValue}>{userData.id}</Text>
                                 </View>
                             </View>
                             <View style={styles.divider} />
@@ -147,26 +148,10 @@ export default function ProfileScreen() {
                             </View>
                             <View style={styles.divider} />
                             <View style={styles.infoRow}>
-                                <Feather name="phone" size={18} color={COLORS.textMuted} />
-                                <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Phone</Text>
-                                    <Text style={styles.infoValue}>{userData.phone}</Text>
-                                </View>
-                            </View>
-                            <View style={styles.divider} />
-                            <View style={styles.infoRow}>
                                 <Feather name="home" size={18} color={COLORS.textMuted} />
                                 <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Warehouse</Text>
-                                    <Text style={styles.infoValue}>{userData.warehouse}</Text>
-                                </View>
-                            </View>
-                            <View style={styles.divider} />
-                            <View style={styles.infoRow}>
-                                <Feather name="calendar" size={18} color={COLORS.textMuted} />
-                                <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Join Date</Text>
-                                    <Text style={styles.infoValue}>{userData.joinDate}</Text>
+                                    <Text style={styles.infoLabel}>Company ID</Text>
+                                    <Text style={styles.infoValue}>{userData.companyId}</Text>
                                 </View>
                             </View>
                         </Card>
