@@ -64,11 +64,11 @@ export default function RequisitionsScreen() {
     }
 
     const handleCreateNew = () => {
-        router.push('/manager/requisitions/create');
+        router.push('/(manager-tabs)/(requisitions)/create' as any);
     };
 
     const handleRequisitionPress = (id: number | string) => {
-        router.push(`/manager/requisitions/${id}` as any);
+        router.push(`/(manager-tabs)/(requisitions)/${id}` as any);
     };
 
     return (

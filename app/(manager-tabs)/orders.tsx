@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     },
     tabHeader: {
         paddingBottom: 0,
-        paddingHorizontal: 0, // Remove default padding since tab buttons handle it
+        paddingHorizontal: 0,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },

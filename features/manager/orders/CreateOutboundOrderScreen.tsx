@@ -93,7 +93,7 @@ export default function CreateOutboundOrderScreen() {
                     text: 'OK',
                     onPress: () => {
                         router.back();
-                        router.push(`/(manager-tabs)/orders/outbound/${created.id}` as any);
+                        router.push(`/(manager-tabs)/(orders-outbound)/${created.id}` as any);
                     },
                 },
             ]);

@@ -61,7 +61,7 @@ export default function InboundOrdersScreen() {
                     <Text style={styles.title}>Đơn Nhập Kho</Text>
                     <TouchableOpacity
                         style={styles.addButton}
-                        onPress={() => router.push('/(manager-tabs)/orders/inbound/create')}
+                        onPress={() => router.push('/(manager-tabs)/(orders-inbound)/create')}
                     >
                         <Feather name="plus" size={20} color="#fff" />
                     </TouchableOpacity>
@@ -132,10 +132,7 @@ export default function InboundOrdersScreen() {
                         return (
                             <TouchableOpacity
                                 key={order.id}
-                                onPress={() => router.push({
-                                    pathname: '/(manager-tabs)/orders/inbound/[id]',
-                                    params: { id: order.id }
-                                })}
+                                onPress={() => router.push(`/(manager-tabs)/(orders-inbound)/${order.id}` as any)}
                             >
                                 <Card style={styles.orderCard}>
                                     <View style={styles.cardHeader}>
@@ -189,7 +186,7 @@ export default function InboundOrdersScreen() {
                     })
                 )}
             </ScrollView>
-        </View>
+        </View >
     );
 }
 

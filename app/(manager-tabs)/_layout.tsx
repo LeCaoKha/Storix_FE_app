@@ -38,6 +38,14 @@ export default function ManagerTabLayout() {
                     tabBarIcon: ({ color }) => <Feather name="user" size={28} color={color} />,
                 }}
             />
+            
+            {/* Hide other screens from tab bar */}
+            <Tabs.Screen
+                name="index"
+                options={{
+                    href: null,
+                }}
+            />
         </Tabs>
     );
 }

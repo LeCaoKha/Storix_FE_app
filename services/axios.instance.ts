@@ -4,7 +4,7 @@ import axios from 'axios';
 // Create axios instance with base configuration
 export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://api.example.com',
-  timeout: 10000,
+  timeout: 120000, // Tăng lên 120s cho server cold start
   headers: {
     'Content-Type': 'application/json',
   },

@@ -77,7 +77,7 @@ export default function CreateInboundOrderScreen() {
                     text: 'OK',
                     onPress: () => {
                         router.back();
-                        router.push(`/(manager-tabs)/orders/inbound/${created.id}` as any);
+                        router.push(`/(manager-tabs)/(orders-inbound)/${created.id}` as any);
                     },
                 },
             ]);
