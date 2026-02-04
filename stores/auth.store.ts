@@ -1,27 +1,26 @@
-import { User } from '@/features/auth/auth.types'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
+import { User } from '@/types/auth.types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 type AuthState = {
-    token: string | null
-    user: User | null
-    login: (token: string, user: User) => void
-    logout: () => void
-}
+  token: string | null;
+  user: User | null;
+  login: (token: string, user: User) => void;
+  logout: () => void;
+};
 
 export const useAuthStore = create<AuthState>()(
-    persist(
-        (set) => ({
-            token: null,
-            user: null,
-
-            login: (token, user) => set({ token, user }),
-            logout: () => set({ token: null, user: null }),
-        }),
-        {
-            name: 'auth-storage',
-            storage: createJSONStorage(() => AsyncStorage),
-        }
-    )
-)
+  persist(
+    (set) => ({
+      token: null,
+      user: null,
+      login: (token, user) => set({ token, user }),
+      logout: () => set({ token: null, user: null }),
+    }),
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);

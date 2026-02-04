@@ -1,183 +1,103 @@
 import { COLORS } from '@/constants/color';
-import type { GoodsRequisition } from '@/types/requisition';
-import { Feather } from '@expo/vector-icons';
+import { GoodsRequisition } from '@/types/requisition';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Card } from '../ui/Card';
-import { StatusBadge } from './StatusBadge';
 
 interface RequisitionCardProps {
-    requisition: GoodsRequisition;
-    onPress: () => void;
+  requisition: GoodsRequisition;
+  onPress?: () => void;
 }
 
-const TYPE_CONFIG = {
-    inbound: {
-        label: 'Nhập kho',
-        icon: 'arrow-down-circle' as const,
-        color: '#3B82F6',
-    },
-    outbound: {
-        label: 'Xuất kho',
-        icon: 'arrow-up-circle' as const,
-        color: '#8B5CF6',
-    },
+export const RequisitionCard: React.FC<RequisitionCardProps> = ({
+  requisition,
+  onPress,
+}) => {
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return COLORS.success;
+      case 'pending':
+        return COLORS.warning;
+      case 'rejected':
+        return COLORS.danger;
+      default:
+        return COLORS.slate500;
+    }
+  };
+
+  return (
+    <TouchableOpacity style={styles.card} onPress={onPress}>
+      <View style={styles.header}>
+        <Text style={styles.id}>#{requisition.requisitionNumber}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(requisition.status) }]}>
+          <Text style={styles.statusText}>{requisition.status}</Text>
+        </View>
+      </View>
+      <Text style={styles.title}>{requisition.purpose}</Text>
+      <View style={styles.footer}>
+        <Text style={styles.date}>
+          {typeof requisition.createdAt === 'string'
+            ? new Date(requisition.createdAt).toLocaleDateString('vi-VN')
+            : requisition.createdAt.toLocaleDateString('vi-VN')}
+        </Text>
+        <Text style={styles.itemCount}>{requisition.items.length} items</Text>
+      </View>
+    </TouchableOpacity>
+  );
 };
 
-export function RequisitionCard({ requisition, onPress }: RequisitionCardProps) {
-    const typeConfig = TYPE_CONFIG[requisition.type];
-    const itemCount = requisition.items.length;
-    const totalQuantity = requisition.items.reduce((sum, item) => sum + item.quantity, 0);
-
-    // Format date
-    const expectedDate = new Date(requisition.expectedDate).toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-    });
-
-    return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-            <Card style={styles.card}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <View style={[styles.typeIcon, { backgroundColor: typeConfig.color + '20' }]}>
-                            <Feather name={typeConfig.icon} size={18} color={typeConfig.color} />
-                        </View>
-                        <View>
-                            <Text style={styles.requisitionNumber}>{requisition.requisitionNumber}</Text>
-                            <Text style={styles.typeLabel}>{typeConfig.label}</Text>
-                        </View>
-                    </View>
-                    <StatusBadge status={requisition.status} size="small" />
-                </View>
-
-                {/* Purpose */}
-                <Text style={styles.purpose} numberOfLines={2}>
-                    {requisition.purpose}
-                </Text>
-
-                {/* Info Row */}
-                <View style={styles.infoRow}>
-                    <View style={styles.infoItem}>
-                        <Feather name="package" size={14} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>
-                            {itemCount} mặt hàng • {totalQuantity} sp
-                        </Text>
-                    </View>
-                    <View style={styles.infoItem}>
-                        <Feather name="calendar" size={14} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>{expectedDate}</Text>
-                    </View>
-                </View>
-
-                {/* Linked Order */}
-                {requisition.linkedOrderNumber && (
-                    <View style={styles.linkedOrder}>
-                        <Feather name="link" size={12} color={COLORS.primary} />
-                        <Text style={styles.linkedOrderText}>
-                            Đã tạo đơn: {requisition.linkedOrderNumber}
-                        </Text>
-                    </View>
-                )}
-
-                {/* Rejection Reason */}
-                {requisition.status === 'rejected' && requisition.rejectionReason && (
-                    <View style={styles.rejectionBox}>
-                        <Feather name="alert-circle" size={14} color="#EF4444" />
-                        <Text style={styles.rejectionText} numberOfLines={2}>
-                            {requisition.rejectionReason}
-                        </Text>
-                    </View>
-                )}
-            </Card>
-        </TouchableOpacity>
-    );
-}
-
 const styles = StyleSheet.create({
-    card: {
-        marginBottom: 12,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 12,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        flex: 1,
-    },
-    typeIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    requisitionNumber: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: COLORS.text,
-    },
-    typeLabel: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-        marginTop: 2,
-    },
-    purpose: {
-        fontSize: 14,
-        color: COLORS.text,
-        lineHeight: 20,
-        marginBottom: 12,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        gap: 16,
-        flexWrap: 'wrap',
-    },
-    infoItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    infoText: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-    },
-    linkedOrder: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 12,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-    },
-    linkedOrderText: {
-        fontSize: 12,
-        color: COLORS.primary,
-        fontWeight: '600',
-    },
-    rejectionBox: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: 8,
-        marginTop: 12,
-        padding: 10,
-        backgroundColor: '#FEE2E2',
-        borderRadius: 8,
-        borderLeftWidth: 3,
-        borderLeftColor: '#EF4444',
-    },
-    rejectionText: {
-        flex: 1,
-        fontSize: 12,
-        color: '#991B1B',
-        lineHeight: 16,
-    },
+  card: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  id: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textMuted,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#fff',
+    textTransform: 'capitalize',
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 12,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  date: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+  },
+  itemCount: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
 });

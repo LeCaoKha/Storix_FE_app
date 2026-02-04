@@ -1,70 +1,58 @@
-import { COLORS } from '@/constants/color';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { ReactNode } from 'react';
-import { Platform, StatusBar, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface SafeAreaHeaderProps {
-    children: ReactNode;
-    backgroundColor?: string;
-    showBackButton?: boolean;
-    onBackPress?: () => void;
-    style?: ViewStyle;
+  title?: string;
+  onBack?: () => void;
+  showBackButton?: boolean;
+  children?: React.ReactNode;
+  backgroundColor?: string;
+  style?: any;
 }
 
-export function SafeAreaHeader({
-    children,
-    backgroundColor = '#fff',
-    showBackButton = false,
-    onBackPress,
-    style,
-}: SafeAreaHeaderProps) {
-    const router = useRouter();
-
-    const handleBackPress = () => {
-        if (onBackPress) {
-            onBackPress();
-        } else {
-            router.back();
-        }
-    };
-
-    // Calculate safe area top padding
-    const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 44;
-    const paddingTop = statusBarHeight + 16; // 16px additional padding
-
-    return (
-        <View style={[styles.container, { backgroundColor, paddingTop }, style]}>
-            <View style={styles.headerContent}>
-                {showBackButton && (
-                    <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-                        <Feather name="arrow-left" size={24} color={COLORS.text} />
-                    </TouchableOpacity>
-                )}
-                <View style={styles.childrenContainer}>
-                    {children}
-                </View>
-            </View>
-        </View>
-    );
-}
+export const SafeAreaHeader: React.FC<SafeAreaHeaderProps> = ({
+  title,
+  onBack,
+  showBackButton = true,
+  children,
+  backgroundColor,
+  style,
+}) => {
+  return (
+    <View style={[styles.header, backgroundColor ? { backgroundColor } : {}, style]}>
+      <View style={styles.content}>
+        {showBackButton && (
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Ionicons name="arrow-back" size={24} color="#000" />
+          </TouchableOpacity>
+        )}
+        {children || <Text style={styles.title}>{title}</Text>}
+      </View>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
-    container: {
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-        paddingBottom: 16,
-        paddingHorizontal: 20, // Default padding for all headers
-    },
-    headerContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        marginRight: 12, // Match Manager style spacing
-    },
-    childrenContainer: {
-        flex: 1,
-        justifyContent: 'center',
-    },
+  header: {
+    backgroundColor: '#fff',
+    paddingTop: 44, // Safe area top
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E1E5E9',
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  backButton: {
+    marginRight: 16,
+    padding: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#11181C',
+  },
 });

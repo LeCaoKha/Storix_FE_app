@@ -1,5 +1,5 @@
-import { api } from '@/services/axios.instance';
-import { LoginResponse } from './auth.types';
+import { LoginResponse } from '@/types/auth.types';
+import { api } from './axios.instance';
 
 export const loginRequest = async (email: string, password: string): Promise<LoginResponse> => {
     const res = await api.post('/api/Home/Login', { email, password });

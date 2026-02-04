@@ -1,7 +1,6 @@
-import { Card } from '@/components/ui/Card';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useOutboundOrders } from '@/contexts/OutboundOrderContext';
+import { useOutboundOrder, useUpdateOutboundOrder } from '@/hooks';
 import { OutboundStatus } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,23 +8,34 @@ import React from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const STATUS_CONFIG: Record<OutboundStatus, { label: string; color: string; bgColor: string }> = {
-    open: { label: 'Mới tạo', color: '#3B82F6', bgColor: '#DBEAFE' },
-    picking: { label: 'Đang lấy hàng', color: '#F59E0B', bgColor: '#FEF3C7' },
-    packing: { label: 'Đang đóng gói', color: '#8B5CF6', bgColor: '#EDE9FE' },
-    ready: { label: 'Sẵn sàng', color: '#06B6D4', bgColor: '#CFFAFE' },
-    shipped: { label: 'Đã xuất', color: '#10B981', bgColor: '#D1FAE5' },
-    completed: { label: 'Hoàn tất', color: '#059669', bgColor: '#D1FAE5' },
-    cancelled: { label: 'Đã hủy', color: '#EF4444', bgColor: '#FEE2E2' },
+    open: { label: 'Mới tạo', color: COLORS.primaryDark, bgColor: COLORS.primaryLight + '40' },
+    picking: { label: 'Đang lấy hàng', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    packing: { label: 'Đang đóng gói', color: COLORS.slate700, bgColor: COLORS.slate200 },
+    ready: { label: 'Sẵn sàng', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    shipped: { label: 'Đã xuất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    completed: { label: 'Hoàn tất', color: COLORS.teal600, bgColor: COLORS.teal50 },
+    delivered: { label: 'Đã giao', color: COLORS.success, bgColor: COLORS.success + '20' },
+    on_hold: { label: 'Tạm dừng', color: COLORS.slate500, bgColor: COLORS.slate200 },
+    cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
 export default function OutboundOrderDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { getOutboundOrderById, updateOutboundStatus } = useOutboundOrders();
+    const { data: order, isLoading, error } = useOutboundOrder(id);
+    const updateOrder = useUpdateOutboundOrder();
 
-    const order = getOutboundOrderById(id);
+    if (isLoading) {
+        return (
+            <View style={styles.container}>
+                <SafeAreaHeader showBackButton>
+                    <Text style={styles.headerTitle}>Đang tải...</Text>
+                </SafeAreaHeader>
+            </View>
+        );
+    }
 
-    if (!order) {
+    if (!order || error) {
         return (
             <View style={styles.container}>
                 <View style={styles.errorContainer}>
@@ -44,7 +54,10 @@ export default function OutboundOrderDetailScreen() {
 
     const handleStatusUpdate = async (newStatus: OutboundStatus) => {
         try {
-            await updateOutboundStatus(order.id, newStatus);
+            await updateOrder.mutateAsync({
+                id: order.id,
+                updates: { status: newStatus }
+            });
             Alert.alert('Thành công', 'Đã cập nhật trạng thái');
         } catch (error) {
             Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
@@ -338,7 +351,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     actionBar: {
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.card,
         padding: 20,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,

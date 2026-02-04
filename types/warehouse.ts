@@ -1,41 +1,45 @@
-// Warehouse & Route types
-export interface RouteStep {
-    id: string;
-    sequence: number;
-    itemId: string;
-    itemSku: string;
-    itemName: string;
-    locationCode: string;
-    quantity: number;
-    distanceFromPrevious?: number; // in meters
-    estimatedTime?: number; // in seconds
-    completed: boolean;
+export interface Warehouse {
+  id: string;
+  name: string;
+  code: string;
+  address: string;
+  capacity: number;
+  zones: Zone[];
+}
+
+export interface Zone {
+  id: string;
+  name: string;
+  code: string;
+  warehouseId: string;
+  type: ZoneType;
+  locations: Location[];
 }
 
 export interface Location {
-    code: string;
-    zone: string;
-    aisle: string;
-    shelf: string;
-    capacity: number;
-    currentOccupancy: number;
-    distanceFromEntry?: number;
+  id: string;
+  code: string;
+  zoneId: string;
+  aisle: string;
+  rack: string;
+  shelf: string;
+  bin: string;
+  capacity: number;
+  currentOccupancy: number;
+  status: LocationStatus;
 }
 
-export interface StorageSuggestion {
-    locationCode: string;
-    location: Location;
-    score: number; // 0-100
-    reasoning: string;
-    estimatedDistance?: number;
+export enum ZoneType {
+  RECEIVING = 'receiving',
+  STORAGE = 'storage',
+  PICKING = 'picking',
+  PACKING = 'packing',
+  SHIPPING = 'shipping',
 }
 
-export interface ValidationAlert {
-    id: string;
-    type: 'error' | 'warning' | 'success' | 'info';
-    title: string;
-    message: string;
-    actionLabel?: string;
-    onAction?: () => void;
-    dismissible: boolean;
+export enum LocationStatus {
+  AVAILABLE = 'available',
+  OCCUPIED = 'occupied',
+  RESERVED = 'reserved',
+  MAINTENANCE = 'maintenance',
 }

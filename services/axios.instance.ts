@@ -1,19 +1,37 @@
-import { useAuthStore } from '@/stores/auth.store';
+import { useAuthStore } from '@/stores';
 import axios from 'axios';
 
-const api = axios.create({
-    baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://storix-docker.onrender.com',
-    timeout: 30000, // Tăng timeout lên 30s cho production
+// Create axios instance with base configuration
+export const api = axios.create({
+  baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://api.example.com',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-// Add token to requests
-api.interceptors.request.use((config) => {
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
     const token = useAuthStore.getState().token;
     if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
-});
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
-export { api };
-
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized error - clear auth state
+      useAuthStore.getState().logout();
+    }
+    return Promise.reject(error);
+  }
+);

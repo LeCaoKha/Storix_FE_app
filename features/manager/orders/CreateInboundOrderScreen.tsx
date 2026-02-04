@@ -1,29 +1,32 @@
-import { Card } from '@/components/ui/Card';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrders } from '@/contexts/InboundOrderContext';
-import { useRequisitions } from '@/contexts/RequisitionContext';
+import { useInboundOrders, useLinkOrderToRequisition, useRequisition } from '@/hooks';
 import { InboundOrder } from '@/types/inbound-order';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateInboundOrderScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const requisitionId = params.requisitionId as string;
 
-    const { getRequisitionById, linkOrderToRequisition } = useRequisitions();
+    const { data: requisition, isLoading: isLoadingRequisition } = useRequisition(requisitionId);
+    const { mutateAsync: linkOrder } = useLinkOrderToRequisition();
     const { createInboundOrder } = useInboundOrders();
 
-    const requisition = requisitionId ? getRequisitionById(requisitionId) : null;
-
-    const [supplier, setSupplier] = useState(requisition?.supplier || '');
+    const [supplier, setSupplier] = useState('');
     const [supplierContact, setSupplierContact] = useState('');
     const [poReference, setPOReference] = useState('');
     const [expectedDate, setExpectedDate] = useState(new Date());
     const [notes, setNotes] = useState('');
     const [isCreating, setIsCreating] = useState(false);
+
+    useEffect(() => {
+        if (requisition) {
+            setSupplier(requisition.supplier || '');
+        }
+    }, [requisition]);
 
     const handleCreate = async () => {
         if (!supplier.trim()) {
@@ -34,7 +37,7 @@ export default function CreateInboundOrderScreen() {
         setIsCreating(true);
         try {
             const newOrder: Omit<InboundOrder, 'id' | 'inboundNumber' | 'createdAt'> = {
-                requisitionId: requisition?.id,
+                requisitionId: requisition?.id ? String(requisition.id) : undefined,
                 requisitionNumber: requisition?.requisitionNumber,
                 supplier: supplier.trim(),
                 supplierContact: supplierContact.trim() || undefined,
@@ -62,7 +65,11 @@ export default function CreateInboundOrderScreen() {
 
             // Link order to requisition
             if (requisition) {
-                await linkOrderToRequisition(requisition.id, created.id, created.inboundNumber);
+                await linkOrder({
+                    requisitionId: requisition.id,
+                    orderId: created.id,
+                    orderNumber: created.inboundNumber
+                });
             }
 
             Alert.alert('Thành công', 'Đã tạo đơn nhập kho', [
@@ -80,6 +87,14 @@ export default function CreateInboundOrderScreen() {
             setIsCreating(false);
         }
     };
+
+    if (isLoadingRequisition) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>

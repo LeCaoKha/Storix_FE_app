@@ -1,30 +1,46 @@
-import { Card } from '@/components/ui/Card';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrders } from '@/contexts/InboundOrderContext';
+import { useInboundOrder, useUpdateInboundOrder } from '@/hooks';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function StaffInboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { getInboundOrderById, updateReceivedQuantities, updateInboundStatus } = useInboundOrders();
-
-    const order = getInboundOrderById(id);
-    const [localQuantities, setLocalQuantities] = useState<Record<string, number>>(
-        order?.items.reduce((acc, item) => ({ ...acc, [item.id]: item.receivedQty }), {}) || {}
-    );
-    const [localItemData, setLocalItemData] = useState<Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>(
-        order?.items.reduce((acc, item) => ({
-            ...acc,
-            [item.id]: { batch: '', expiry: '', qc: 'good' }
-        }), {}) || {}
-    );
+    const { data: order, isLoading, error } = useInboundOrder(id);
+    const updateOrder = useUpdateInboundOrder();
+    const [localQuantities, setLocalQuantities] = useState<Record<string, number>>({});
+    const [localItemData, setLocalItemData] = useState<Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});
     const [isSaving, setIsSaving] = useState(false);
 
-    if (!order) {
+    // Initialize state when order data is loaded
+    useEffect(() => {
+        if (order?.items) {
+            setLocalQuantities(
+                order.items.reduce((acc: Record<string, number>, item: any) => ({ ...acc, [item.id]: item.receivedQty || 0 }), {})
+            );
+            setLocalItemData(
+                order.items.reduce((acc: Record<string, any>, item: any) => ({
+                    ...acc,
+                    [item.id]: { batch: '', expiry: '', qc: 'good' }
+                }), {})
+            );
+        }
+    }, [order]);
+
+    if (isLoading) {
+        return (
+            <View style={styles.container}>
+                <SafeAreaHeader showBackButton>
+                    <Text style={styles.headerTitle}>Đang tải...</Text>
+                </SafeAreaHeader>
+            </View>
+        );
+    }
+
+    if (!order || error) {
         return (
             <View style={styles.container}>
                 <SafeAreaHeader showBackButton>
@@ -44,7 +60,7 @@ export default function StaffInboundDetailScreen() {
     const handleUpdateQty = (itemId: string, increment: boolean) => {
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
-            const item = order.items.find(i => i.id === itemId);
+            const item = order.items.find((i) => i.id === itemId);
             const newValue = increment
                 ? Math.min(current + 1, item?.expectedQty || 9999)
                 : Math.max(current - 1, 0);
@@ -62,25 +78,35 @@ export default function StaffInboundDetailScreen() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const updates = Object.entries(localQuantities).map(([itemId, receivedQty]) => ({
-                itemId,
-                receivedQty,
-                ...localItemData[itemId],
+            // Update items with received quantities
+            const updatedItems = order.items.map((item: any) => ({
+                ...item,
+                receivedQty: localQuantities[item.id] || item.receivedQty || 0,
+                batch: localItemData[item.id]?.batch || '',
+                expiry: localItemData[item.id]?.expiry || '',
+                qc: localItemData[item.id]?.qc || 'good',
             }));
 
-            // In a real app, updateReceivedQuantities would be updated to take these fields
-            await updateReceivedQuantities(order.id, updates as any);
-
             // Check if all items received
-            const allReceived = order.items.every(item =>
+            const allReceived = order.items.every((item: any) =>
                 (localQuantities[item.id] || 0) >= item.expectedQty
             );
 
+            // Determine new status
+            let newStatus = order.status;
             if (allReceived && order.status !== 'completed') {
-                await updateInboundStatus(order.id, 'completed');
+                newStatus = 'completed';
             } else if (order.status === 'scheduled') {
-                await updateInboundStatus(order.id, 'receiving');
+                newStatus = 'receiving';
             }
+
+            await updateOrder.mutateAsync({
+                id: order.id,
+                updates: {
+                    items: updatedItems,
+                    status: newStatus,
+                }
+            });
 
             Alert.alert('Thành công', 'Đã lưu thông tin nhận hàng và số lô/hạn sử dụng');
             router.back();
@@ -120,7 +146,7 @@ export default function StaffInboundDetailScreen() {
                     <Text style={styles.sectionSubtitle}>{order.items.length} mặt hàng</Text>
                 </View>
 
-                {order.items.map(item => (
+                {order.items.map((item) => (
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>

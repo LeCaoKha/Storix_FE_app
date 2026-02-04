@@ -1,5 +1,4 @@
-import { Card } from '@/components/ui/Card';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';

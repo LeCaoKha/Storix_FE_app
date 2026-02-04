@@ -3,10 +3,9 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Card } from '@/components/ui/Card';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useLogout } from '@/features/auth/auth.hooks';
+import { useLogout } from '@/hooks/auth.hooks';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function ProfileScreen() {

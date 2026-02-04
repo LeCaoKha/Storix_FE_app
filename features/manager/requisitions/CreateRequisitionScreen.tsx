@@ -1,6 +1,7 @@
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useProducts } from '@/features/share/products/product.hooks';
+import { useCreateRequisition } from '@/hooks';
+import { useProducts } from '@/hooks/product.hooks';
 import type { RequisitionItem, RequisitionType } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,7 +17,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useCreateRequisition } from './requisition.hooks';
 
 export default function CreateRequisitionScreen() {
     const router = useRouter();

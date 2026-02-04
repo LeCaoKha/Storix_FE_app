@@ -1,6 +1,6 @@
+import { getProducts } from '@/services/product.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { useQuery } from '@tanstack/react-query';
-import { getProducts } from './product.api';
 
 export const useProducts = () => {
     const { user } = useAuthStore();

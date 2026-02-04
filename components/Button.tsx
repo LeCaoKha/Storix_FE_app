@@ -1,88 +1,113 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import { COLORS } from '../constants/color';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
 
 interface ButtonProps {
-    title: string;
-    onPress: () => void;
-    variant?: 'primary' | 'secondary' | 'outline' | 'danger';
-    isLoading?: boolean;
-    disabled?: boolean;
-    style?: ViewStyle;
+  title: string;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  variant?: 'primary' | 'secondary' | 'outline';
+  size?: 'small' | 'medium' | 'large';
+  style?: ViewStyle;
 }
 
 export const Button: React.FC<ButtonProps> = ({
-    title,
-    onPress,
-    variant = 'primary',
-    isLoading = false,
-    disabled = false,
-    style
+  title,
+  onPress,
+  loading = false,
+  disabled = false,
+  variant = 'primary',
+  size = 'medium',
+  style,
 }) => {
-    const getBackgroundColor = () => {
-        if (disabled) return COLORS.textMuted;
-        switch (variant) {
-            case 'primary': return COLORS.primary;
-            case 'secondary': return COLORS.secondary;
-            case 'danger': return COLORS.danger;
-            case 'outline': return 'transparent';
-            default: return COLORS.primary;
-        }
-    };
+  const buttonStyle = [
+    styles.base,
+    styles[variant],
+    styles[size],
+    (disabled || loading) && styles.disabled,
+    style,
+  ];
 
-    const getTextColor = () => {
-        switch (variant) {
-            case 'primary': return COLORS.textLight;
-            case 'danger': return COLORS.textLight;
-            case 'secondary': return COLORS.text;
-            case 'outline': return COLORS.primary;
-            default: return COLORS.textLight;
-        }
-    };
+  const textStyle = [
+    styles.text,
+    styles[`text_${variant}`],
+    styles[`text_${size}`],
+  ];
 
-    const getBorder = () => {
-        if (variant === 'outline') {
-            return { borderWidth: 1, borderColor: COLORS.primary };
-        }
-        return {};
-    };
-
-    return (
-        <TouchableOpacity
-            style={[
-                styles.container,
-                { backgroundColor: getBackgroundColor() },
-                getBorder(),
-                style,
-                disabled && styles.disabled
-            ]}
-            onPress={onPress}
-            disabled={isLoading || disabled}
-            activeOpacity={0.8}
-        >
-            {isLoading ? (
-                <ActivityIndicator color={getTextColor()} />
-            ) : (
-                <Text style={[styles.text, { color: getTextColor() }]}>{title}</Text>
-            )}
-        </TouchableOpacity>
-    );
+  return (
+    <TouchableOpacity
+      style={buttonStyle}
+      onPress={onPress}
+      disabled={disabled || loading}
+    >
+      {loading ? (
+        <ActivityIndicator color={variant === 'primary' ? '#fff' : '#007AFF'} />
+      ) : (
+        <Text style={textStyle}>{title}</Text>
+      )}
+    </TouchableOpacity>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        paddingVertical: 14,
-        paddingHorizontal: 24,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-    },
-    text: {
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    disabled: {
-        opacity: 0.6,
-    }
+  base: {
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  // Variants
+  primary: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  secondary: {
+    backgroundColor: '#8E8E93',
+    borderColor: '#8E8E93',
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    borderColor: '#007AFF',
+  },
+  // Sizes
+  small: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    minHeight: 36,
+  },
+  medium: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    minHeight: 44,
+  },
+  large: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    minHeight: 52,
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  // Text styles
+  text: {
+    fontWeight: '600',
+  },
+  text_primary: {
+    color: '#fff',
+  },
+  text_secondary: {
+    color: '#fff',
+  },
+  text_outline: {
+    color: '#007AFF',
+  },
+  text_small: {
+    fontSize: 14,
+  },
+  text_medium: {
+    fontSize: 16,
+  },
+  text_large: {
+    fontSize: 18,
+  },
 });

@@ -1,30 +1,35 @@
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useOutboundOrders } from '@/contexts/OutboundOrderContext';
-import { useRequisitions } from '@/contexts/RequisitionContext';
+import { useLinkOrderToRequisition, useOutboundOrders, useRequisition } from '@/hooks';
 import { OutboundOrder } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateOutboundOrderScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const requisitionId = params.requisitionId as string;
 
-    const { getRequisitionById, linkOrderToRequisition } = useRequisitions();
+    const { data: requisition, isLoading: isLoadingRequisition } = useRequisition(requisitionId);
+    const { mutateAsync: linkOrder } = useLinkOrderToRequisition();
     const { createOutboundOrder } = useOutboundOrders();
 
-    const requisition = requisitionId ? getRequisitionById(requisitionId) : null;
-
-    const [customer, setCustomer] = useState(requisition?.customer || '');
+    const [customer, setCustomer] = useState('');
     const [customerContact, setCustomerContact] = useState('');
     const [destination, setDestination] = useState('');
     const [salesOrderRef, setSalesOrderRef] = useState('');
     const [expectedDate, setExpectedDate] = useState(new Date());
     const [notes, setNotes] = useState('');
     const [isCreating, setIsCreating] = useState(false);
+
+    useEffect(() => {
+        if (requisition) {
+            // In a real app, customer info might come from the requisition or a separate service
+            // setCustomer(requisition.customer || ''); 
+        }
+    }, [requisition]);
 
     const handleCreate = async () => {
         if (!customer.trim()) {
@@ -39,7 +44,7 @@ export default function CreateOutboundOrderScreen() {
         setIsCreating(true);
         try {
             const newOrder: Omit<OutboundOrder, 'id' | 'outboundNumber' | 'createdAt'> = {
-                requisitionId: requisition?.id,
+                requisitionId: requisition?.id ? String(requisition.id) : undefined,
                 requisitionNumber: requisition?.requisitionNumber,
                 customer: customer.trim(),
                 customerContact: customerContact.trim() || undefined,
@@ -63,7 +68,6 @@ export default function CreateOutboundOrderScreen() {
                     ],
                     batchNumber: item.batchNumber,
                     lotNumber: item.lotNumber,
-                    serialNumbers: item.serialNumbers,
                 })) || [],
                 optimizedRoute: ['A-01-01'], // Simplified route
                 status: 'open',
@@ -77,7 +81,11 @@ export default function CreateOutboundOrderScreen() {
 
             // Link order to requisition
             if (requisition) {
-                await linkOrderToRequisition(requisition.id, created.id, created.outboundNumber);
+                await linkOrder({
+                    requisitionId: requisition.id,
+                    orderId: created.id,
+                    orderNumber: created.outboundNumber
+                });
             }
 
             Alert.alert('Thành công', 'Đã tạo đơn xuất kho', [
@@ -95,6 +103,14 @@ export default function CreateOutboundOrderScreen() {
             setIsCreating(false);
         }
     };
+
+    if (isLoadingRequisition) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -209,13 +225,13 @@ export default function CreateOutboundOrderScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: COLORS.background,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.card,
         paddingTop: 60,
         paddingHorizontal: 20,
         paddingBottom: 16,
@@ -268,7 +284,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         fontSize: 14,
         color: COLORS.text,
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.card,
     },
     textArea: {
         minHeight: 80,
@@ -292,7 +308,7 @@ const styles = StyleSheet.create({
         color: COLORS.text,
     },
     footer: {
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.card,
         padding: 20,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
@@ -309,6 +325,6 @@ const styles = StyleSheet.create({
     createButtonText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#fff',
+        color: COLORS.textLight,
     },
 });

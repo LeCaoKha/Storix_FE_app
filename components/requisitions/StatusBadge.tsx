@@ -1,74 +1,69 @@
-import type { RequisitionStatus } from '@/types/requisition';
-import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 interface StatusBadgeProps {
-    status: RequisitionStatus;
-    size?: 'small' | 'medium' | 'large';
+  status: string;
+  variant?: 'default' | 'outline';
 }
 
-const STATUS_CONFIG = {
-    pending: {
-        label: 'Chờ duyệt',
-        color: '#F59E0B',
-        bgColor: '#FEF3C7',
-        icon: 'clock' as const,
-    },
-    approved: {
-        label: 'Đã duyệt',
-        color: '#10B981',
-        bgColor: '#D1FAE5',
-        icon: 'check-circle' as const,
-    },
-    rejected: {
-        label: 'Từ chối',
-        color: '#EF4444',
-        bgColor: '#FEE2E2',
-        icon: 'x-circle' as const,
-    },
-};
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ 
+  status, 
+  variant = 'default' 
+}) => {
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved':
+      case 'completed':
+        return '#34C759';
+      case 'pending':
+      case 'in_progress':
+        return '#FF9500';
+      case 'rejected':
+      case 'cancelled':
+        return '#FF3B30';
+      case 'draft':
+        return '#8E8E93';
+      default:
+        return '#6B7280';
+    }
+  };
 
-export function StatusBadge({ status, size = 'medium' }: StatusBadgeProps) {
-    const config = STATUS_CONFIG[status];
-    const sizeStyles = SIZE_STYLES[size];
+  const color = getStatusColor(status);
+  const isOutline = variant === 'outline';
 
-    return (
-        <View style={[styles.badge, { backgroundColor: config.bgColor }, sizeStyles.container]}>
-            <Feather name={config.icon} size={sizeStyles.iconSize} color={config.color} />
-            <Text style={[styles.label, { color: config.color }, sizeStyles.text]}>
-                {config.label}
-            </Text>
-        </View>
-    );
-}
-
-const SIZE_STYLES = {
-    small: {
-        container: { paddingHorizontal: 8, paddingVertical: 4, gap: 4 },
-        iconSize: 12,
-        text: { fontSize: 11 },
-    },
-    medium: {
-        container: { paddingHorizontal: 10, paddingVertical: 6, gap: 6 },
-        iconSize: 14,
-        text: { fontSize: 12 },
-    },
-    large: {
-        container: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-        iconSize: 16,
-        text: { fontSize: 14 },
-    },
+  return (
+    <View 
+      style={[
+        styles.badge,
+        {
+          backgroundColor: isOutline ? 'transparent' : color,
+          borderColor: color,
+          borderWidth: isOutline ? 1 : 0,
+        }
+      ]}
+    >
+      <Text 
+        style={[
+          styles.text, 
+          { color: isOutline ? color : '#fff' }
+        ]}
+      >
+        {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+      </Text>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    badge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 12,
-        alignSelf: 'flex-start',
-    },
-    label: {
-        fontWeight: '600',
-    },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  text: {
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
 });

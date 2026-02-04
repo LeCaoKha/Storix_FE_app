@@ -1,4 +1,4 @@
-import { api } from '@/services/axios.instance';
+import { api } from './axios.instance';
 
 export interface ProductResponse {
     id: number;

@@ -1,23 +1,30 @@
-import { Card } from '@/components/ui/Card';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useOutboundOrders } from '@/contexts/OutboundOrderContext';
+import { useOutboundOrder, useUpdateOutboundOrder } from '@/hooks';
+import { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function OutboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { getOutboundOrderById, updatePickedQuantities, updateOutboundStatus } = useOutboundOrders();
+    const { data: order, isLoading, error } = useOutboundOrder(id);
+    const updateOrder = useUpdateOutboundOrder();
 
-    const order = getOutboundOrderById(id);
-    const [localQuantities, setLocalQuantities] = useState<Record<string, number>>(
-        order?.items.reduce((acc, item) => ({ ...acc, [item.id]: item.qtyPicked }), {}) || {}
-    );
+    const [localQuantities, setLocalQuantities] = useState<Record<string, number>>({});
     const [verifiedItems, setVerifiedItems] = useState<Record<string, boolean>>({});
     const [isSaving, setIsSaving] = useState(false);
+
+    // Initialize state when order data is loaded
+    useEffect(() => {
+        if (order?.items) {
+            setLocalQuantities(
+                order.items.reduce((acc: Record<string, number>, item: OutboundOrderItem) => ({ ...acc, [item.id]: item.qtyPicked || 0 }), {})
+            );
+        }
+    }, [order]);
 
     // Business Logic: Sort items by location code for optimized path
     const sortedItems = React.useMemo(() => {
@@ -29,7 +36,17 @@ export default function OutboundDetailScreen() {
         });
     }, [order]);
 
-    if (!order) {
+    if (isLoading) {
+        return (
+            <View style={styles.container}>
+                <SafeAreaHeader showBackButton>
+                    <Text style={styles.headerTitle}>Đang tải...</Text>
+                </SafeAreaHeader>
+            </View>
+        );
+    }
+
+    if (!order || error) {
         return (
             <View style={styles.container}>
                 <SafeAreaHeader showBackButton>
@@ -63,7 +80,7 @@ export default function OutboundDetailScreen() {
         }
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
-            const item = order.items.find(i => i.id === itemId);
+            const item = order.items.find((i: OutboundOrderItem) => i.id === itemId);
             const newValue = increment
                 ? Math.min(current + 1, item?.qtyToPick || 9999)
                 : Math.max(current - 1, 0);
@@ -74,22 +91,32 @@ export default function OutboundDetailScreen() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const updates = Object.entries(localQuantities).map(([itemId, qtyPicked]) => ({
-                itemId,
-                qtyPicked,
+            // Update items with picked quantities
+            const updatedItems = order.items.map((item: OutboundOrderItem) => ({
+                ...item,
+                qtyPicked: localQuantities[item.id] || item.qtyPicked || 0,
             }));
-            await updatePickedQuantities(order.id, updates);
 
             // Check if all items picked
-            const allPicked = order.items.every(item =>
+            const allPicked = order.items.every((item: OutboundOrderItem) =>
                 (localQuantities[item.id] || 0) >= item.qtyToPick
             );
 
+            // Determine new status
+            let newStatus = order.status;
             if (allPicked && order.status !== 'ready') {
-                await updateOutboundStatus(order.id, 'ready');
+                newStatus = 'ready';
             } else if (order.status === 'open') {
-                await updateOutboundStatus(order.id, 'picking');
+                newStatus = 'picking';
             }
+
+            await updateOrder.mutateAsync({
+                id: order.id,
+                updates: {
+                    items: updatedItems,
+                    status: newStatus,
+                }
+            });
 
             Alert.alert('Thành công', 'Đã cập nhật số lượng lấy hàng');
             router.back();
@@ -127,8 +154,8 @@ export default function OutboundDetailScreen() {
                     <Text style={styles.sectionSubtitle}>{order.items.length} mặt hàng</Text>
                 </View>
 
-                {sortedItems.map(item => (
-                    <Card key={item.id} style={[styles.itemCard, verifiedItems[item.id] && styles.itemCardVerified]}>
+                {sortedItems.map((item: OutboundOrderItem) => (
+                    <Card key={item.id} style={[styles.itemCard, verifiedItems[item.id] ? styles.itemCardVerified : null]}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
                                 <Text style={styles.productName}>{item.productName}</Text>
@@ -136,7 +163,7 @@ export default function OutboundDetailScreen() {
                                     <View style={styles.skuBadge}>
                                         <Text style={styles.skuText}>{item.sku}</Text>
                                     </View>
-                                    {item.pickLocations.map(loc => (
+                                    {item.pickLocations.map((loc: any) => (
                                         <View key={loc.locationCode} style={styles.locationBadge}>
                                             <Feather name="layers" size={10} color={COLORS.primary} />
                                             <Text style={styles.locationText}>{loc.locationCode}</Text>
@@ -145,10 +172,10 @@ export default function OutboundDetailScreen() {
                                 </View>
                             </View>
                             <View style={[styles.statusBadge, {
-                                backgroundColor: (localQuantities[item.id] || 0) >= item.qtyToPick ? '#D1FAE5' : '#FEF3C7'
+                                backgroundColor: (localQuantities[item.id] || 0) >= item.qtyToPick ? COLORS.success + '20' : COLORS.warning + '20'
                             }]}>
                                 <Text style={[styles.statusBadgeText, {
-                                    color: (localQuantities[item.id] || 0) >= item.qtyToPick ? '#059669' : '#D97706'
+                                    color: (localQuantities[item.id] || 0) >= item.qtyToPick ? COLORS.success : COLORS.warning
                                 }]}>
                                     {(localQuantities[item.id] || 0) >= item.qtyToPick ? 'Xong' : 'Chờ'}
                                 </Text>
@@ -191,8 +218,8 @@ export default function OutboundDetailScreen() {
                             onPress={() => handleVerifyItem(item.id)}
                             disabled={verifiedItems[item.id] || isSaving}
                         >
-                            <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? "#059669" : COLORS.primary} />
-                            <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: '#059669' }]}>
+                            <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? COLORS.success : COLORS.primary} />
+                            <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: COLORS.success }]}>
                                 {verifiedItems[item.id] ? 'Đã xác minh sản phẩm' : 'Verify Scan (Quét mã xác nhận)'}
                             </Text>
                         </TouchableOpacity>

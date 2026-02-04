@@ -1,13 +1,11 @@
-import { RequisitionItemList } from '@/components/requisitions/ItemList';
-import { StatusBadge } from '@/components/requisitions/StatusBadge';
-import { Card } from '@/components/ui/Card';
-import { COLORS } from '@/constants/color';
+import { Card, RequisitionItemList, StatusBadge } from '@/components';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { useRequisition } from './requisition.hooks';
+import { COLORS } from '@/constants/color';
+import { useRequisition } from '@/hooks';
 
 export default function RequisitionDetailScreen() {
     const router = useRouter();

@@ -1,30 +1,48 @@
-import { Card } from '@/components/ui/Card';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrders } from '@/contexts/InboundOrderContext';
+import { useInboundOrder, useUpdateInboundOrder } from '@/hooks';
+import { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function InboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { getInboundOrderById, updateReceivedQuantities, updateInboundStatus } = useInboundOrders();
+    const { data: order, isLoading, error } = useInboundOrder(id);
+    const updateOrder = useUpdateInboundOrder();
 
-    const order = getInboundOrderById(id);
-    const [localQuantities, setLocalQuantities] = useState<Record<string, number>>(
-        order?.items.reduce((acc, item) => ({ ...acc, [item.id]: item.receivedQty }), {}) || {}
-    );
-    const [localItemData, setLocalItemData] = useState<Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>(
-        order?.items.reduce((acc, item) => ({
-            ...acc,
-            [item.id]: { batch: '', expiry: '', qc: 'good' }
-        }), {}) || {}
-    );
+    const [localQuantities, setLocalQuantities] = useState<Record<string, number>>({});
+    const [localItemData, setLocalItemData] = useState<Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});
     const [isSaving, setIsSaving] = useState(false);
 
-    if (!order) {
+    // Initialize state when order data is loaded
+    useEffect(() => {
+        if (order?.items) {
+            setLocalQuantities(
+                order.items.reduce((acc: Record<string, number>, item: InboundOrderItem) => ({ ...acc, [item.id]: item.receivedQty || 0 }), {})
+            );
+            setLocalItemData(
+                order.items.reduce((acc: Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>, item: InboundOrderItem) => ({
+                    ...acc,
+                    [item.id]: { batch: item.batchNumber || '', expiry: typeof item.expiryDate === 'string' ? item.expiryDate : '', qc: 'good' }
+                }), {})
+            );
+        }
+    }, [order]);
+
+    if (isLoading) {
+        return (
+            <View style={styles.container}>
+                <SafeAreaHeader showBackButton>
+                    <Text style={styles.headerTitle}>Đang tải...</Text>
+                </SafeAreaHeader>
+            </View>
+        );
+    }
+
+    if (!order || error) {
         return (
             <View style={styles.container}>
                 <SafeAreaHeader showBackButton>
@@ -44,7 +62,7 @@ export default function InboundDetailScreen() {
     const handleUpdateQty = (itemId: string, increment: boolean) => {
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
-            const item = order.items.find(i => i.id === itemId);
+            const item = order.items.find((i: InboundOrderItem) => i.id === itemId);
             const newValue = increment
                 ? Math.min(current + 1, item?.expectedQty || 9999)
                 : Math.max(current - 1, 0);
@@ -62,25 +80,35 @@ export default function InboundDetailScreen() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const updates = Object.entries(localQuantities).map(([itemId, receivedQty]) => ({
-                itemId,
-                receivedQty,
-                ...localItemData[itemId],
+            // Update items with received quantities
+            const updatedItems = order.items.map((item: InboundOrderItem) => ({
+                ...item,
+                receivedQty: localQuantities[item.id] || item.receivedQty || 0,
+                batchNumber: localItemData[item.id]?.batch || item.batchNumber || '',
+                expiryDate: localItemData[item.id]?.expiry || item.expiryDate || '',
+                qc: localItemData[item.id]?.qc || 'good',
             }));
 
-            // In a real app, updateReceivedQuantities would be updated to take these fields
-            await updateReceivedQuantities(order.id, updates as any);
-
             // Check if all items received
-            const allReceived = order.items.every(item =>
+            const allReceived = order.items.every((item: InboundOrderItem) =>
                 (localQuantities[item.id] || 0) >= item.expectedQty
             );
 
+            // Determine new status
+            let newStatus = order.status;
             if (allReceived && order.status !== 'completed') {
-                await updateInboundStatus(order.id, 'completed');
+                newStatus = 'completed';
             } else if (order.status === 'scheduled') {
-                await updateInboundStatus(order.id, 'receiving');
+                newStatus = 'receiving';
             }
+
+            await updateOrder.mutateAsync({
+                id: order.id,
+                updates: {
+                    items: updatedItems,
+                    status: newStatus,
+                }
+            });
 
             Alert.alert('Thành công', 'Đã lưu thông tin nhận hàng và số lô/hạn sử dụng');
             router.back();
@@ -120,7 +148,7 @@ export default function InboundDetailScreen() {
                     <Text style={styles.sectionSubtitle}>{order.items.length} mặt hàng</Text>
                 </View>
 
-                {order.items.map(item => (
+                {order.items.map((item: InboundOrderItem) => (
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
@@ -128,10 +156,10 @@ export default function InboundDetailScreen() {
                                 <Text style={styles.skuText}>SKU: {item.sku}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
-                                backgroundColor: (localQuantities[item.id] || 0) >= item.expectedQty ? '#D1FAE5' : '#FEF3C7'
+                                backgroundColor: (localQuantities[item.id] || 0) >= item.expectedQty ? COLORS.success + '20' : COLORS.warning + '20'
                             }]}>
                                 <Text style={[styles.statusBadgeText, {
-                                    color: (localQuantities[item.id] || 0) >= item.expectedQty ? '#059669' : '#D97706'
+                                    color: (localQuantities[item.id] || 0) >= item.expectedQty ? COLORS.success : COLORS.warning
                                 }]}>
                                     {(localQuantities[item.id] || 0) >= item.expectedQty ? 'Đủ' : 'Chờ'}
                                 </Text>
@@ -195,7 +223,7 @@ export default function InboundDetailScreen() {
                                     style={[styles.qcOption, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionActiveDanger]}
                                     onPress={() => handleUpdateItemData(item.id, 'qc', 'damaged')}
                                 >
-                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActive]}>Lỗi/Hỏng</Text>
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActiveDanger]}>Lỗi/Hỏng</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -427,6 +455,9 @@ const styles = StyleSheet.create({
     qcOptionTextActive: {
         color: COLORS.primary,
     },
+    qcOptionTextActiveDanger: {
+        color: COLORS.danger,
+    },
     scanItemBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -483,7 +514,7 @@ const styles = StyleSheet.create({
     saveBtnText: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#fff',
+        color: COLORS.textLight,
     },
     disabledBtn: {
         opacity: 0.6,

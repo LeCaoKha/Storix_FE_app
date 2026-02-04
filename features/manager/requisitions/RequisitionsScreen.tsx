@@ -1,11 +1,11 @@
-import { RequisitionCard } from '@/components/requisitions/RequisitionCard';
+import { RequisitionCard } from '@/components';
 import { COLORS } from '@/constants/color';
+import { useRequisitions } from '@/hooks';
 import type { RequisitionStatus } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useRequisitions } from './requisition.hooks';
 
 type TabType = 'all' | RequisitionStatus;
 
@@ -67,7 +67,7 @@ export default function RequisitionsScreen() {
         router.push('/manager/requisitions/create');
     };
 
-    const handleRequisitionPress = (id: string) => {
+    const handleRequisitionPress = (id: number | string) => {
         router.push(`/manager/requisitions/${id}` as any);
     };
 

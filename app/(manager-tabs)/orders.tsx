@@ -1,4 +1,4 @@
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import InboundOrdersScreen from '@/features/manager/orders/InboundOrdersScreen';
 import OutboundOrdersScreen from '@/features/manager/orders/OutboundOrdersScreen';

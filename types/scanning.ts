@@ -1,25 +1,19 @@
-// Scanning types
-export type ScanType = 'item' | 'location';
-
 export interface ScanResult {
-    success: boolean;
-    type: ScanType;
-    code: string;
-    message: string;
-    timestamp: Date;
-    itemId?: string;
-    locationCode?: string;
+  code: string;
+  type: ScanningType;
+  data: any;
+  timestamp: Date;
 }
 
-export interface ScanError {
-    code: 'WRONG_SKU' | 'WRONG_LOCATION' | 'QUANTITY_EXCEEDED' | 'DUPLICATE_SCAN' | 'ITEM_NOT_FOUND' | 'LOCATION_FULL';
-    message: string;
-    suggestedAction?: string;
+export enum ScanningType {
+  BARCODE = 'barcode',
+  QR_CODE = 'qr_code',
+  RFID = 'rfid',
 }
 
-export interface ScanHistory {
-    id: string;
-    result: ScanResult;
-    itemSku?: string;
-    itemName?: string;
+export interface ScannerConfig {
+  type: ScanningType[];
+  continuous?: boolean;
+  vibrate?: boolean;
+  sound?: boolean;
 }

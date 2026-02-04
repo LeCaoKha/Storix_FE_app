@@ -1,8 +1,8 @@
+import { COLORS } from '@/constants/color';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
 import React from "react";
 
-import { COLORS } from "@/constants/color";
 
 export default function ManagerTabLayout() {
     return (

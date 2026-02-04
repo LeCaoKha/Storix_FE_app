@@ -1,6 +1,6 @@
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrders } from '@/contexts/InboundOrderContext';
+import { useInboundOrders } from '@/hooks/inbound-orders.hooks';
 import { InboundStatus } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,27 +8,38 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const STATUS_CONFIG: Record<InboundStatus, { label: string; color: string; bgColor: string }> = {
-    scheduled: { label: 'Đã lên lịch', color: '#3B82F6', bgColor: '#DBEAFE' },
-    arrived: { label: 'Đã đến', color: '#8B5CF6', bgColor: '#EDE9FE' },
-    receiving: { label: 'Đang nhận', color: '#F59E0B', bgColor: '#FEF3C7' },
-    putaway: { label: 'Đang cất', color: '#06B6D4', bgColor: '#CFFAFE' },
-    completed: { label: 'Hoàn tất', color: '#10B981', bgColor: '#D1FAE5' },
-    cancelled: { label: 'Đã hủy', color: '#EF4444', bgColor: '#FEE2E2' },
+    scheduled: { label: 'Đã lên lịch', color: COLORS.primaryDark, bgColor: COLORS.primaryLight + '40' },
+    arrived: { label: 'Đã đến', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    receiving: { label: 'Đang nhận', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    putaway: { label: 'Đang cất', color: COLORS.slate700, bgColor: COLORS.slate200 },
+    completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
 export default function InboundOrdersScreen() {
     const router = useRouter();
-    const { inboundOrders, searchInboundOrders } = useInboundOrders();
+    const { data: inboundOrders = [], isLoading } = useInboundOrders();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedStatus, setSelectedStatus] = useState<InboundStatus | 'all'>('all');
 
     const filteredOrders = useMemo(() => {
-        let orders = searchQuery ? searchInboundOrders(searchQuery) : inboundOrders;
+        let orders = inboundOrders;
+
+        // Search filter
+        if (searchQuery) {
+            orders = orders.filter(o =>
+                o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                o.supplierName?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        // Status filter
         if (selectedStatus !== 'all') {
             orders = orders.filter(o => o.status === selectedStatus);
         }
+
         return orders;
-    }, [inboundOrders, searchQuery, selectedStatus, searchInboundOrders]);
+    }, [inboundOrders, searchQuery, selectedStatus]);
 
     const statusCounts = useMemo(() => {
         return {

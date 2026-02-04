@@ -1,189 +1,174 @@
+import { COLORS } from '@/constants/color';
+import { Task, TaskPriority, TaskStatus } from '@/types/order';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { COLORS } from '@/constants/color';
-import type { Task } from '@/types/order';
-
 interface TaskCardProps {
-    task: Task;
+  task: Task;
+  onPress?: () => void;
 }
 
-export function TaskCard({ task }: TaskCardProps) {
-    const router = useRouter();
+export const TaskCard: React.FC<TaskCardProps> = ({
+  task,
+  onPress,
+}) => {
+  const router = useRouter();
 
-    const handlePress = () => {
-        if (task.type === 'outbound') {
-            router.push(`/staff/outbound/${task.orderId}` as any);
-        } else if (task.type === 'inbound') {
-            router.push(`/staff/inbound/${task.orderId}` as any);
-        } else if (task.type === 'putaway') {
-            router.push(`/staff/putaway/${task.orderId}` as any);
-        } else if (task.type === 'count') {
-            router.push(`/staff/count/${task.orderId}` as any);
-        }
-    };
+  const getPriorityColor = (priority: TaskPriority) => {
+    switch (priority) {
+      case TaskPriority.LOW: return COLORS.success;
+      case TaskPriority.MEDIUM: return COLORS.warning;
+      case TaskPriority.HIGH: return COLORS.danger;
+      case TaskPriority.URGENT: return '#7C3AED'; // Deep Purple
+      default: return COLORS.slate500;
+    }
+  };
 
-    const getTaskTypeConfig = (type: Task['type']) => {
-        switch (type) {
-            case 'outbound':
-                return {
-                    label: 'OUTBOUND',
-                    icon: 'arrow-up-circle',
-                    color: '#EF4444',
-                };
-            case 'inbound':
-                return {
-                    label: 'INBOUND',
-                    icon: 'arrow-down-circle',
-                    color: '#10B981',
-                };
-            case 'putaway':
-                return {
-                    label: 'PUTAWAY',
-                    icon: 'package',
-                    color: '#3B82F6',
-                };
-            case 'count':
-                return {
-                    label: 'COUNT',
-                    icon: 'clipboard',
-                    color: '#F59E0B',
-                };
-        }
-    };
+  const getStatusColor = (status: TaskStatus) => {
+    switch (status) {
+      case TaskStatus.COMPLETED: return COLORS.success;
+      case TaskStatus.IN_PROGRESS: return COLORS.primary;
+      case TaskStatus.PENDING: return COLORS.warning;
+      case TaskStatus.CANCELLED: return COLORS.slate500;
+      default: return COLORS.slate500;
+    }
+  };
 
-    const getStatusConfig = (status: Task['status']) => {
-        switch (status) {
-            case 'pending':
-                return { label: 'Pending', color: '#B45309', bgColor: '#FEF3C7' };
-            case 'in_progress':
-                return { label: 'In Progress', color: '#0D9488', bgColor: '#CCFBF1' };
-            case 'completed':
-                return { label: 'Completed', color: '#065F46', bgColor: '#D1FAE5' };
-        }
-    };
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
 
-    const typeConfig = getTaskTypeConfig(task.type);
-    const statusConfig = getStatusConfig(task.status);
+    // Default navigation based on task type
+    switch (task.type) {
+      case 'inbound':
+        router.push(`/staff/tasks/inbound/${task.relatedOrderId || task.id}` as any);
+        break;
+      case 'outbound':
+        router.push(`/staff/tasks/outbound/${task.relatedOrderId || task.id}` as any);
+        break;
+      case 'putaway':
+        router.push(`/staff/tasks/putaway/${task.id}` as any);
+        break;
+      case 'count':
+        router.push(`/staff/tasks/count/${task.id}` as any);
+        break;
+      default:
+        console.log('No route for task type:', task.type);
+    }
+  };
 
-    // Format date: dd/m/yyyy to match image
-    const date = new Date(task.assignedDateTime);
-    const formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+  return (
+    <TouchableOpacity style={styles.card} onPress={handlePress}>
+      <View style={styles.header}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title} numberOfLines={1}>{task.title}</Text>
+          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(task.priority) + '20' }]}>
+            <Text style={[styles.priorityText, { color: getPriorityColor(task.priority) }]}>{task.priority}</Text>
+          </View>
+        </View>
+        <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+      </View>
 
-    return (
-        <TouchableOpacity onPress={handlePress} style={styles.container}>
-            <View style={styles.header}>
-                <View style={styles.typeContainer}>
-                    <Feather name={typeConfig.icon as any} size={18} color={typeConfig.color} />
-                    <Text style={[styles.typeLabel, { color: typeConfig.color }]}>{typeConfig.label}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-                    <Text style={[styles.statusText, { color: statusConfig.color }]}>{statusConfig.label}</Text>
-                </View>
-            </View>
+      <Text style={styles.description} numberOfLines={2}>{task.description}</Text>
 
-            <View style={styles.content}>
-                <Text style={styles.orderNumber}>{task.orderNumber}</Text>
-                {task.customerOrSupplier && (
-                    <Text style={styles.customerOrSupplier}>{task.customerOrSupplier}</Text>
-                )}
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.footer}>
-                <View style={styles.footerInfo}>
-                    <View style={styles.metaItem}>
-                        <Feather name="package" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.metaText}>{task.itemCount} items</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                        <Feather name="clock" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.metaText}>{formattedDate}</Text>
-                    </View>
-                </View>
-                <Feather name="chevron-right" size={18} color={COLORS.textMuted} />
-            </View>
-        </TouchableOpacity>
-    );
-}
+      <View style={styles.footer}>
+        <View style={styles.typeTag}>
+          <Feather name="tag" size={12} color={COLORS.textMuted} />
+          <Text style={styles.typeText}>{task.type}</Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '10' }]}>
+          <View style={[styles.statusDot, { backgroundColor: getStatusColor(task.status) }]} />
+          <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>{task.status}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
-    container: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        marginBottom: 16,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: '#F3F4F6',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    typeContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    typeLabel: {
-        fontSize: 13,
-        fontWeight: 'bold',
-        letterSpacing: 0.5,
-    },
-    statusBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 20,
-    },
-    statusText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    content: {
-        marginBottom: 16,
-    },
-    orderNumber: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginBottom: 2,
-    },
-    customerOrSupplier: {
-        fontSize: 14,
-        color: COLORS.textMuted,
-        fontWeight: '400',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#F3F4F6',
-        marginBottom: 12,
-    },
-    footer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    footerInfo: {
-        flexDirection: 'row',
-        gap: 16,
-    },
-    metaItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    metaText: {
-        fontSize: 14,
-        color: COLORS.textMuted,
-    },
+  card: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+    maxWidth: '70%',
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  priorityText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  description: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  typeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  typeText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
 });

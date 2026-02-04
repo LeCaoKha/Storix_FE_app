@@ -1,6 +1,6 @@
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useOutboundOrders } from '@/contexts/OutboundOrderContext';
+import { useOutboundOrders } from '@/hooks/outbound-orders.hooks';
 import { OutboundStatus } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,28 +8,41 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const STATUS_CONFIG: Record<OutboundStatus, { label: string; color: string; bgColor: string }> = {
-    open: { label: 'Mới tạo', color: '#3B82F6', bgColor: '#DBEAFE' },
-    picking: { label: 'Đang lấy hàng', color: '#F59E0B', bgColor: '#FEF3C7' },
-    packing: { label: 'Đang đóng gói', color: '#8B5CF6', bgColor: '#EDE9FE' },
-    ready: { label: 'Sẵn sàng', color: '#06B6D4', bgColor: '#CFFAFE' },
-    shipped: { label: 'Đã xuất', color: '#10B981', bgColor: '#D1FAE5' },
-    completed: { label: 'Hoàn tất', color: '#059669', bgColor: '#D1FAE5' },
-    cancelled: { label: 'Đã hủy', color: '#EF4444', bgColor: '#FEE2E2' },
+    open: { label: 'Mới tạo', color: COLORS.primaryDark, bgColor: COLORS.primaryLight + '40' },
+    picking: { label: 'Đang lấy hàng', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    packing: { label: 'Đang đóng gói', color: COLORS.slate700, bgColor: COLORS.slate200 },
+    ready: { label: 'Sẵn sàng', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    shipped: { label: 'Đã xuất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    completed: { label: 'Hoàn tất', color: COLORS.teal600, bgColor: COLORS.teal50 },
+    delivered: { label: 'Đã giao', color: COLORS.success, bgColor: COLORS.success + '20' },
+    on_hold: { label: 'Tạm dừng', color: COLORS.slate500, bgColor: COLORS.slate200 },
+    cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
 export default function OutboundOrdersScreen() {
     const router = useRouter();
-    const { outboundOrders, searchOutboundOrders } = useOutboundOrders();
+    const { data: outboundOrders = [], isLoading } = useOutboundOrders();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedStatus, setSelectedStatus] = useState<OutboundStatus | 'all'>('all');
 
     const filteredOrders = useMemo(() => {
-        let orders = searchQuery ? searchOutboundOrders(searchQuery) : outboundOrders;
+        let orders = outboundOrders;
+
+        // Search filter
+        if (searchQuery) {
+            orders = orders.filter(o =>
+                o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                o.customerName?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        // Status filter
         if (selectedStatus !== 'all') {
             orders = orders.filter(o => o.status === selectedStatus);
         }
+
         return orders;
-    }, [outboundOrders, searchQuery, selectedStatus, searchOutboundOrders]);
+    }, [outboundOrders, searchQuery, selectedStatus]);
 
     const statusCounts = useMemo(() => {
         return {

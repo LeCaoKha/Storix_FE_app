@@ -1,5 +1,5 @@
-import { api } from '@/services/axios.instance';
 import { GoodsRequisition } from '@/types/requisition';
+import { api } from './axios.instance';
 
 export const getRequisitions = async (): Promise<GoodsRequisition[]> => {
     // Current BE doesn't have a list endpoint, we'll keep using mock data for the list

@@ -5,10 +5,9 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Button, Input } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useLogin } from '@/features/auth/auth.hooks';
+import { useLogin } from '@/hooks/auth.hooks';
 
 export default function LoginScreen() {
     const router = useRouter();

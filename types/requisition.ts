@@ -1,35 +1,48 @@
-export type RequisitionStatus = 'Pending' | 'Approved' | 'Rejected' | 'Created';
 export type RequisitionType = 'inbound' | 'outbound';
-
-export interface RequisitionItem {
-    id: number; // ProductId
-    sku: string;
-    productName: string;
-    quantity: number;
-    unit: string;
-}
+export type RequisitionStatus = 'pending' | 'approved' | 'rejected' | 'completed';
 
 export interface GoodsRequisition {
-    id: number;
-    requisitionNumber: string;
-    type: RequisitionType;
-    status: RequisitionStatus;
+  id: number;
+  requisitionNumber: string;
+  type: RequisitionType;
+  status: RequisitionStatus;
+  warehouseId: number;
+  warehouse?: string;
+  supplierId: number;
+  supplier?: string;
+  requestedBy: number;
+  createdByName?: string;
+  purpose: string;
+  notes?: string;
+  expectedDate: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  items: RequisitionItem[];
 
-    // Backend compatible fields
-    warehouseId: number;
-    supplierId: number;
-    requestedBy: number;
-
-    // Dates
-    createdAt: Date;
-    approvedAt?: Date;
-
-    // Items
-    items: RequisitionItem[];
-
-    // Display fields (optional for BE)
-    warehouseName?: string;
-    supplierName?: string;
-    requestedByName?: string;
+  // For details/review
+  reviewedByName?: string;
+  reviewedAt?: Date | string;
+  rejectionReason?: string;
+  linkedOrderId?: string;
+  linkedOrderNumber?: string;
 }
 
+export interface RequisitionItem {
+  id: number;
+  sku: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  notes?: string;
+  // Metadata for inbound/outbound
+  batchNumber?: string;
+  lotNumber?: string;
+  expiryDate?: Date | string;
+}
+
+export enum Priority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  URGENT = 'urgent',
+}

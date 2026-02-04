@@ -1,7 +1,6 @@
-import { Card } from '@/components/ui/Card';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
+import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrders } from '@/contexts/InboundOrderContext';
+import { useInboundOrder, useUpdateInboundOrder } from '@/hooks';
 import { InboundStatus } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,22 +8,31 @@ import React from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const STATUS_CONFIG: Record<InboundStatus, { label: string; color: string; bgColor: string }> = {
-    scheduled: { label: 'Đã lên lịch', color: '#3B82F6', bgColor: '#DBEAFE' },
-    arrived: { label: 'Đã đến', color: '#8B5CF6', bgColor: '#EDE9FE' },
-    receiving: { label: 'Đang nhận', color: '#F59E0B', bgColor: '#FEF3C7' },
-    putaway: { label: 'Đang cất', color: '#06B6D4', bgColor: '#CFFAFE' },
-    completed: { label: 'Hoàn tất', color: '#10B981', bgColor: '#D1FAE5' },
-    cancelled: { label: 'Đã hủy', color: '#EF4444', bgColor: '#FEE2E2' },
+    scheduled: { label: 'Đã lên lịch', color: COLORS.primaryDark, bgColor: COLORS.primaryLight + '40' },
+    arrived: { label: 'Đã đến', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    receiving: { label: 'Đang nhận', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    putaway: { label: 'Đang cất', color: COLORS.slate700, bgColor: COLORS.slate200 },
+    completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
 export default function InboundOrderDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { getInboundOrderById, updateInboundStatus } = useInboundOrders();
+    const { data: order, isLoading, error } = useInboundOrder(id);
+    const updateOrder = useUpdateInboundOrder();
 
-    const order = getInboundOrderById(id);
+    if (isLoading) {
+        return (
+            <View style={styles.container}>
+                <SafeAreaHeader showBackButton>
+                    <Text style={styles.headerTitle}>Đang tải...</Text>
+                </SafeAreaHeader>
+            </View>
+        );
+    }
 
-    if (!order) {
+    if (!order || error) {
         return (
             <View style={styles.container}>
                 <View style={styles.errorContainer}>
@@ -43,7 +51,10 @@ export default function InboundOrderDetailScreen() {
 
     const handleStatusUpdate = async (newStatus: InboundStatus) => {
         try {
-            await updateInboundStatus(order.id, newStatus);
+            await updateOrder.mutateAsync({
+                id: order.id,
+                updates: { status: newStatus }
+            });
             Alert.alert('Thành công', 'Đã cập nhật trạng thái');
         } catch (error) {
             Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
@@ -138,7 +149,7 @@ export default function InboundOrderDetailScreen() {
                                     {item.condition && (
                                         <Text style={[
                                             styles.itemCondition,
-                                            { color: item.condition === 'good' ? '#10B981' : '#EF4444' }
+                                            { color: item.condition === 'good' ? COLORS.success : COLORS.danger }
                                         ]}>
                                             {item.condition === 'good' ? 'Tốt' : 'Lỗi'}
                                         </Text>

@@ -1,5 +1,5 @@
+import { getTasks } from '@/services/task.api';
 import { useQuery } from '@tanstack/react-query';
-import { getTasks } from './task.api';
 
 export const useTasks = () => {
     return useQuery({
@@ -7,3 +7,4 @@ export const useTasks = () => {
         queryFn: getTasks,
     });
 };
+

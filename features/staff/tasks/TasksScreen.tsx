@@ -2,13 +2,10 @@ import { Feather } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { HorizontalFilterBar, type FilterOption } from '@/components/ui/HorizontalFilterBar';
-import { SafeAreaHeader } from '@/components/ui/SafeAreaHeader';
-import { TaskCard } from '@/components/ui/TaskCard';
+import { HorizontalFilterBar, SafeAreaHeader, TaskCard, type FilterOption } from '@/components';
 import { COLORS } from '@/constants/color';
-import type { TaskType } from '@/types/order';
-
-import { useTasks } from './task.hooks';
+import { useTasks } from '@/hooks/task.hooks';
+import { Task, TaskStatus, TaskType } from '@/types/order';
 
 export default function TasksScreen() {
     const [activeFilter, setActiveFilter] = useState<'all' | TaskType>('all');
@@ -18,20 +15,21 @@ export default function TasksScreen() {
     const getFilterLabel = (type: 'all' | TaskType) => {
         switch (type) {
             case 'all': return 'Tất cả';
-            case 'outbound': return 'Xuất kho';
-            case 'inbound': return 'Nhập kho';
-            case 'putaway': return 'Xếp hàng';
-            case 'count': return 'Kiểm kê';
+            case TaskType.OUTBOUND: return 'Xuất kho';
+            case TaskType.INBOUND: return 'Nhập kho';
+            case TaskType.PUTAWAY: return 'Xếp hàng';
+            case TaskType.COUNT: return 'Kiểm kê';
+            default: return 'Khác';
         }
     };
 
     // Prepare filter options with counts - MUST be before early return
     const filterOptions = useMemo<FilterOption<'all' | TaskType>[]>(() => {
-        const filters: ('all' | TaskType)[] = ['all', 'outbound', 'inbound', 'putaway', 'count'];
+        const filters: ('all' | TaskType)[] = ['all', TaskType.OUTBOUND, TaskType.INBOUND, TaskType.PUTAWAY, TaskType.COUNT];
         return filters.map(filter => ({
             value: filter,
             label: getFilterLabel(filter),
-            count: filter === 'all' ? tasks.length : tasks.filter(t => t.type === filter).length,
+            count: filter === 'all' ? tasks.length : tasks.filter((t: Task) => t.type === filter).length,
         }));
     }, [tasks]);
 
@@ -49,9 +47,9 @@ export default function TasksScreen() {
     );
 
     const getTaskSummary = () => {
-        const pending = tasks.filter(t => t.status === 'pending').length;
-        const inProgress = tasks.filter(t => t.status === 'in_progress').length;
-        const completed = tasks.filter(t => t.status === 'completed').length;
+        const pending = tasks.filter((t: Task) => t.status === TaskStatus.PENDING).length;
+        const inProgress = tasks.filter((t: Task) => t.status === TaskStatus.IN_PROGRESS).length;
+        const completed = tasks.filter((t: Task) => t.status === TaskStatus.COMPLETED).length;
         return { pending, inProgress, completed, total: tasks.length };
     };
 
@@ -68,24 +66,24 @@ export default function TasksScreen() {
             <View style={styles.summaryAndFilterContainer}>
                 <View style={styles.summaryContainer}>
                     <TouchableOpacity
-                        style={[styles.summaryCard, { backgroundColor: '#FFFBEB' }]}
+                        style={[styles.summaryCard, { backgroundColor: COLORS.warning + '20' }]}
                         activeOpacity={0.7}
                     >
-                        <Text style={[styles.summaryNumber, { color: '#F59E0B' }]}>{summary.pending}</Text>
+                        <Text style={[styles.summaryNumber, { color: COLORS.warning }]}>{summary.pending}</Text>
                         <Text style={styles.summaryLabel}>Chờ xử lý</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.summaryCard, { backgroundColor: '#EFF6FF' }]}
+                        style={[styles.summaryCard, { backgroundColor: COLORS.primary + '20' }]}
                         activeOpacity={0.7}
                     >
-                        <Text style={[styles.summaryNumber, { color: '#3B82F6' }]}>{summary.inProgress}</Text>
+                        <Text style={[styles.summaryNumber, { color: COLORS.primary }]}>{summary.inProgress}</Text>
                         <Text style={styles.summaryLabel}>Đang làm</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.summaryCard, { backgroundColor: '#F0FDF4' }]}
+                        style={[styles.summaryCard, { backgroundColor: COLORS.success + '20' }]}
                         activeOpacity={0.7}
                     >
-                        <Text style={[styles.summaryNumber, { color: '#10B981' }]}>{summary.completed}</Text>
+                        <Text style={[styles.summaryNumber, { color: COLORS.success }]}>{summary.completed}</Text>
                         <Text style={styles.summaryLabel}>Hoàn thành</Text>
                     </TouchableOpacity>
                 </View>
@@ -93,8 +91,8 @@ export default function TasksScreen() {
                 {/* Filter Tabs */}
                 <HorizontalFilterBar
                     options={filterOptions}
-                    activeFilter={activeFilter}
-                    onFilterChange={setActiveFilter}
+                    activeValue={activeFilter}
+                    onSelect={setActiveFilter}
                 />
             </View>
 
@@ -104,7 +102,7 @@ export default function TasksScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 {filteredTasks.length > 0 ? (
-                    filteredTasks.map((task) => (
+                    filteredTasks.map((task: Task) => (
                         <TaskCard key={task.id} task={task} />
                     ))
                 ) : (
@@ -143,7 +141,7 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
     },
     summaryAndFilterContainer: {
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.card,
     },
     summaryContainer: {
         flexDirection: 'row',

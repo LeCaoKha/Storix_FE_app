@@ -1,10 +1,9 @@
+import { Card } from '@/components';
+import { COLORS } from '@/constants/color';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-import { Card } from '@/components/ui/Card';
-import { COLORS } from '@/constants/color';
 
 export default function HomeScreen() {
     const router = useRouter();
