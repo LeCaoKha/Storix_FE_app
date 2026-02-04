@@ -14,6 +14,9 @@ const STATUS_CONFIG: Record<InboundStatus, { label: string; color: string; bgCol
     putaway: { label: 'Đang cất', color: COLORS.slate700, bgColor: COLORS.slate200 },
     completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
     cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    pending: { label: 'Chờ duyệt', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    received: { label: 'Đã nhận', color: COLORS.success, bgColor: COLORS.success + '20' },
+    in_transit: { label: 'Đang về', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
 };
 
 export default function InboundOrdersScreen() {
@@ -28,8 +31,8 @@ export default function InboundOrdersScreen() {
         // Search filter
         if (searchQuery) {
             orders = orders.filter(o =>
-                o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                o.supplierName?.toLowerCase().includes(searchQuery.toLowerCase())
+                o.inboundNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                o.supplier?.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
@@ -58,7 +61,7 @@ export default function InboundOrdersScreen() {
                     <Text style={styles.title}>Đơn Nhập Kho</Text>
                     <TouchableOpacity
                         style={styles.addButton}
-                        onPress={() => router.push('/manager/orders/inbound/create')}
+                        onPress={() => router.push('/(manager-tabs)/orders/inbound/create')}
                     >
                         <Feather name="plus" size={20} color="#fff" />
                     </TouchableOpacity>
@@ -130,7 +133,7 @@ export default function InboundOrdersScreen() {
                             <TouchableOpacity
                                 key={order.id}
                                 onPress={() => router.push({
-                                    pathname: '/manager/orders/inbound/[id]',
+                                    pathname: '/(manager-tabs)/orders/inbound/[id]',
                                     params: { id: order.id }
                                 })}
                             >

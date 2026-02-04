@@ -1,6 +1,6 @@
 import { Card } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useLinkOrderToRequisition, useOutboundOrders, useRequisition } from '@/hooks';
+import { useCreateOutboundOrder, useLinkOrderToRequisition, useRequisition } from '@/hooks';
 import { OutboundOrder } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,7 +14,7 @@ export default function CreateOutboundOrderScreen() {
 
     const { data: requisition, isLoading: isLoadingRequisition } = useRequisition(requisitionId);
     const { mutateAsync: linkOrder } = useLinkOrderToRequisition();
-    const { createOutboundOrder } = useOutboundOrders();
+    const { mutateAsync: createOutboundOrder } = useCreateOutboundOrder();
 
     const [customer, setCustomer] = useState('');
     const [customerContact, setCustomerContact] = useState('');
@@ -93,7 +93,7 @@ export default function CreateOutboundOrderScreen() {
                     text: 'OK',
                     onPress: () => {
                         router.back();
-                        router.push(`/manager/orders/outbound/${created.id}` as any);
+                        router.push(`/(manager-tabs)/orders/outbound/${created.id}` as any);
                     },
                 },
             ]);

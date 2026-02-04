@@ -45,16 +45,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     // Default navigation based on task type
     switch (task.type) {
       case 'inbound':
-        router.push(`/staff/tasks/inbound/${task.relatedOrderId || task.id}` as any);
+        router.push(`/(staff-tabs)/tasks/inbound/${task.relatedOrderId || task.id}` as any);
         break;
       case 'outbound':
-        router.push(`/staff/tasks/outbound/${task.relatedOrderId || task.id}` as any);
+        router.push(`/(staff-tabs)/tasks/outbound/${task.relatedOrderId || task.id}` as any);
         break;
       case 'putaway':
-        router.push(`/staff/tasks/putaway/${task.id}` as any);
+        router.push(`/(staff-tabs)/tasks/putaway/${task.id}` as any);
         break;
       case 'count':
-        router.push(`/staff/tasks/count/${task.id}` as any);
+        router.push(`/(staff-tabs)/tasks/count/${task.id}` as any);
         break;
       default:
         console.log('No route for task type:', task.type);

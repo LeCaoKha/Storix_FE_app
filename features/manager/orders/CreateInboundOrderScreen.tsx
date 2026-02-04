@@ -1,6 +1,6 @@
 import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrders, useLinkOrderToRequisition, useRequisition } from '@/hooks';
+import { useCreateInboundOrder, useLinkOrderToRequisition, useRequisition } from '@/hooks';
 import { InboundOrder } from '@/types/inbound-order';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -13,7 +13,7 @@ export default function CreateInboundOrderScreen() {
 
     const { data: requisition, isLoading: isLoadingRequisition } = useRequisition(requisitionId);
     const { mutateAsync: linkOrder } = useLinkOrderToRequisition();
-    const { createInboundOrder } = useInboundOrders();
+    const { mutateAsync: createInboundOrder } = useCreateInboundOrder();
 
     const [supplier, setSupplier] = useState('');
     const [supplierContact, setSupplierContact] = useState('');
@@ -77,7 +77,7 @@ export default function CreateInboundOrderScreen() {
                     text: 'OK',
                     onPress: () => {
                         router.back();
-                        router.push(`/manager/orders/inbound/${created.id}` as any);
+                        router.push(`/(manager-tabs)/orders/inbound/${created.id}` as any);
                     },
                 },
             ]);
