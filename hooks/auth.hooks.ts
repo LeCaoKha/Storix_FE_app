@@ -9,7 +9,7 @@ export const useLogin = () => {
         mutationFn: ({ email, password }: { email: string; password: string }) =>
             loginRequest(email, password),
         onSuccess: (data) => {
-            login(data.token, {
+            login(data.accessToken, {
                 id: data.userId,
                 roleId: data.roleId,
                 companyId: data.companyId,

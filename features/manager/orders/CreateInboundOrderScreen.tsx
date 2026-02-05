@@ -1,7 +1,6 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useCreateInboundOrder, useLinkOrderToRequisition, useRequisition } from '@/hooks';
-import { InboundOrder } from '@/types/inbound-order';
+import { useCreateInboundTicket, useInboundRequest } from '@/hooks';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -9,11 +8,10 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, Touc
 export default function CreateInboundOrderScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const requisitionId = params.requisitionId as string;
+    const requestId = params.requestId as string;
 
-    const { data: requisition, isLoading: isLoadingRequisition } = useRequisition(requisitionId);
-    const { mutateAsync: linkOrder } = useLinkOrderToRequisition();
-    const { mutateAsync: createInboundOrder } = useCreateInboundOrder();
+    const { data: inboundRequest, isLoading: isLoadingRequest } = useInboundRequest(requestId);
+    const { mutateAsync: createInboundTicket } = useCreateInboundTicket();
 
     const [supplier, setSupplier] = useState('');
     const [supplierContact, setSupplierContact] = useState('');
@@ -23,10 +21,11 @@ export default function CreateInboundOrderScreen() {
     const [isCreating, setIsCreating] = useState(false);
 
     useEffect(() => {
-        if (requisition) {
-            setSupplier(requisition.supplier || '');
+        if (inboundRequest) {
+            // Set supplier from inboundRequest if available
+            setSupplier(inboundRequest.supplier?.name || '');
         }
-    }, [requisition]);
+    }, [inboundRequest]);
 
     const handleCreate = async () => {
         if (!supplier.trim()) {
@@ -36,41 +35,17 @@ export default function CreateInboundOrderScreen() {
 
         setIsCreating(true);
         try {
-            const newOrder: Omit<InboundOrder, 'id' | 'inboundNumber' | 'createdAt'> = {
-                requisitionId: requisition?.id ? String(requisition.id) : undefined,
-                requisitionNumber: requisition?.requisitionNumber,
-                supplier: supplier.trim(),
-                supplierContact: supplierContact.trim() || undefined,
-                poReference: poReference.trim() || undefined,
-                warehouse: requisition?.warehouse || 'Warehouse Central',
-                items: requisition?.items.map(item => ({
-                    id: `inb-item-${Date.now()}-${item.id}`,
-                    sku: item.sku,
-                    productName: item.productName,
-                    expectedQty: item.quantity,
-                    receivedQty: 0,
-                    unit: item.unit,
-                    batchNumber: item.batchNumber,
-                    lotNumber: item.lotNumber,
-                    expiryDate: item.expiryDate,
-                })) || [],
-                status: 'scheduled',
-                expectedArrivalDate: expectedDate,
-                createdBy: 'mgr-001',
-                createdByName: 'Manager Name',
-                notes: notes.trim() || undefined,
+            // Create inbound ticket from the approved request
+            const payload = {
+                inboundRequestId: inboundRequest?.id || parseInt(requestId),
+                items: inboundRequest?.items?.map(item => ({
+                    productId: item.productId,
+                    expectedQuantity: item.expectedQuantity,
+                    actualQuantity: 0,
+                })) || []
             };
 
-            const created = await createInboundOrder(newOrder);
-
-            // Link order to requisition
-            if (requisition) {
-                await linkOrder({
-                    requisitionId: requisition.id,
-                    orderId: created.id,
-                    orderNumber: created.inboundNumber
-                });
-            }
+            const created = await createInboundTicket(payload);
 
             Alert.alert('Thành công', 'Đã tạo đơn nhập kho', [
                 {
@@ -88,7 +63,7 @@ export default function CreateInboundOrderScreen() {
         }
     };
 
-    if (isLoadingRequisition) {
+    if (isLoadingRequest) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
@@ -114,11 +89,11 @@ export default function CreateInboundOrderScreen() {
             />
 
             <ScrollView style={styles.content}>
-                {requisition && (
+                {inboundRequest && (
                     <Card style={styles.card}>
-                        <Text style={styles.sectionTitle}>Từ Đề Xuất</Text>
-                        <Text style={styles.requisitionNumber}>{requisition.requisitionNumber}</Text>
-                        <Text style={styles.requisitionPurpose}>{requisition.purpose}</Text>
+                        <Text style={styles.sectionTitle}>Từ Yêu Cầu Nhập Kho</Text>
+                        <Text style={styles.requisitionNumber}>Request #{inboundRequest.id}</Text>
+                        <Text style={styles.requisitionPurpose}>Trạng thái: {inboundRequest.status}</Text>
                     </Card>
                 )}
 

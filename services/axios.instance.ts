@@ -14,6 +14,12 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().token;
+    console.log('API Request - Token check:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      url: config.url
+    });
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

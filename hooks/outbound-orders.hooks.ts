@@ -11,6 +11,7 @@ import {
   type CreateOutboundRequestPayload,
   type UpdateOutboundItemPayload,
 } from '@/services/outbound-order.api';
+import { useAuthStore } from '@/stores/auth.store';
 import { OutboundRequest } from '@/types/outbound-order';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -38,13 +39,16 @@ export const outboundOrderKeys = {
 
 /**
  * Lấy danh sách yêu cầu xuất kho (requests - chờ duyệt)
+ * NOTE: Backend chưa có endpoint get-all-outbound-requests/{companyId}
+ * Cần liên hệ Backend team để thêm endpoint này
  */
-const getOutboundRequests = async (): Promise<OutboundRequest[]> => {
+const getOutboundRequests = async (companyId: number): Promise<OutboundRequest[]> => {
   try {
-    const response = await api.get('/api/InventoryOutbound/get-all-outbound-requests');
+    // TODO: Backend cần thêm endpoint này
+    const response = await api.get(`/api/InventoryOutbound/get-all-outbound-requests/${companyId}`);
     return response.data;
   } catch {
-    console.warn('Outbound requests API not available, returning empty array');
+    console.warn('Outbound requests API not available (Backend needs to add endpoint)');
     return [];
   }
 };
@@ -52,9 +56,9 @@ const getOutboundRequests = async (): Promise<OutboundRequest[]> => {
 /**
  * Lấy chi tiết yêu cầu xuất kho
  */
-const getOutboundRequestById = async (id: number): Promise<OutboundRequest | null> => {
+const getOutboundRequestById = async (companyId: number, id: number): Promise<OutboundRequest | null> => {
   try {
-    const response = await api.get(`/api/InventoryOutbound/get-outbound-request-by-id/${id}`);
+    const response = await api.get(`/api/InventoryOutbound/get-outbound-request-by-id/${companyId}/${id}`);
     return response.data;
   } catch {
     console.warn(`Outbound request ${id} not found`);
@@ -64,13 +68,15 @@ const getOutboundRequestById = async (id: number): Promise<OutboundRequest | nul
 
 /**
  * Lấy danh sách phiếu xuất kho (tickets - đã duyệt)
+ * NOTE: Backend chưa có endpoint get-all-outbound-tickets/{companyId}
  */
-const getOutboundTickets = async (): Promise<ApiOutboundOrder[]> => {
+const getOutboundTickets = async (companyId: number): Promise<ApiOutboundOrder[]> => {
   try {
-    const response = await api.get('/api/InventoryOutbound/get-all-outbound-tickets');
+    // TODO: Backend cần thêm endpoint này
+    const response = await api.get(`/api/InventoryOutbound/get-all-outbound-tickets/${companyId}`);
     return response.data;
   } catch {
-    console.warn('Outbound tickets API not available, returning empty array');
+    console.warn('Outbound tickets API not available (Backend needs to add endpoint)');
     return [];
   }
 };
@@ -78,9 +84,9 @@ const getOutboundTickets = async (): Promise<ApiOutboundOrder[]> => {
 /**
  * Lấy chi tiết phiếu xuất kho
  */
-const getOutboundTicketById = async (id: number): Promise<ApiOutboundOrder | null> => {
+const getOutboundTicketById = async (companyId: number, id: number): Promise<ApiOutboundOrder | null> => {
   try {
-    const response = await api.get(`/api/InventoryOutbound/get-outbound-ticket-by-id/${id}`);
+    const response = await api.get(`/api/InventoryOutbound/get-outbound-ticket-by-id/${companyId}/${id}`);
     return response.data;
   } catch {
     console.warn(`Outbound ticket ${id} not found`);
@@ -94,9 +100,12 @@ const getOutboundTicketById = async (id: number): Promise<ApiOutboundOrder | nul
  * Hook lấy danh sách yêu cầu xuất kho (chờ duyệt - cho Manager/Admin)
  */
 export const useOutboundRequests = () => {
+  const companyId = useAuthStore((state) => state.user?.companyId);
+  
   return useQuery({
-    queryKey: outboundOrderKeys.requests(),
-    queryFn: getOutboundRequests,
+    queryKey: [...outboundOrderKeys.requests(), companyId],
+    queryFn: () => getOutboundRequests(companyId!),
+    enabled: !!companyId,
   });
 };
 
@@ -104,12 +113,13 @@ export const useOutboundRequests = () => {
  * Hook lấy chi tiết yêu cầu xuất kho
  */
 export const useOutboundRequest = (id: number | string | undefined) => {
+  const companyId = useAuthStore((state) => state.user?.companyId);
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
   return useQuery({
     queryKey: outboundOrderKeys.requestDetail(numericId ?? 0),
-    queryFn: () => getOutboundRequestById(numericId!),
-    enabled: !!numericId && !isNaN(numericId),
+    queryFn: () => getOutboundRequestById(companyId!, numericId!),
+    enabled: !!companyId && !!numericId && !isNaN(numericId),
   });
 };
 
@@ -117,9 +127,12 @@ export const useOutboundRequest = (id: number | string | undefined) => {
  * Hook lấy danh sách phiếu xuất kho (đã duyệt - cho Staff xử lý)
  */
 export const useOutboundTickets = () => {
+  const companyId = useAuthStore((state) => state.user?.companyId);
+  
   return useQuery({
-    queryKey: outboundOrderKeys.tickets(),
-    queryFn: getOutboundTickets,
+    queryKey: [...outboundOrderKeys.tickets(), companyId],
+    queryFn: () => getOutboundTickets(companyId!),
+    enabled: !!companyId,
   });
 };
 
@@ -127,12 +140,13 @@ export const useOutboundTickets = () => {
  * Hook lấy chi tiết phiếu xuất kho
  */
 export const useOutboundTicket = (id: number | string | undefined) => {
+  const companyId = useAuthStore((state) => state.user?.companyId);
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
   return useQuery({
     queryKey: outboundOrderKeys.ticketDetail(numericId ?? 0),
-    queryFn: () => getOutboundTicketById(numericId!),
-    enabled: !!numericId && !isNaN(numericId),
+    queryFn: () => getOutboundTicketById(companyId!, numericId!),
+    enabled: !!companyId && !!numericId && !isNaN(numericId),
   });
 };
 
@@ -141,9 +155,12 @@ export const useOutboundTicket = (id: number | string | undefined) => {
  * @deprecated Use useOutboundTickets or useOutboundRequests instead
  */
 export const useOutboundOrders = () => {
+  const companyId = useAuthStore((state) => state.user?.companyId);
+  
   return useQuery({
     queryKey: outboundOrderKeys.lists(),
-    queryFn: getOutboundTickets,
+    queryFn: () => getOutboundTickets(companyId!),
+    enabled: !!companyId,
   });
 };
 
@@ -152,12 +169,13 @@ export const useOutboundOrders = () => {
  * @deprecated Use useOutboundTicket or useOutboundRequest instead
  */
 export const useOutboundOrder = (id: number | string | undefined) => {
+  const companyId = useAuthStore((state) => state.user?.companyId);
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
   return useQuery({
     queryKey: outboundOrderKeys.detail(numericId ?? 0),
-    queryFn: () => getOutboundTicketById(numericId!),
-    enabled: !!numericId && !isNaN(numericId),
+    queryFn: () => getOutboundTicketById(companyId!, numericId!),
+    enabled: !!companyId && !!numericId && !isNaN(numericId),
   });
 };
 

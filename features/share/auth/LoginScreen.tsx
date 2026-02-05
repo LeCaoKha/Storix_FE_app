@@ -21,13 +21,27 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         try {
             const data = await login({ email, password });
+            
+            console.log('Login response:', {
+                hasToken: !!data.accessToken,
+                tokenLength: data.accessToken?.length,
+                userId: data.userId,
+                roleId: data.roleId,
+                companyId: data.companyId
+            });
 
             // Save to store explicitly
-            loginStore(data.token, {
+            loginStore(data.accessToken, {
                 id: data.userId,
                 roleId: data.roleId,
                 companyId: data.companyId,
                 email: email,
+            });
+            
+            console.log('After loginStore - checking store state:', {
+                hasToken: !!useAuthStore.getState().token,
+                tokenLength: useAuthStore.getState().token?.length,
+                hasUser: !!useAuthStore.getState().user
             });
 
             // Small delay to ensure AsyncStorage write completes

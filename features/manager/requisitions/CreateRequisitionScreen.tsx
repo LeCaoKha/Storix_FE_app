@@ -2,10 +2,13 @@ import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useCreateRequisition } from '@/hooks';
 import { useProducts } from '@/hooks/product.hooks';
+import { useSuppliers } from '@/hooks/suppliers.hooks';
+import { api } from '@/services/axios.instance';
+import { useAuthStore } from '@/stores/auth.store';
 import type { RequisitionItem, RequisitionType } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     FlatList,
@@ -22,13 +25,86 @@ export default function CreateRequisitionScreen() {
     const router = useRouter();
     const { mutateAsync: createRequisition, isPending: loading } = useCreateRequisition();
     const { data: products = [], isLoading: loadingProducts } = useProducts();
+    const { data: suppliers = [], isLoading: loadingSuppliers } = useSuppliers();
+    const user = useAuthStore((state) => state.user);
+    const token = useAuthStore((state) => state.token);
+    const companyId = user?.companyId;
 
     const [type, setType] = useState<RequisitionType>('inbound');
-    const [warehouseId, setWarehouseId] = useState('1');
-    const [supplierId, setSupplierId] = useState('1');
+    const [warehouseId, setWarehouseId] = useState<number | null>(null);
+    const [supplierId, setSupplierId] = useState<number | null>(null);
+    const [warehouses, setWarehouses] = useState<any[]>([]);
+    const [loadingWarehouses, setLoadingWarehouses] = useState(false);
     const [items, setItems] = useState<RequisitionItem[]>([]);
     const [showProductPicker, setShowProductPicker] = useState(false);
+    const [showWarehousePicker, setShowWarehousePicker] = useState(false);
+    const [showSupplierPicker, setShowSupplierPicker] = useState(false);
     const [productSearch, setProductSearch] = useState('');
+
+    // Load warehouses - chỉ chạy 1 lần khi component mount
+    useEffect(() => {
+        let mounted = true;
+        
+        const loadWarehouses = async () => {
+            if (!companyId) {
+                console.log('No companyId available');
+                return;
+            }
+            
+            if (!token) {
+                console.log('No token available, please login again');
+                Alert.alert('Lỗi', 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                return;
+            }
+
+            setLoadingWarehouses(true);
+            console.log('Loading warehouses for companyId:', companyId);
+            
+            try {
+                const res = await api.get(`/api/company-warehouses/${companyId}/assignments`);
+                if (!mounted) return;
+                
+                console.log('Warehouses loaded successfully:', res.data?.length || 0);
+                setWarehouses(res.data || []);
+                
+                // Auto-select first warehouse if available
+                if (res.data && res.data.length > 0 && !warehouseId) {
+                    setWarehouseId(res.data[0].warehouseId || res.data[0].id);
+                }
+            } catch (error: any) {
+                if (!mounted) return;
+                
+                console.warn('Warehouse endpoint not available:', error.response?.status);
+                
+                // For 403/404, just allow manual warehouse ID entry
+                if (error.response?.status === 403 || error.response?.status === 404) {
+                    console.log('Warehouses endpoint not available - user can enter warehouse ID manually');
+                    setWarehouses([]);
+                } else if (error.response?.status === 401) {
+                    Alert.alert('Lỗi', 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                } else {
+                    console.error('Error loading warehouses:', error.message);
+                }
+            } finally {
+                if (mounted) {
+                    setLoadingWarehouses(false);
+                }
+            }
+        };
+
+        loadWarehouses();
+        
+        return () => {
+            mounted = false;
+        };
+    }, []); // Chỉ chạy 1 lần khi mount
+
+    // Auto-select first supplier
+    useEffect(() => {
+        if (suppliers.length > 0 && !supplierId) {
+            setSupplierId(suppliers[0].supplierId);
+        }
+    }, [suppliers]);
 
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
@@ -72,13 +148,18 @@ export default function CreateRequisitionScreen() {
             return;
         }
 
+        if (!companyId) {
+            Alert.alert('Lỗi', 'Không tìm thấy thông tin công ty. Vui lòng đăng nhập lại.');
+            return;
+        }
+
         if (!warehouseId) {
-            Alert.alert('Lỗi', 'Vui lòng nhập ID kho');
+            Alert.alert('Lỗi', 'Vui lòng chọn kho');
             return;
         }
 
         if (!supplierId) {
-            Alert.alert('Lỗi', 'Vui lòng nhập ID nhà cung cấp');
+            Alert.alert('Lỗi', 'Vui lòng chọn nhà cung cấp');
             return;
         }
 
@@ -96,10 +177,15 @@ export default function CreateRequisitionScreen() {
     };
 
     const submitRequisition = async () => {
+        if (!user) {
+            Alert.alert('Lỗi', 'Không tìm thấy thông tin người dùng');
+            return;
+        }
+
         try {
             await createRequisition({
-                warehouseId: parseInt(warehouseId),
-                supplierId: parseInt(supplierId),
+                warehouseId: warehouseId!,
+                supplierId: supplierId!,
                 items: items.map(i => ({
                     productId: i.id,
                     expectedQuantity: i.quantity
@@ -111,7 +197,7 @@ export default function CreateRequisitionScreen() {
             ]);
         } catch (error) {
             console.error('Create requisition error:', error);
-            Alert.alert('Lỗi', 'Không thể tạo phiếu đề xuất. Vui lòng kiểm tra lại ID kho/NCC.');
+            Alert.alert('Lỗi', 'Không thể tạo phiếu đề xuất. Vui lòng kiểm tra lại thông tin.');
         }
     };
 
@@ -186,24 +272,81 @@ export default function CreateRequisitionScreen() {
                 {/* Warehouse & Supplier */}
                 <View style={styles.row}>
                     <View style={[styles.section, { flex: 1, marginRight: 8 }]}>
-                        <Text style={styles.sectionTitle}>ID Kho *</Text>
-                        <TextInput
-                            style={styles.inputField}
-                            value={warehouseId}
-                            onChangeText={setWarehouseId}
-                            keyboardType="number-pad"
-                            placeholder="VD: 1"
-                        />
+                        <Text style={styles.sectionTitle}>Kho *</Text>
+                        <TouchableOpacity
+                            style={styles.selectField}
+                            onPress={() => {
+                                if (warehouses.length === 0 && !loadingWarehouses) {
+                                    Alert.alert(
+                                        'Không có kho',
+                                        'Không tìm thấy kho nào. Bạn có muốn nhập ID kho thủ công không?',
+                                        [
+                                            { text: 'Hủy', style: 'cancel' },
+                                            {
+                                                text: 'Nhập thủ công',
+                                                onPress: () => {
+                                                    Alert.prompt(
+                                                        'Nhập ID Kho',
+                                                        'Vui lòng nhập ID kho (số nguyên)',
+                                                        [
+                                                            { text: 'Hủy', style: 'cancel' },
+                                                            {
+                                                                text: 'OK',
+                                                                onPress: (value?: string) => {
+                                                                    const id = parseInt(value || '0');
+                                                                    if (id > 0) {
+                                                                        setWarehouseId(id);
+                                                                    } else {
+                                                                        Alert.alert('Lỗi', 'ID kho không hợp lệ');
+                                                                    }
+                                                                }
+                                                            }
+                                                        ],
+                                                        'plain-text',
+                                                        '',
+                                                        'number-pad'
+                                                    );
+                                                }
+                                            }
+                                        ]
+                                    );
+                                } else {
+                                    setShowWarehousePicker(true);
+                                }
+                            }}
+                            disabled={loadingWarehouses}
+                        >
+                            <Text style={[styles.selectFieldText, !warehouseId && styles.placeholder]}>
+                                {loadingWarehouses
+                                    ? 'Đang tải...'
+                                    : warehouseId
+                                    ? warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.warehouseName || warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.name || `Kho #${warehouseId}`
+                                    : 'Chọn kho'
+                                }
+                            </Text>
+                            <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
+                        </TouchableOpacity>
+                        {warehouses.length === 0 && !loadingWarehouses && (
+                            <Text style={styles.warningText}>⚠️ Không tìm thấy kho. Nhấn để nhập thủ công.</Text>
+                        )}
                     </View>
                     <View style={[styles.section, { flex: 1, marginLeft: 8 }]}>
-                        <Text style={styles.sectionTitle}>ID Nhà CC *</Text>
-                        <TextInput
-                            style={styles.inputField}
-                            value={supplierId}
-                            onChangeText={setSupplierId}
-                            keyboardType="number-pad"
-                            placeholder="VD: 1"
-                        />
+                        <Text style={styles.sectionTitle}>Nhà CC *</Text>
+                        <TouchableOpacity
+                            style={styles.selectField}
+                            onPress={() => setShowSupplierPicker(true)}
+                            disabled={loadingSuppliers}
+                        >
+                            <Text style={[styles.selectFieldText, !supplierId && styles.placeholder]}>
+                                {loadingSuppliers
+                                    ? 'Đang tải...'
+                                    : supplierId
+                                    ? suppliers.find(s => s.supplierId === supplierId)?.supplierName || `NCC #${supplierId}`
+                                    : 'Chọn NCC'
+                                }
+                            </Text>
+                            <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -224,7 +367,7 @@ export default function CreateRequisitionScreen() {
                         <Card style={styles.emptyCard}>
                             <Feather name="package" size={48} color={COLORS.border} />
                             <Text style={styles.emptyText}>Chưa có sản phẩm nào</Text>
-                            <Text style={styles.emptyHint}>Nhấn "Thêm SP" để lấy hàng từ kho</Text>
+                            <Text style={styles.emptyHint}>Nhấn &quot;Thêm SP&quot; để lấy hàng từ kho</Text>
                         </Card>
                     ) : (
                         <Card style={styles.itemsCard}>
@@ -319,6 +462,114 @@ export default function CreateRequisitionScreen() {
                     )}
                 </View>
             </Modal>
+
+            {/* Warehouse Picker Modal */}
+            <Modal
+                visible={showWarehousePicker}
+                animationType="slide"
+                onRequestClose={() => setShowWarehousePicker(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Chọn kho</Text>
+                        <TouchableOpacity onPress={() => setShowWarehousePicker(false)}>
+                            <Feather name="x" size={24} color={COLORS.text} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {loadingWarehouses ? (
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <Text>Đang tải...</Text>
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={warehouses}
+                            keyExtractor={item => String(item.warehouseId || item.id)}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.listItem,
+                                        (item.warehouseId || item.id) === warehouseId && styles.listItemSelected
+                                    ]}
+                                    onPress={() => {
+                                        setWarehouseId(item.warehouseId || item.id);
+                                        setShowWarehousePicker(false);
+                                    }}
+                                >
+                                    <View style={styles.listItemIcon}>
+                                        <Feather name="home" size={20} color={COLORS.primary} />
+                                    </View>
+                                    <View style={styles.listItemInfo}>
+                                        <Text style={styles.listItemName}>
+                                            {item.warehouseName || item.name || `Kho #${item.warehouseId || item.id}`}
+                                        </Text>
+                                        {item.address && (
+                                            <Text style={styles.listItemMeta}>{item.address}</Text>
+                                        )}
+                                    </View>
+                                    {(item.warehouseId || item.id) === warehouseId && (
+                                        <Feather name="check" size={20} color={COLORS.primary} />
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            contentContainerStyle={styles.listContainer}
+                        />
+                    )}
+                </View>
+            </Modal>
+
+            {/* Supplier Picker Modal */}
+            <Modal
+                visible={showSupplierPicker}
+                animationType="slide"
+                onRequestClose={() => setShowSupplierPicker(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Chọn nhà cung cấp</Text>
+                        <TouchableOpacity onPress={() => setShowSupplierPicker(false)}>
+                            <Feather name="x" size={24} color={COLORS.text} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {loadingSuppliers ? (
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <Text>Đang tải...</Text>
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={suppliers}
+                            keyExtractor={item => String(item.supplierId)}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.listItem,
+                                        item.supplierId === supplierId && styles.listItemSelected
+                                    ]}
+                                    onPress={() => {
+                                        setSupplierId(item.supplierId);
+                                        setShowSupplierPicker(false);
+                                    }}
+                                >
+                                    <View style={styles.listItemIcon}>
+                                        <Feather name="truck" size={20} color={COLORS.primary} />
+                                    </View>
+                                    <View style={styles.listItemInfo}>
+                                        <Text style={styles.listItemName}>{item.supplierName}</Text>
+                                        {item.email && (
+                                            <Text style={styles.listItemMeta}>{item.email}</Text>
+                                        )}
+                                    </View>
+                                    {item.supplierId === supplierId && (
+                                        <Feather name="check" size={20} color={COLORS.primary} />
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            contentContainerStyle={styles.listContainer}
+                        />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -389,6 +640,31 @@ const styles = StyleSheet.create({
         padding: 14,
         fontSize: 14,
         color: COLORS.text,
+    },
+    selectField: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 14,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    selectFieldText: {
+        fontSize: 14,
+        color: COLORS.text,
+        flex: 1,
+    },
+    placeholder: {
+        color: COLORS.textMuted,
+    },
+    warningText: {
+        fontSize: 11,
+        color: '#F59E0B',
+        marginTop: 4,
+        fontStyle: 'italic',
     },
     typeCards: {
         flexDirection: 'row',
@@ -591,6 +867,44 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     productStock: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+    },
+    listContainer: {
+        padding: 20,
+    },
+    listItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        backgroundColor: '#f5f5f5',
+        borderRadius: 12,
+        marginBottom: 12,
+        gap: 12,
+    },
+    listItemSelected: {
+        backgroundColor: COLORS.primary + '15',
+        borderWidth: 2,
+        borderColor: COLORS.primary,
+    },
+    listItemIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    listItemInfo: {
+        flex: 1,
+    },
+    listItemName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    listItemMeta: {
         fontSize: 12,
         color: COLORS.textMuted,
     },

@@ -3,17 +3,20 @@ import { api } from './axios.instance';
 
 /**
  * Get all suppliers
+ * @param userId - ID của user hiện tại để lấy danh sách suppliers
  */
-export const getSuppliers = async (): Promise<Supplier[]> => {
-  const response = await api.get<Supplier[]>('/api/Suppliers');
+export const getSuppliers = async (userId: number): Promise<Supplier[]> => {
+  const response = await api.get<Supplier[]>(`/api/Suppliers/get-all/${userId}`);
   return response.data;
 };
 
 /**
  * Get supplier by ID
+ * @param userId - ID của user hiện tại
+ * @param supplierId - ID của supplier cần lấy
  */
-export const getSupplierById = async (supplierId: number): Promise<Supplier> => {
-  const response = await api.get<Supplier>(`/api/Suppliers/${supplierId}`);
+export const getSupplierById = async (userId: number, supplierId: number): Promise<Supplier> => {
+  const response = await api.get<Supplier>(`/api/Suppliers/get-by-id/${userId}/${supplierId}`);
   return response.data;
 };
 
@@ -21,7 +24,7 @@ export const getSupplierById = async (supplierId: number): Promise<Supplier> => 
  * Create new supplier
  */
 export const createSupplier = async (data: CreateSupplierPayload): Promise<Supplier> => {
-  const response = await api.post<Supplier>('/api/Suppliers', data);
+  const response = await api.post<Supplier>('/api/Suppliers/add-new-supplier', data);
   return response.data;
 };
 
@@ -32,12 +35,13 @@ export const updateSupplier = async (
   supplierId: number,
   data: UpdateSupplierPayload
 ): Promise<Supplier> => {
-  const response = await api.put<Supplier>(`/api/Suppliers/${supplierId}`, data);
+  const response = await api.put<Supplier>(`/api/Suppliers/update-a-supplier/${supplierId}`, data);
   return response.data;
 };
 
 /**
  * Delete supplier
+ * NOTE: Backend may not have delete endpoint
  */
 export const deleteSupplier = async (supplierId: number): Promise<void> => {
   await api.delete(`/api/Suppliers/${supplierId}`);

@@ -37,6 +37,31 @@ export default function StaffTabLayout() {
                     tabBarIcon: ({ color }) => <Feather name="user" size={28} color={color} />,
                 }}
             />
+            {/* Hide nested task routes from tab bar */}
+            <Tabs.Screen
+                name="tasks/count/[id]"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="tasks/inbound/[id]"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="tasks/outbound/[id]"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="tasks/putaway/[id]"
+                options={{
+                    href: null,
+                }}
+            />
         </Tabs>
     );
 }

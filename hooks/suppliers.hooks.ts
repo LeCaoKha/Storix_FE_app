@@ -5,6 +5,7 @@ import {
     getSuppliers,
     updateSupplier,
 } from '@/services/supplier.api';
+import { useAuthStore } from '@/stores/auth.store';
 import { CreateSupplierPayload, UpdateSupplierPayload } from '@/types/supplier';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -21,9 +22,12 @@ export const supplierKeys = {
  * Hook to fetch all suppliers
  */
 export const useSuppliers = () => {
+  const userId = useAuthStore((state) => state.user?.id);
+  
   return useQuery({
-    queryKey: supplierKeys.lists(),
-    queryFn: getSuppliers,
+    queryKey: [...supplierKeys.lists(), userId],
+    queryFn: () => getSuppliers(userId!),
+    enabled: !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -32,10 +36,12 @@ export const useSuppliers = () => {
  * Hook to fetch a single supplier by ID
  */
 export const useSupplier = (supplierId: number) => {
+  const userId = useAuthStore((state) => state.user?.id);
+  
   return useQuery({
     queryKey: supplierKeys.detail(supplierId),
-    queryFn: () => getSupplierById(supplierId),
-    enabled: !!supplierId,
+    queryFn: () => getSupplierById(userId!, supplierId),
+    enabled: !!userId && !!supplierId,
   });
 };
 

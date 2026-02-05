@@ -1,0 +1,1091 @@
+﻿{
+    "openapi":  "3.0.1",
+    "info":  {
+                 "title":  "Car Services Management System",
+                 "version":  "v1"
+             },
+    "paths":  {
+                  "/api/Companies/register":  {
+                                                  "post":  {
+                                                               "tags":  "Companies",
+                                                               "requestBody":  "@{content=}",
+                                                               "responses":  "@{200=}"
+                                                           }
+                                              },
+                  "/api/Debug/db-health":  {
+                                               "get":  {
+                                                           "tags":  "Debug",
+                                                           "responses":  "@{200=}"
+                                                       }
+                                           },
+                  "/api/Debug/fix-users-sequence":  {
+                                                        "post":  {
+                                                                     "tags":  "Debug",
+                                                                     "responses":  "@{200=}"
+                                                                 }
+                                                    },
+                  "/api/Home/Login":  {
+                                          "post":  {
+                                                       "tags":  "Home",
+                                                       "requestBody":  "@{content=}",
+                                                       "responses":  "@{200=}"
+                                                   }
+                                      },
+                  "/api/Home/refresh":  {
+                                            "post":  {
+                                                         "tags":  "Home",
+                                                         "requestBody":  "@{content=}",
+                                                         "responses":  "@{200=}"
+                                                     }
+                                        },
+                  "/api/Home/logout":  {
+                                           "post":  {
+                                                        "tags":  "Home",
+                                                        "requestBody":  "@{content=}",
+                                                        "responses":  "@{200=}"
+                                                    }
+                                       },
+                  "/api/Home/Signup":  {
+                                           "post":  {
+                                                        "tags":  "Home",
+                                                        "requestBody":  "@{content=}",
+                                                        "responses":  "@{200=}"
+                                                    }
+                                       },
+                  "/api/Home/login-google":  {
+                                                 "get":  {
+                                                             "tags":  "Home",
+                                                             "parameters":  "                                                                                                                                                                                                                                                                                                                                                                                                                    ",
+                                                             "requestBody":  "@{content=}",
+                                                             "responses":  "@{200=}"
+                                                         }
+                                             },
+                  "/api/Home/login-google-callback":  {
+                                                          "get":  {
+                                                                      "tags":  "Home",
+                                                                      "operationId":  "GoogleLoginCallback",
+                                                                      "parameters":  "                                                                                                                                                                                                                                                                                                                                                                                                                    ",
+                                                                      "requestBody":  "@{content=}",
+                                                                      "responses":  "@{200=}"
+                                                                  }
+                                                      },
+                  "/api/InventoryInbound/get-all-inbound-requests/{companyId}":  {
+                                                                                     "get":  {
+                                                                                                 "tags":  "InventoryInbound",
+                                                                                                 "parameters":  "",
+                                                                                                 "responses":  "@{200=}"
+                                                                                             }
+                                                                                 },
+                  "/api/InventoryInbound/get-all-inbound-tickets/{companyId}":  {
+                                                                                    "get":  {
+                                                                                                "tags":  "InventoryInbound",
+                                                                                                "parameters":  "",
+                                                                                                "responses":  "@{200=}"
+                                                                                            }
+                                                                                },
+                  "/api/InventoryInbound/get-inbound-request-by-id/{companyId}/{id}":  {
+                                                                                           "get":  {
+                                                                                                       "tags":  "InventoryInbound",
+                                                                                                       "parameters":  " ",
+                                                                                                       "responses":  "@{200=}"
+                                                                                                   }
+                                                                                       },
+                  "/api/InventoryInbound/get-inbound-ticket-by-id/{companyId}/{id}":  {
+                                                                                          "get":  {
+                                                                                                      "tags":  "InventoryInbound",
+                                                                                                      "parameters":  " ",
+                                                                                                      "responses":  "@{200=}"
+                                                                                                  }
+                                                                                      },
+                  "/api/InventoryInbound/create-inbound-request":  {
+                                                                       "post":  {
+                                                                                    "tags":  "InventoryInbound",
+                                                                                    "requestBody":  "@{content=}",
+                                                                                    "responses":  "@{200=}"
+                                                                                }
+                                                                   },
+                  "/api/InventoryInbound/update-inbound-request/{id}/status":  {
+                                                                                   "put":  {
+                                                                                               "tags":  "InventoryInbound",
+                                                                                               "parameters":  "",
+                                                                                               "requestBody":  "@{content=}",
+                                                                                               "responses":  "@{200=}"
+                                                                                           }
+                                                                               },
+                  "/api/InventoryInbound/create-inbound-ticket/{requestId}/tickets":  {
+                                                                                          "post":  {
+                                                                                                       "tags":  "InventoryInbound",
+                                                                                                       "parameters":  "",
+                                                                                                       "requestBody":  "@{content=}",
+                                                                                                       "responses":  "@{200=}"
+                                                                                                   }
+                                                                                      },
+                  "/api/InventoryInbound/tickets/{ticketId}/items":  {
+                                                                         "put":  {
+                                                                                     "tags":  "InventoryInbound",
+                                                                                     "parameters":  "",
+                                                                                     "requestBody":  "@{content=}",
+                                                                                     "responses":  "@{200=}"
+                                                                                 }
+                                                                     },
+                  "/api/InventoryOutbound/create-outbound-request":  {
+                                                                         "post":  {
+                                                                                      "tags":  "InventoryOutbound",
+                                                                                      "requestBody":  "@{content=}",
+                                                                                      "responses":  "@{200=}"
+                                                                                  }
+                                                                     },
+                  "/api/InventoryOutbound/availability":  {
+                                                              "get":  {
+                                                                          "tags":  "InventoryOutbound",
+                                                                          "parameters":  " ",
+                                                                          "responses":  "@{200=}"
+                                                                      }
+                                                          },
+                  "/api/InventoryOutbound/update-outbound-request/{id}/status":  {
+                                                                                     "put":  {
+                                                                                                 "tags":  "InventoryOutbound",
+                                                                                                 "parameters":  "",
+                                                                                                 "requestBody":  "@{content=}",
+                                                                                                 "responses":  "@{200=}"
+                                                                                             }
+                                                                                 },
+                  "/api/InventoryOutbound/create-outbound-ticket/{requestId}/tickets":  {
+                                                                                            "post":  {
+                                                                                                         "tags":  "InventoryOutbound",
+                                                                                                         "parameters":  "",
+                                                                                                         "requestBody":  "@{content=}",
+                                                                                                         "responses":  "@{200=}"
+                                                                                                     }
+                                                                                        },
+                  "/api/InventoryOutbound/tickets/{ticketId}/items":  {
+                                                                          "put":  {
+                                                                                      "tags":  "InventoryOutbound",
+                                                                                      "parameters":  "",
+                                                                                      "requestBody":  "@{content=}",
+                                                                                      "responses":  "@{200=}"
+                                                                                  }
+                                                                      },
+                  "/api/InventoryOutbound/tickets/{ticketId}/confirm":  {
+                                                                            "post":  {
+                                                                                         "tags":  "InventoryOutbound",
+                                                                                         "parameters":  "",
+                                                                                         "requestBody":  "@{content=}",
+                                                                                         "responses":  "@{200=}"
+                                                                                     }
+                                                                        },
+                  "/api/InventoryOutbound/tickets/{ticketId}/status":  {
+                                                                           "put":  {
+                                                                                       "tags":  "InventoryOutbound",
+                                                                                       "parameters":  "",
+                                                                                       "requestBody":  "@{content=}",
+                                                                                       "responses":  "@{200=}"
+                                                                                   }
+                                                                       },
+                  "/api/Products/get-all/{userId}":  {
+                                                         "get":  {
+                                                                     "tags":  "Products",
+                                                                     "parameters":  "",
+                                                                     "responses":  "@{200=}"
+                                                                 }
+                                                     },
+                  "/api/Products/get-by-id/{userId}/{id}":  {
+                                                                "get":  {
+                                                                            "tags":  "Products",
+                                                                            "parameters":  " ",
+                                                                            "responses":  "@{200=}"
+                                                                        }
+                                                            },
+                  "/api/Products/get-by-sku/{userId}/sku/{sku}":  {
+                                                                      "get":  {
+                                                                                  "tags":  "Products",
+                                                                                  "parameters":  " ",
+                                                                                  "responses":  "@{200=}"
+                                                                              }
+                                                                  },
+                  "/api/Products/create":  {
+                                               "post":  {
+                                                            "tags":  "Products",
+                                                            "requestBody":  "@{content=}",
+                                                            "responses":  "@{200=}"
+                                                        }
+                                           },
+                  "/api/Products/update{id}":  {
+                                                   "put":  {
+                                                               "tags":  "Products",
+                                                               "parameters":  "",
+                                                               "requestBody":  "@{content=}",
+                                                               "responses":  "@{200=}"
+                                                           }
+                                               },
+                  "/api/Products/delete/{userId}/{id}":  {
+                                                             "delete":  {
+                                                                            "tags":  "Products",
+                                                                            "parameters":  " ",
+                                                                            "responses":  "@{200=}"
+                                                                        }
+                                                         },
+                  "/api/Products/get-all-product-types/{userId}":  {
+                                                                       "get":  {
+                                                                                   "tags":  "Products",
+                                                                                   "parameters":  "",
+                                                                                   "responses":  "@{200=}"
+                                                                               }
+                                                                   },
+                  "/api/Products/create-new-product-type":  {
+                                                                "post":  {
+                                                                             "tags":  "Products",
+                                                                             "requestBody":  "@{content=}",
+                                                                             "responses":  "@{200=}"
+                                                                         }
+                                                            },
+                  "/api/Products/update-type-name/{id}":  {
+                                                              "put":  {
+                                                                          "tags":  "Products",
+                                                                          "parameters":  "",
+                                                                          "requestBody":  "@{content=}",
+                                                                          "responses":  "@{200=}"
+                                                                      }
+                                                          },
+                  "/api/Products/delete-product-type/{id}":  {
+                                                                 "delete":  {
+                                                                                "tags":  "Products",
+                                                                                "parameters":  "",
+                                                                                "responses":  "@{200=}"
+                                                                            }
+                                                             },
+                  "/api/Suppliers/get-all/{userId}":  {
+                                                          "get":  {
+                                                                      "tags":  "Suppliers",
+                                                                      "parameters":  "",
+                                                                      "responses":  "@{200=}"
+                                                                  }
+                                                      },
+                  "/api/Suppliers/get-by-id/{userId}/{id}":  {
+                                                                 "get":  {
+                                                                             "tags":  "Suppliers",
+                                                                             "parameters":  " ",
+                                                                             "responses":  "@{200=}"
+                                                                         }
+                                                             },
+                  "/api/Suppliers/add-new-supplier":  {
+                                                          "post":  {
+                                                                       "tags":  "Suppliers",
+                                                                       "requestBody":  "@{content=}",
+                                                                       "responses":  "@{200=}"
+                                                                   }
+                                                      },
+                  "/api/Suppliers/update-a-supplier/{id}":  {
+                                                                "put":  {
+                                                                            "tags":  "Suppliers",
+                                                                            "parameters":  "",
+                                                                            "requestBody":  "@{content=}",
+                                                                            "responses":  "@{200=}"
+                                                                        }
+                                                            },
+                  "/api/Suppliers/delete-a-supplier/{userId}/{id}":  {
+                                                                         "delete":  {
+                                                                                        "tags":  "Suppliers",
+                                                                                        "parameters":  " ",
+                                                                                        "responses":  "@{200=}"
+                                                                                    }
+                                                                     },
+                  "/api/Users/update-profile/{userId}":  {
+                                                             "put":  {
+                                                                         "tags":  "Users",
+                                                                         "parameters":  "",
+                                                                         "requestBody":  "@{content=}",
+                                                                         "responses":  "@{200=}"
+                                                                     }
+                                                         },
+                  "/api/Users/get-user-profile/{userId}":  {
+                                                               "get":  {
+                                                                           "tags":  "Users",
+                                                                           "parameters":  "",
+                                                                           "responses":  "@{200=}"
+                                                                       }
+                                                           },
+                  "/api/Users":  {
+                                     "get":  {
+                                                 "tags":  "Users",
+                                                 "responses":  "@{200=}"
+                                             },
+                                     "post":  {
+                                                  "tags":  "Users",
+                                                  "requestBody":  "@{content=}",
+                                                  "responses":  "@{200=}"
+                                              }
+                                 },
+                  "/api/Users/{id}":  {
+                                          "get":  {
+                                                      "tags":  "Users",
+                                                      "parameters":  "",
+                                                      "responses":  "@{200=}"
+                                                  },
+                                          "put":  {
+                                                      "tags":  "Users",
+                                                      "parameters":  "",
+                                                      "requestBody":  "@{content=}",
+                                                      "responses":  "@{200=}"
+                                                  },
+                                          "delete":  {
+                                                         "tags":  "Users",
+                                                         "parameters":  "",
+                                                         "responses":  "@{200=}"
+                                                     }
+                                      },
+                  "/api/company-warehouses/{companyId}/assignments":  {
+                                                                          "get":  {
+                                                                                      "tags":  "WarehouseAssignments",
+                                                                                      "parameters":  "",
+                                                                                      "responses":  "@{200=}"
+                                                                                  },
+                                                                          "post":  {
+                                                                                       "tags":  "WarehouseAssignments",
+                                                                                       "parameters":  "",
+                                                                                       "requestBody":  "@{content=}",
+                                                                                       "responses":  "@{200=}"
+                                                                                   },
+                                                                          "delete":  {
+                                                                                         "tags":  "WarehouseAssignments",
+                                                                                         "parameters":  "  ",
+                                                                                         "responses":  "@{200=}"
+                                                                                     }
+                                                                      },
+                  "/api/company-warehouses/{companyId}/assignments/warehouse/{warehouseId}":  {
+                                                                                                  "get":  {
+                                                                                                              "tags":  "WarehouseAssignments",
+                                                                                                              "parameters":  " ",
+                                                                                                              "responses":  "@{200=}"
+                                                                                                          }
+                                                                                              }
+              },
+    "components":  {
+                       "schemas":  {
+                                       "ActivityLog":  {
+                                                           "type":  "object",
+                                                           "properties":  "@{id=; userId=; action=; entity=; entityId=; timestamp=; user=}",
+                                                           "additionalProperties":  false
+                                                       },
+                                       "AddressFamily":  {
+                                                             "enum":  "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 21 22 23 24 25 26 28 29 65536 65537 -1",
+                                                             "type":  "integer",
+                                                             "format":  "int32"
+                                                         },
+                                       "AsnEncodedData":  {
+                                                              "type":  "object",
+                                                              "properties":  "@{oid=; rawData=}",
+                                                              "additionalProperties":  false
+                                                          },
+                                       "Assembly":  {
+                                                        "type":  "object",
+                                                        "properties":  "@{definedTypes=; exportedTypes=; codeBase=; entryPoint=; fullName=; imageRuntimeVersion=; isDynamic=; location=; reflectionOnly=; isCollectible=; isFullyTrusted=; customAttributes=; escapedCodeBase=; manifestModule=; modules=; globalAssemblyCache=; hostContext=; securityRuleSet=}",
+                                                        "additionalProperties":  false
+                                                    },
+                                       "AssignWarehouseRequest":  {
+                                                                      "type":  "object",
+                                                                      "properties":  "@{userId=; warehouseId=; roleInWarehouse=}",
+                                                                      "additionalProperties":  false
+                                                                  },
+                                       "AsymmetricAlgorithm":  {
+                                                                   "type":  "object",
+                                                                   "properties":  "@{keySize=; legalKeySizes=; signatureAlgorithm=; keyExchangeAlgorithm=}",
+                                                                   "additionalProperties":  false
+                                                               },
+                                       "ByteReadOnlyMemory":  {
+                                                                  "type":  "object",
+                                                                  "properties":  "@{length=; isEmpty=; span=}",
+                                                                  "additionalProperties":  false
+                                                              },
+                                       "ByteReadOnlySpan":  {
+                                                                "type":  "object",
+                                                                "properties":  "@{length=; isEmpty=}",
+                                                                "additionalProperties":  false
+                                                            },
+                                       "CallingConventions":  {
+                                                                  "enum":  "1 2 3 32 64",
+                                                                  "type":  "integer",
+                                                                  "format":  "int32"
+                                                              },
+                                       "CancellationToken":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{isCancellationRequested=; canBeCanceled=; waitHandle=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "Claim":  {
+                                                     "type":  "object",
+                                                     "properties":  "@{issuer=; originalIssuer=; properties=; subject=; type=; value=; valueType=}",
+                                                     "additionalProperties":  false
+                                                 },
+                                       "ClaimsIdentity":  {
+                                                              "type":  "object",
+                                                              "properties":  "@{authenticationType=; isAuthenticated=; actor=; bootstrapContext=; claims=; label=; name=; nameClaimType=; roleClaimType=}",
+                                                              "additionalProperties":  false
+                                                          },
+                                       "ClaimsIdentityOptions":  {
+                                                                     "type":  "object",
+                                                                     "properties":  "@{roleClaimType=; userNameClaimType=; userIdClaimType=; emailClaimType=; securityStampClaimType=}",
+                                                                     "additionalProperties":  false
+                                                                 },
+                                       "ClaimsPrincipal":  {
+                                                               "type":  "object",
+                                                               "properties":  "@{claims=; identities=; identity=}",
+                                                               "additionalProperties":  false
+                                                           },
+                                       "Company":  {
+                                                       "type":  "object",
+                                                       "properties":  "@{id=; name=; businessCode=; address=; contactEmail=; contactPhone=; subscriptionPlan=; status=; createdAt=; updatedAt=; productTypes=; products=; suppliers=; users=; warehouses=}",
+                                                       "additionalProperties":  false
+                                                   },
+                                       "CompanyRegisterRequest":  {
+                                                                      "type":  "object",
+                                                                      "properties":  "@{companyName=; businessCode=; address=; contactEmail=; contactPhone=; adminFullName=; adminEmail=; adminPhone=; password=}",
+                                                                      "additionalProperties":  false
+                                                                  },
+                                       "ConfirmOutboundOrderRequest":  {
+                                                                           "type":  "object",
+                                                                           "properties":  "@{performedBy=}",
+                                                                           "additionalProperties":  false
+                                                                       },
+                                       "ConnectionInfo":  {
+                                                              "type":  "object",
+                                                              "properties":  "@{id=; remoteIpAddress=; remotePort=; localIpAddress=; localPort=; clientCertificate=}",
+                                                              "additionalProperties":  false
+                                                          },
+                                       "ConstructorInfo":  {
+                                                               "type":  "object",
+                                                               "properties":  "@{name=; declaringType=; reflectedType=; module=; customAttributes=; isCollectible=; metadataToken=; attributes=; methodImplementationFlags=; callingConvention=; isAbstract=; isConstructor=; isFinal=; isHideBySig=; isSpecialName=; isStatic=; isVirtual=; isAssembly=; isFamily=; isFamilyAndAssembly=; isFamilyOrAssembly=; isPrivate=; isPublic=; isConstructedGenericMethod=; isGenericMethod=; isGenericMethodDefinition=; containsGenericParameters=; methodHandle=; isSecurityCritical=; isSecuritySafeCritical=; isSecurityTransparent=; memberType=}",
+                                                               "additionalProperties":  false
+                                                           },
+                                       "CreateInboundOrderItemRequest":  {
+                                                                             "type":  "object",
+                                                                             "properties":  "@{productId=; expectedQuantity=}",
+                                                                             "additionalProperties":  false
+                                                                         },
+                                       "CreateInboundRequestRequest":  {
+                                                                           "type":  "object",
+                                                                           "properties":  "@{warehouseId=; supplierId=; requestedBy=; items=}",
+                                                                           "additionalProperties":  false
+                                                                       },
+                                       "CreateOutboundOrderFromRequestRequest":  {
+                                                                                     "type":  "object",
+                                                                                     "properties":  "@{createdBy=; staffId=; note=}",
+                                                                                     "additionalProperties":  false
+                                                                                 },
+                                       "CreateOutboundOrderItemRequest":  {
+                                                                              "type":  "object",
+                                                                              "properties":  "@{productId=; quantity=}",
+                                                                              "additionalProperties":  false
+                                                                          },
+                                       "CreateOutboundRequestRequest":  {
+                                                                            "type":  "object",
+                                                                            "properties":  "@{warehouseId=; destination=; requestedBy=; items=}",
+                                                                            "additionalProperties":  false
+                                                                        },
+                                       "CreateProductRequest":  {
+                                                                    "type":  "object",
+                                                                    "properties":  "@{companyId=; sku=; name=; typeId=; category=; unit=; weight=; description=}",
+                                                                    "additionalProperties":  false
+                                                                },
+                                       "CreateProductTypeRequest":  {
+                                                                        "type":  "object",
+                                                                        "properties":  "@{companyId=; name=}",
+                                                                        "additionalProperties":  false
+                                                                    },
+                                       "CreateSupplierRequest":  {
+                                                                     "type":  "object",
+                                                                     "properties":  "@{companyId=; name=; contactPerson=; email=; phone=; address=}",
+                                                                     "additionalProperties":  false
+                                                                 },
+                                       "CreateTicketFromRequestRequest":  {
+                                                                              "type":  "object",
+                                                                              "properties":  "@{createdBy=}",
+                                                                              "additionalProperties":  false
+                                                                          },
+                                       "CreateUserRequest":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{fullName=; email=; phone=; password=; roleName=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "CustomAttributeData":  {
+                                                                   "type":  "object",
+                                                                   "properties":  "@{attributeType=; constructor=; constructorArguments=; namedArguments=}",
+                                                                   "additionalProperties":  false
+                                                               },
+                                       "CustomAttributeNamedArgument":  {
+                                                                            "type":  "object",
+                                                                            "properties":  "@{memberInfo=; typedValue=; memberName=; isField=}",
+                                                                            "additionalProperties":  false
+                                                                        },
+                                       "CustomAttributeTypedArgument":  {
+                                                                            "type":  "object",
+                                                                            "properties":  "@{argumentType=; value=}",
+                                                                            "additionalProperties":  false
+                                                                        },
+                                       "EventAttributes":  {
+                                                               "enum":  "0 512 1024",
+                                                               "type":  "integer",
+                                                               "format":  "int32"
+                                                           },
+                                       "EventInfo":  {
+                                                         "type":  "object",
+                                                         "properties":  "@{name=; declaringType=; reflectedType=; module=; customAttributes=; isCollectible=; metadataToken=; memberType=; attributes=; isSpecialName=; addMethod=; removeMethod=; raiseMethod=; isMulticast=; eventHandlerType=}",
+                                                         "additionalProperties":  false
+                                                     },
+                                       "FieldAttributes":  {
+                                                               "enum":  "0 1 2 3 4 5 6 7 16 32 64 128 256 512 1024 4096 8192 32768 38144",
+                                                               "type":  "integer",
+                                                               "format":  "int32"
+                                                           },
+                                       "FieldInfo":  {
+                                                         "type":  "object",
+                                                         "properties":  "@{name=; declaringType=; reflectedType=; module=; customAttributes=; isCollectible=; metadataToken=; memberType=; attributes=; fieldType=; isInitOnly=; isLiteral=; isNotSerialized=; isPinvokeImpl=; isSpecialName=; isStatic=; isAssembly=; isFamily=; isFamilyAndAssembly=; isFamilyOrAssembly=; isPrivate=; isPublic=; isSecurityCritical=; isSecuritySafeCritical=; isSecurityTransparent=; fieldHandle=}",
+                                                         "additionalProperties":  false
+                                                     },
+                                       "GenericParameterAttributes":  {
+                                                                          "enum":  "0 1 2 3 4 8 16 28 32",
+                                                                          "type":  "integer",
+                                                                          "format":  "int32"
+                                                                      },
+                                       "HostString":  {
+                                                          "type":  "object",
+                                                          "properties":  "@{value=; hasValue=; host=; port=}",
+                                                          "additionalProperties":  false
+                                                      },
+                                       "HttpContext":  {
+                                                           "type":  "object",
+                                                           "properties":  "@{features=; request=; response=; connection=; webSockets=; user=; items=; requestServices=; requestAborted=; traceIdentifier=; session=}",
+                                                           "additionalProperties":  false
+                                                       },
+                                       "HttpRequest":  {
+                                                           "type":  "object",
+                                                           "properties":  "@{httpContext=; method=; scheme=; isHttps=; host=; pathBase=; path=; queryString=; query=; protocol=; headers=; cookies=; contentLength=; contentType=; body=; bodyReader=; hasFormContentType=; form=; routeValues=}",
+                                                           "additionalProperties":  false
+                                                       },
+                                       "HttpResponse":  {
+                                                            "type":  "object",
+                                                            "properties":  "@{httpContext=; statusCode=; headers=; body=; bodyWriter=; contentLength=; contentType=; cookies=; hasStarted=}",
+                                                            "additionalProperties":  false
+                                                        },
+                                       "ICustomAttributeProvider":  {
+                                                                        "type":  "object",
+                                                                        "additionalProperties":  false
+                                                                    },
+                                       "IIdentity":  {
+                                                         "type":  "object",
+                                                         "properties":  "@{name=; authenticationType=; isAuthenticated=}",
+                                                         "additionalProperties":  false
+                                                     },
+                                       "ILogger":  {
+                                                       "type":  "object",
+                                                       "additionalProperties":  false
+                                                   },
+                                       "ILookupNormalizer":  {
+                                                                 "type":  "object",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "IPAddress":  {
+                                                         "type":  "object",
+                                                         "properties":  "@{addressFamily=; scopeId=; isIPv6Multicast=; isIPv6LinkLocal=; isIPv6SiteLocal=; isIPv6Teredo=; isIPv6UniqueLocal=; isIPv4MappedToIPv6=; address=}",
+                                                         "additionalProperties":  false
+                                                     },
+                                       "IResponseCookies":  {
+                                                                "type":  "object",
+                                                                "additionalProperties":  false
+                                                            },
+                                       "IServiceProvider":  {
+                                                                "type":  "object",
+                                                                "additionalProperties":  false
+                                                            },
+                                       "ISession":  {
+                                                        "type":  "object",
+                                                        "properties":  "@{isAvailable=; id=; keys=}",
+                                                        "additionalProperties":  false
+                                                    },
+                                       "IdentityErrorDescriber":  {
+                                                                      "type":  "object",
+                                                                      "additionalProperties":  false
+                                                                  },
+                                       "IdentityOptions":  {
+                                                               "type":  "object",
+                                                               "properties":  "@{claimsIdentity=; user=; password=; lockout=; signIn=; tokens=; stores=}",
+                                                               "additionalProperties":  false
+                                                           },
+                                       "InboundOrder":  {
+                                                            "type":  "object",
+                                                            "properties":  "@{id=; inboundRequestId=; warehouseId=; supplierId=; createdBy=; referenceCode=; status=; createdAt=; createdByNavigation=; inboundOrderItems=; inboundRequest=; supplier=; warehouse=}",
+                                                            "additionalProperties":  false
+                                                        },
+                                       "InboundOrderItem":  {
+                                                                "type":  "object",
+                                                                "properties":  "@{id=; inboundRequestId=; inboundOrderId=; productId=; expectedQuantity=; receivedQuantity=; inboundOrder=; inboundRequest=; product=; storageRecommendations=}",
+                                                                "additionalProperties":  false
+                                                            },
+                                       "InboundRequest":  {
+                                                              "type":  "object",
+                                                              "properties":  "@{id=; warehouseId=; supplierId=; requestedBy=; approvedBy=; status=; createdAt=; approvedAt=; approvedByNavigation=; inboundOrderItems=; inboundOrders=; requestedByNavigation=; supplier=; warehouse=}",
+                                                              "additionalProperties":  false
+                                                          },
+                                       "IntPtr":  {
+                                                      "type":  "object",
+                                                      "additionalProperties":  false
+                                                  },
+                                       "Inventory":  {
+                                                         "type":  "object",
+                                                         "properties":  "@{id=; warehouseId=; productId=; quantity=; reservedQuantity=; lastUpdated=; inventoryLocations=; product=; shelfLevelBins=; warehouse=}",
+                                                         "additionalProperties":  false
+                                                     },
+                                       "InventoryLocation":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{id=; inventoryId=; shelfId=; quantity=; updatedAt=; inventory=; shelf=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "InventoryTransaction":  {
+                                                                    "type":  "object",
+                                                                    "properties":  "@{id=; warehouseId=; productId=; transactionType=; quantityChange=; referenceId=; performedBy=; createdAt=; performedByNavigation=; product=; warehouse=}",
+                                                                    "additionalProperties":  false
+                                                                },
+                                       "KeySizes":  {
+                                                        "type":  "object",
+                                                        "properties":  "@{minSize=; maxSize=; skipSize=}",
+                                                        "additionalProperties":  false
+                                                    },
+                                       "LayoutKind":  {
+                                                          "enum":  "0 2 3",
+                                                          "type":  "integer",
+                                                          "format":  "int32"
+                                                      },
+                                       "LockoutOptions":  {
+                                                              "type":  "object",
+                                                              "properties":  "@{allowedForNewUsers=; maxFailedAccessAttempts=; defaultLockoutTimeSpan=}",
+                                                              "additionalProperties":  false
+                                                          },
+                                       "LoginRequest":  {
+                                                            "type":  "object",
+                                                            "properties":  "@{email=; password=}",
+                                                            "additionalProperties":  false
+                                                        },
+                                       "MemberInfo":  {
+                                                          "type":  "object",
+                                                          "properties":  "@{memberType=; name=; declaringType=; reflectedType=; module=; customAttributes=; isCollectible=; metadataToken=}",
+                                                          "additionalProperties":  false
+                                                      },
+                                       "MemberTypes":  {
+                                                           "enum":  "1 2 4 8 16 32 64 128 191",
+                                                           "type":  "integer",
+                                                           "format":  "int32"
+                                                       },
+                                       "MethodAttributes":  {
+                                                                "enum":  "0 1 2 3 4 5 6 7 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 53248",
+                                                                "type":  "integer",
+                                                                "format":  "int32"
+                                                            },
+                                       "MethodBase":  {
+                                                          "type":  "object",
+                                                          "properties":  "@{memberType=; name=; declaringType=; reflectedType=; module=; customAttributes=; isCollectible=; metadataToken=; attributes=; methodImplementationFlags=; callingConvention=; isAbstract=; isConstructor=; isFinal=; isHideBySig=; isSpecialName=; isStatic=; isVirtual=; isAssembly=; isFamily=; isFamilyAndAssembly=; isFamilyOrAssembly=; isPrivate=; isPublic=; isConstructedGenericMethod=; isGenericMethod=; isGenericMethodDefinition=; containsGenericParameters=; methodHandle=; isSecurityCritical=; isSecuritySafeCritical=; isSecurityTransparent=}",
+                                                          "additionalProperties":  false
+                                                      },
+                                       "MethodImplAttributes":  {
+                                                                    "enum":  "0 1 2 3 4 8 16 32 64 128 256 512 4096 65535",
+                                                                    "type":  "integer",
+                                                                    "format":  "int32"
+                                                                },
+                                       "MethodInfo":  {
+                                                          "type":  "object",
+                                                          "properties":  "@{name=; declaringType=; reflectedType=; module=; customAttributes=; isCollectible=; metadataToken=; attributes=; methodImplementationFlags=; callingConvention=; isAbstract=; isConstructor=; isFinal=; isHideBySig=; isSpecialName=; isStatic=; isVirtual=; isAssembly=; isFamily=; isFamilyAndAssembly=; isFamilyOrAssembly=; isPrivate=; isPublic=; isConstructedGenericMethod=; isGenericMethod=; isGenericMethodDefinition=; containsGenericParameters=; methodHandle=; isSecurityCritical=; isSecuritySafeCritical=; isSecurityTransparent=; memberType=; returnParameter=; returnType=; returnTypeCustomAttributes=}",
+                                                          "additionalProperties":  false
+                                                      },
+                                       "Module":  {
+                                                      "type":  "object",
+                                                      "properties":  "@{assembly=; fullyQualifiedName=; name=; mdStreamVersion=; moduleVersionId=; scopeName=; moduleHandle=; customAttributes=; metadataToken=}",
+                                                      "additionalProperties":  false
+                                                  },
+                                       "ModuleHandle":  {
+                                                            "type":  "object",
+                                                            "properties":  "@{mdStreamVersion=}",
+                                                            "additionalProperties":  false
+                                                        },
+                                       "NavEdge":  {
+                                                       "type":  "object",
+                                                       "properties":  "@{id=; nodeFrom=; nodeTo=; distance=; warehouseId=; nodeFromNavigation=; nodeToNavigation=; warehouse=}",
+                                                       "additionalProperties":  false
+                                                   },
+                                       "NavNode":  {
+                                                       "type":  "object",
+                                                       "properties":  "@{id=; xCoordinate=; yCoordinate=; type=; warehouseId=; navEdgeNodeFromNavigations=; navEdgeNodeToNavigations=; shelfNodes=; warehouse=}",
+                                                       "additionalProperties":  false
+                                                   },
+                                       "Oid":  {
+                                                   "type":  "object",
+                                                   "properties":  "@{value=; friendlyName=}",
+                                                   "additionalProperties":  false
+                                               },
+                                       "OutboundOrder":  {
+                                                             "type":  "object",
+                                                             "properties":  "@{id=; warehouseId=; createdBy=; destination=; staffId=; status=; note=; createdAt=; createdByNavigation=; outboundOrderItems=; warehouse=}",
+                                                             "additionalProperties":  false
+                                                         },
+                                       "OutboundOrderItem":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{id=; outboundRequestId=; outboundOrderId=; productId=; quantity=; outboundOrder=; outboundRequest=; product=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "OutboundRequest":  {
+                                                               "type":  "object",
+                                                               "properties":  "@{id=; warehouseId=; requestedBy=; approvedBy=; destination=; status=; createdAt=; approvedAt=; approvedByNavigation=; outboundOrderItems=; requestedByNavigation=; warehouse=}",
+                                                               "additionalProperties":  false
+                                                           },
+                                       "ParameterAttributes":  {
+                                                                   "enum":  "0 1 2 4 8 16 4096 8192 16384 32768 61440",
+                                                                   "type":  "integer",
+                                                                   "format":  "int32"
+                                                               },
+                                       "ParameterInfo":  {
+                                                             "type":  "object",
+                                                             "properties":  "@{attributes=; member=; name=; parameterType=; position=; isIn=; isLcid=; isOptional=; isOut=; isRetval=; defaultValue=; rawDefaultValue=; hasDefaultValue=; customAttributes=; metadataToken=}",
+                                                             "additionalProperties":  false
+                                                         },
+                                       "PasswordOptions":  {
+                                                               "type":  "object",
+                                                               "properties":  "@{requiredLength=; requiredUniqueChars=; requireNonAlphanumeric=; requireLowercase=; requireUppercase=; requireDigit=}",
+                                                               "additionalProperties":  false
+                                                           },
+                                       "PathString":  {
+                                                          "type":  "object",
+                                                          "properties":  "@{value=; hasValue=}",
+                                                          "additionalProperties":  false
+                                                      },
+                                       "PipeWriter":  {
+                                                          "type":  "object",
+                                                          "properties":  "@{canGetUnflushedBytes=; unflushedBytes=}",
+                                                          "additionalProperties":  false
+                                                      },
+                                       "Product":  {
+                                                       "type":  "object",
+                                                       "properties":  "@{id=; companyId=; sku=; name=; typeId=; category=; unit=; weight=; description=; createdAt=; updatedAt=; company=; inboundOrderItems=; inventories=; inventoryTransactions=; outboundOrderItems=; stockCountItems=; storageForecasts=; transferOrderItems=; type=}",
+                                                       "additionalProperties":  false
+                                                   },
+                                       "ProductType":  {
+                                                           "type":  "object",
+                                                           "properties":  "@{id=; name=; companyId=; company=; products=; storageZones=}",
+                                                           "additionalProperties":  false
+                                                       },
+                                       "PropertyAttributes":  {
+                                                                  "enum":  "0 512 1024 4096 8192 16384 32768 62464",
+                                                                  "type":  "integer",
+                                                                  "format":  "int32"
+                                                              },
+                                       "PropertyInfo":  {
+                                                            "type":  "object",
+                                                            "properties":  "@{name=; declaringType=; reflectedType=; module=; customAttributes=; isCollectible=; metadataToken=; memberType=; propertyType=; attributes=; isSpecialName=; canRead=; canWrite=; getMethod=; setMethod=}",
+                                                            "additionalProperties":  false
+                                                        },
+                                       "PublicKey":  {
+                                                         "type":  "object",
+                                                         "properties":  "@{encodedKeyValue=; encodedParameters=; key=; oid=}",
+                                                         "additionalProperties":  false
+                                                     },
+                                       "QueryString":  {
+                                                           "type":  "object",
+                                                           "properties":  "@{value=; hasValue=}",
+                                                           "additionalProperties":  false
+                                                       },
+                                       "RefreshToken":  {
+                                                            "type":  "object",
+                                                            "properties":  "@{id=; userId=; token=; expiredAt=; isRevoked=; createdAt=; user=}",
+                                                            "additionalProperties":  false
+                                                        },
+                                       "RefreshTokenRequest":  {
+                                                                   "type":  "object",
+                                                                   "properties":  "@{refreshToken=}",
+                                                                   "additionalProperties":  false
+                                                               },
+                                       "Role":  {
+                                                    "type":  "object",
+                                                    "properties":  "@{id=; name=; users=}",
+                                                    "additionalProperties":  false
+                                                },
+                                       "RuntimeFieldHandle":  {
+                                                                  "type":  "object",
+                                                                  "properties":  "@{value=}",
+                                                                  "additionalProperties":  false
+                                                              },
+                                       "RuntimeMethodHandle":  {
+                                                                   "type":  "object",
+                                                                   "properties":  "@{value=}",
+                                                                   "additionalProperties":  false
+                                                               },
+                                       "RuntimeTypeHandle":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{value=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "SafeWaitHandle":  {
+                                                              "type":  "object",
+                                                              "properties":  "@{isClosed=; isInvalid=}",
+                                                              "additionalProperties":  false
+                                                          },
+                                       "SecurityRuleSet":  {
+                                                               "enum":  "0 1 2",
+                                                               "type":  "integer",
+                                                               "format":  "int32"
+                                                           },
+                                       "Shelf":  {
+                                                     "type":  "object",
+                                                     "properties":  "@{id=; zoneId=; code=; capacity=; xCoordinate=; yCoordinate=; width=; height=; image=; createdAt=; inventoryLocations=; shelfLevels=; shelfNodes=; zone=}",
+                                                     "additionalProperties":  false
+                                                 },
+                                       "ShelfLevel":  {
+                                                          "type":  "object",
+                                                          "properties":  "@{id=; shelfId=; code=; shelf=; shelfLevelBins=}",
+                                                          "additionalProperties":  false
+                                                      },
+                                       "ShelfLevelBin":  {
+                                                             "type":  "object",
+                                                             "properties":  "@{id=; levelId=; code=; width=; height=; status=; inventoryId=; inventory=; level=}",
+                                                             "additionalProperties":  false
+                                                         },
+                                       "ShelfNode":  {
+                                                         "type":  "object",
+                                                         "properties":  "@{id=; shelfId=; nodeId=; node=; shelf=}",
+                                                         "additionalProperties":  false
+                                                     },
+                                       "SignInOptions":  {
+                                                             "type":  "object",
+                                                             "properties":  "@{requireConfirmedEmail=; requireConfirmedPhoneNumber=; requireConfirmedAccount=}",
+                                                             "additionalProperties":  false
+                                                         },
+                                       "SignupRequest":  {
+                                                             "type":  "object",
+                                                             "properties":  "@{fullName=; email=; phoneNumber=; password=; address=; companyCode=}",
+                                                             "additionalProperties":  false
+                                                         },
+                                       "StockCountItem":  {
+                                                              "type":  "object",
+                                                              "properties":  "@{id=; stockCountId=; productId=; systemQuantity=; countedQuantity=; discrepancy=; status=; description=; product=; stockCount=}",
+                                                              "additionalProperties":  false
+                                                          },
+                                       "StockCountsTicket":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{id=; warehouseId=; performedBy=; assignedTo=; name=; type=; status=; createdAt=; executedDay=; finishedDay=; description=; performedByNavigation=; stockCountItems=; warehouse=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "StorageForecast":  {
+                                                               "type":  "object",
+                                                               "properties":  "@{id=; productId=; warehouseId=; typeOfForecast=; predictedStock=; daysToStockout=; riskLevel=; confidence=; recommendedAction=; createdAt=; product=; warehouse=}",
+                                                               "additionalProperties":  false
+                                                           },
+                                       "StorageRecommendation":  {
+                                                                     "type":  "object",
+                                                                     "properties":  "@{id=; inboundProductId=; storageRecommendation1=; reason=; createdAt=; inboundProduct=}",
+                                                                     "additionalProperties":  false
+                                                                 },
+                                       "StorageZone":  {
+                                                           "type":  "object",
+                                                           "properties":  "@{id=; warehouseId=; code=; typeId=; image=; createdAt=; shelves=; type=; warehouse=}",
+                                                           "additionalProperties":  false
+                                                       },
+                                       "StoreOptions":  {
+                                                            "type":  "object",
+                                                            "properties":  "@{maxLengthForKeys=; protectPersonalData=; schemaVersion=}",
+                                                            "additionalProperties":  false
+                                                        },
+                                       "StringStringKeyValuePair":  {
+                                                                        "type":  "object",
+                                                                        "properties":  "@{key=; value=}",
+                                                                        "additionalProperties":  false
+                                                                    },
+                                       "StringStringValuesKeyValuePair":  {
+                                                                              "type":  "object",
+                                                                              "properties":  "@{key=; value=}",
+                                                                              "additionalProperties":  false
+                                                                          },
+                                       "StructLayoutAttribute":  {
+                                                                     "type":  "object",
+                                                                     "properties":  "@{typeId=; value=}",
+                                                                     "additionalProperties":  false
+                                                                 },
+                                       "Supplier":  {
+                                                        "type":  "object",
+                                                        "properties":  "@{id=; companyId=; name=; contactPerson=; email=; phone=; address=; status=; createdAt=; company=; inboundOrders=; inboundRequests=}",
+                                                        "additionalProperties":  false
+                                                    },
+                                       "TokenOptions":  {
+                                                            "type":  "object",
+                                                            "properties":  "@{providerMap=; emailConfirmationTokenProvider=; passwordResetTokenProvider=; changeEmailTokenProvider=; changePhoneNumberTokenProvider=; authenticatorTokenProvider=; authenticatorIssuer=}",
+                                                            "additionalProperties":  false
+                                                        },
+                                       "TokenProviderDescriptor":  {
+                                                                       "type":  "object",
+                                                                       "properties":  "@{providerType=; providerInstance=}",
+                                                                       "additionalProperties":  false
+                                                                   },
+                                       "TransferOrder":  {
+                                                             "type":  "object",
+                                                             "properties":  "@{id=; sourceWarehouseId=; destinationWarehouseId=; createdBy=; status=; createdAt=; createdByNavigation=; destinationWarehouse=; sourceWarehouse=; transferOrderItems=}",
+                                                             "additionalProperties":  false
+                                                         },
+                                       "TransferOrderItem":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{id=; transferOrderId=; productId=; quantity=; product=; transferOrder=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "Type":  {
+                                                    "type":  "object",
+                                                    "properties":  "@{name=; customAttributes=; isCollectible=; metadataToken=; memberType=; namespace=; assemblyQualifiedName=; fullName=; assembly=; module=; isInterface=; isNested=; declaringType=; declaringMethod=; reflectedType=; underlyingSystemType=; isTypeDefinition=; isArray=; isByRef=; isPointer=; isConstructedGenericType=; isGenericParameter=; isGenericTypeParameter=; isGenericMethodParameter=; isGenericType=; isGenericTypeDefinition=; isSZArray=; isVariableBoundArray=; isByRefLike=; isFunctionPointer=; isUnmanagedFunctionPointer=; hasElementType=; genericTypeArguments=; genericParameterPosition=; genericParameterAttributes=; attributes=; isAbstract=; isImport=; isSealed=; isSpecialName=; isClass=; isNestedAssembly=; isNestedFamANDAssem=; isNestedFamily=; isNestedFamORAssem=; isNestedPrivate=; isNestedPublic=; isNotPublic=; isPublic=; isAutoLayout=; isExplicitLayout=; isLayoutSequential=; isAnsiClass=; isAutoClass=; isUnicodeClass=; isCOMObject=; isContextful=; isEnum=; isMarshalByRef=; isPrimitive=; isValueType=; isSignatureType=; isSecurityCritical=; isSecuritySafeCritical=; isSecurityTransparent=; structLayoutAttribute=; typeInitializer=; typeHandle=; guid=; baseType=; isSerializable=; containsGenericParameters=; isVisible=}",
+                                                    "additionalProperties":  false
+                                                },
+                                       "TypeAttributes":  {
+                                                              "enum":  "0 1 2 3 4 5 6 7 8 16 24 32 128 256 1024 2048 4096 8192 16384 65536 131072 196608 262144 264192 1048576 12582912",
+                                                              "type":  "integer",
+                                                              "format":  "int32"
+                                                          },
+                                       "TypeInfo":  {
+                                                        "type":  "object",
+                                                        "properties":  "@{name=; customAttributes=; isCollectible=; metadataToken=; memberType=; namespace=; assemblyQualifiedName=; fullName=; assembly=; module=; isInterface=; isNested=; declaringType=; declaringMethod=; reflectedType=; underlyingSystemType=; isTypeDefinition=; isArray=; isByRef=; isPointer=; isConstructedGenericType=; isGenericParameter=; isGenericTypeParameter=; isGenericMethodParameter=; isGenericType=; isGenericTypeDefinition=; isSZArray=; isVariableBoundArray=; isByRefLike=; isFunctionPointer=; isUnmanagedFunctionPointer=; hasElementType=; genericTypeArguments=; genericParameterPosition=; genericParameterAttributes=; attributes=; isAbstract=; isImport=; isSealed=; isSpecialName=; isClass=; isNestedAssembly=; isNestedFamANDAssem=; isNestedFamily=; isNestedFamORAssem=; isNestedPrivate=; isNestedPublic=; isNotPublic=; isPublic=; isAutoLayout=; isExplicitLayout=; isLayoutSequential=; isAnsiClass=; isAutoClass=; isUnicodeClass=; isCOMObject=; isContextful=; isEnum=; isMarshalByRef=; isPrimitive=; isValueType=; isSignatureType=; isSecurityCritical=; isSecuritySafeCritical=; isSecurityTransparent=; structLayoutAttribute=; typeInitializer=; typeHandle=; guid=; baseType=; isSerializable=; containsGenericParameters=; isVisible=; genericTypeParameters=; declaredConstructors=; declaredEvents=; declaredFields=; declaredMembers=; declaredMethods=; declaredNestedTypes=; declaredProperties=; implementedInterfaces=}",
+                                                        "additionalProperties":  false
+                                                    },
+                                       "TypeObjectKeyValuePair":  {
+                                                                      "type":  "object",
+                                                                      "properties":  "@{key=; value=}",
+                                                                      "additionalProperties":  false
+                                                                  },
+                                       "UpdateInboundOrderItemRequest":  {
+                                                                             "type":  "object",
+                                                                             "properties":  "@{id=; productId=; expectedQuantity=; receivedQuantity=}",
+                                                                             "additionalProperties":  false
+                                                                         },
+                                       "UpdateInboundRequestStatusRequest":  {
+                                                                                 "type":  "object",
+                                                                                 "properties":  "@{approverId=; status=}",
+                                                                                 "additionalProperties":  false
+                                                                             },
+                                       "UpdateOutboundOrderItemRequest":  {
+                                                                              "type":  "object",
+                                                                              "properties":  "@{id=; productId=; quantity=}",
+                                                                              "additionalProperties":  false
+                                                                          },
+                                       "UpdateOutboundOrderStatusRequest":  {
+                                                                                "type":  "object",
+                                                                                "properties":  "@{performedBy=; status=}",
+                                                                                "additionalProperties":  false
+                                                                            },
+                                       "UpdateOutboundRequestStatusRequest":  {
+                                                                                  "type":  "object",
+                                                                                  "properties":  "@{approverId=; status=}",
+                                                                                  "additionalProperties":  false
+                                                                              },
+                                       "UpdateProductRequest":  {
+                                                                    "type":  "object",
+                                                                    "properties":  "@{companyId=; sku=; name=; typeId=; category=; unit=; weight=; description=}",
+                                                                    "additionalProperties":  false
+                                                                },
+                                       "UpdateProductTypeRequest":  {
+                                                                        "type":  "object",
+                                                                        "properties":  "@{name=}",
+                                                                        "additionalProperties":  false
+                                                                    },
+                                       "UpdateProfileDto":  {
+                                                                "type":  "object",
+                                                                "properties":  "@{companyId=; fullName=; email=; phone=; passwordHash=}",
+                                                                "additionalProperties":  false
+                                                            },
+                                       "UpdateSupplierRequest":  {
+                                                                     "type":  "object",
+                                                                     "properties":  "@{companyId=; name=; contactPerson=; email=; phone=; address=; status=}",
+                                                                     "additionalProperties":  false
+                                                                 },
+                                       "UpdateUserRequest":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{fullName=; email=; phone=; password=; roleName=; status=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "User":  {
+                                                    "type":  "object",
+                                                    "properties":  "@{id=; companyId=; fullName=; email=; phone=; roleId=; status=; createdAt=; updatedAt=; activityLogs=; company=; inboundOrders=; inboundRequestApprovedByNavigations=; inboundRequestRequestedByNavigations=; inventoryTransactions=; outboundOrders=; outboundRequestApprovedByNavigations=; outboundRequestRequestedByNavigations=; refreshTokens=; role=; stockCountsTickets=; transferOrders=; warehouseAssignments=}",
+                                                    "additionalProperties":  false
+                                                },
+                                       "UserIPasswordHasher":  {
+                                                                   "type":  "object",
+                                                                   "additionalProperties":  false
+                                                               },
+                                       "UserIPasswordValidator":  {
+                                                                      "type":  "object",
+                                                                      "additionalProperties":  false
+                                                                  },
+                                       "UserIUserClaimsPrincipalFactory":  {
+                                                                               "type":  "object",
+                                                                               "additionalProperties":  false
+                                                                           },
+                                       "UserIUserValidator":  {
+                                                                  "type":  "object",
+                                                                  "additionalProperties":  false
+                                                              },
+                                       "UserOptions":  {
+                                                           "type":  "object",
+                                                           "properties":  "@{allowedUserNameCharacters=; requireUniqueEmail=}",
+                                                           "additionalProperties":  false
+                                                       },
+                                       "UserSignInManager":  {
+                                                                 "type":  "object",
+                                                                 "properties":  "@{logger=; userManager=; claimsFactory=; options=; authenticationScheme=; context=}",
+                                                                 "additionalProperties":  false
+                                                             },
+                                       "UserUserManager":  {
+                                                               "type":  "object",
+                                                               "properties":  "@{logger=; passwordHasher=; userValidators=; passwordValidators=; keyNormalizer=; errorDescriber=; options=; supportsUserAuthenticationTokens=; supportsUserAuthenticatorKey=; supportsUserTwoFactorRecoveryCodes=; supportsUserTwoFactor=; supportsUserPassword=; supportsUserSecurityStamp=; supportsUserRole=; supportsUserLogin=; supportsUserEmail=; supportsUserPhoneNumber=; supportsUserClaim=; supportsUserLockout=; supportsQueryableUsers=; users=}",
+                                                               "additionalProperties":  false
+                                                           },
+                                       "WaitHandle":  {
+                                                          "type":  "object",
+                                                          "properties":  "@{handle=; safeWaitHandle=}",
+                                                          "additionalProperties":  false
+                                                      },
+                                       "Warehouse":  {
+                                                         "type":  "object",
+                                                         "properties":  "@{id=; companyId=; name=; address=; description=; width=; height=; length=; gridSize=; status=; image=; createdAt=; updatedAt=; company=; inboundOrders=; inboundRequests=; inventories=; inventoryTransactions=; navEdges=; navNodes=; outboundOrders=; outboundRequests=; stockCountsTickets=; storageForecasts=; storageZones=; transferOrderDestinationWarehouses=; transferOrderSourceWarehouses=; warehouseAssignments=}",
+                                                         "additionalProperties":  false
+                                                     },
+                                       "WarehouseAssignment":  {
+                                                                   "type":  "object",
+                                                                   "properties":  "@{id=; userId=; warehouseId=; roleInWarehouse=; assignedAt=; user=; warehouse=}",
+                                                                   "additionalProperties":  false
+                                                               },
+                                       "WebSocketManager":  {
+                                                                "type":  "object",
+                                                                "properties":  "@{isWebSocketRequest=; webSocketRequestedProtocols=}",
+                                                                "additionalProperties":  false
+                                                            },
+                                       "X500DistinguishedName":  {
+                                                                     "type":  "object",
+                                                                     "properties":  "@{oid=; rawData=; name=}",
+                                                                     "additionalProperties":  false
+                                                                 },
+                                       "X509Certificate2":  {
+                                                                "type":  "object",
+                                                                "properties":  "@{handle=; issuer=; subject=; serialNumberBytes=; archived=; extensions=; friendlyName=; hasPrivateKey=; privateKey=; issuerName=; notAfter=; notBefore=; publicKey=; rawData=; rawDataMemory=; serialNumber=; signatureAlgorithm=; subjectName=; thumbprint=; version=}",
+                                                                "additionalProperties":  false
+                                                            },
+                                       "X509Extension":  {
+                                                             "type":  "object",
+                                                             "properties":  "@{oid=; rawData=; critical=}",
+                                                             "additionalProperties":  false
+                                                         }
+                                   },
+                       "securitySchemes":  {
+                                               "Bearer":  {
+                                                              "type":  "http",
+                                                              "description":  "Please enter into field the token receive from authentication",
+                                                              "scheme":  "bearer",
+                                                              "bearerFormat":  "JWT"
+                                                          }
+                                           }
+                   },
+    "security":  [
+                     {
+                         "Bearer":  [
+
+                                    ]
+                     }
+                 ]
+}

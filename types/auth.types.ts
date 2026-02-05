@@ -9,7 +9,8 @@ export interface User {
 
 
 export interface LoginResponse {
-    token: string;
+    accessToken: string;
+    refreshToken: string;
     userId: number;
     roleId: number;
     companyId?: number;

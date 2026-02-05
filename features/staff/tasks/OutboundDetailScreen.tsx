@@ -1,6 +1,7 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useOutboundOrder, useUpdateOutboundTicketItems } from '@/hooks';
+import { useConfirmOutboundOrder, useOutboundOrder, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
+import { useAuthStore } from '@/stores/auth.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,10 +13,14 @@ export default function OutboundDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { data: order, isLoading, error } = useOutboundOrder(id);
     const updateItems = useUpdateOutboundTicketItems();
+    const updateStatus = useUpdateOutboundTicketStatus();
+    const confirmOrder = useConfirmOutboundOrder();
+    const user = useAuthStore((state) => state.user);
 
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [verifiedItems, setVerifiedItems] = useState<Record<number, boolean>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
 
     // Initialize state when order data is loaded
     useEffect(() => {
@@ -98,23 +103,81 @@ export default function OutboundDetailScreen() {
                 quantity: localQuantities[item.id] || item.quantity || 0,
             }));
 
-            // Check if all items picked
-            const allPicked = order.outboundOrderItems.every((item: OutboundOrderItem) =>
-                (localQuantities[item.id] || 0) >= (item.quantity || 0)
-            );
-
             await updateItems.mutateAsync({
                 ticketId: order.id,
                 items: updatedItems,
             });
 
-            Alert.alert('Thành công', allPicked ? 'Đã hoàn tất lấy hàng' : 'Đã cập nhật số lượng lấy hàng');
-            router.back();
+            Alert.alert('Thành công', 'Đã cập nhật số lượng lấy hàng');
         } catch {
             Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Check if all items are picked
+    const allItemsPicked = order?.outboundOrderItems?.every(
+        (item: OutboundOrderItem) => (localQuantities[item.id] || 0) >= (item.quantity || 0)
+    ) ?? false;
+
+    // Check if all items are verified (scanned)
+    const allItemsVerified = order?.outboundOrderItems?.every(
+        (item: OutboundOrderItem) => verifiedItems[item.id]
+    ) ?? false;
+
+    const handleConfirmComplete = async () => {
+        if (!order || !user) return;
+
+        // Check if all items are verified first
+        if (!allItemsVerified) {
+            Alert.alert('Chưa hoàn tất', 'Vui lòng quét xác minh tất cả sản phẩm trước khi xác nhận hoàn tất.');
+            return;
+        }
+
+        Alert.alert(
+            'Xác nhận hoàn tất xuất kho',
+            'Bạn có chắc chắn đã lấy đủ và kiểm tra tất cả hàng hóa? Sau khi xác nhận, phiếu xuất sẽ được đánh dấu hoàn thành.',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Xác nhận',
+                    style: 'default',
+                    onPress: async () => {
+                        setIsConfirming(true);
+                        try {
+                            // First update items with final quantities
+                            const updatedItems = order.outboundOrderItems.map((item: OutboundOrderItem) => ({
+                                id: item.id,
+                                productId: item.productId || 0,
+                                quantity: localQuantities[item.id] || item.quantity || 0,
+                            }));
+
+                            await updateItems.mutateAsync({
+                                ticketId: order.id,
+                                items: updatedItems,
+                            });
+
+                            // Then confirm the order
+                            await confirmOrder.mutateAsync({
+                                ticketId: order.id,
+                                performedBy: user.id,
+                            });
+
+                            Alert.alert(
+                                'Hoàn tất!',
+                                'Phiếu xuất kho đã được xác nhận hoàn thành. Hàng hóa đã được ghi giảm khỏi tồn kho.',
+                                [{ text: 'OK', onPress: () => router.back() }]
+                            );
+                        } catch {
+                            Alert.alert('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
+                        } finally {
+                            setIsConfirming(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     return (
@@ -213,15 +276,29 @@ export default function OutboundDetailScreen() {
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
                     <Text style={styles.reportBtnText}>Báo lỗi</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.saveBtn, isSaving && styles.disabledBtn]}
-                    onPress={handleSave}
-                    disabled={isSaving}
-                >
-                    <Text style={styles.saveBtnText}>
-                        {isSaving ? 'Đang lưu...' : 'Hoàn tất lấy hàng'}
-                    </Text>
-                </TouchableOpacity>
+                
+                {!(allItemsPicked && allItemsVerified) ? (
+                    <TouchableOpacity
+                        style={[styles.saveBtn, isSaving && styles.disabledBtn]}
+                        onPress={handleSave}
+                        disabled={isSaving}
+                    >
+                        <Text style={styles.saveBtnText}>
+                            {isSaving ? 'Đang lưu...' : 'Lưu tiến độ'}
+                        </Text>
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.confirmBtn, isConfirming && styles.disabledBtn]}
+                        onPress={handleConfirmComplete}
+                        disabled={isConfirming}
+                    >
+                        <Feather name="check-circle" size={20} color="#fff" />
+                        <Text style={styles.confirmBtnText}>
+                            {isConfirming ? 'Đang xử lý...' : 'Xác nhận hoàn tất'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -444,6 +521,26 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    confirmBtn: {
+        flex: 1,
+        height: 56,
+        backgroundColor: COLORS.success,
+        borderRadius: 12,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        shadowColor: COLORS.success,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    confirmBtnText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
     },
     itemCardVerified: {
         borderColor: '#059669',

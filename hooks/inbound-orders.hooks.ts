@@ -38,8 +38,12 @@ const getInboundRequests = async (): Promise<InboundRequest[]> => {
   try {
     const response = await api.get('/api/InventoryInbound/get-all-inbound-requests');
     return response.data;
-  } catch {
-    console.warn('Inbound requests API not available, returning empty array');
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      console.warn('Inbound requests endpoint not implemented yet');
+      return [];
+    }
+    console.error('Error fetching inbound requests:', error);
     return [];
   }
 };
@@ -51,8 +55,8 @@ const getInboundRequestById = async (id: number): Promise<InboundRequest | null>
   try {
     const response = await api.get(`/api/InventoryInbound/get-inbound-request-by-id/${id}`);
     return response.data;
-  } catch {
-    console.warn(`Inbound request ${id} not found`);
+  } catch (error) {
+    console.error(`Error fetching inbound request ${id}:`, error);
     return null;
   }
 };
@@ -64,8 +68,12 @@ const getInboundTickets = async (): Promise<ApiInboundOrder[]> => {
   try {
     const response = await api.get('/api/InventoryInbound/get-all-inbound-tickets');
     return response.data;
-  } catch {
-    console.warn('Inbound tickets API not available, returning empty array');
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      console.warn('⚠️ API endpoint /get-all-inbound-tickets not implemented yet');
+    } else {
+      console.error('Error fetching inbound tickets:', error);
+    }
     return [];
   }
 };
@@ -77,8 +85,12 @@ const getInboundTicketById = async (id: number): Promise<ApiInboundOrder | null>
   try {
     const response = await api.get(`/api/InventoryInbound/get-inbound-ticket-by-id/${id}`);
     return response.data;
-  } catch {
-    console.warn(`Inbound ticket ${id} not found`);
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      console.warn(`⚠️ Ticket ${id} not found or API not implemented`);
+    } else {
+      console.error(`Error fetching inbound ticket ${id}:`, error);
+    }
     return null;
   }
 };

@@ -1,6 +1,7 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundOrder, useUpdateInboundTicketItems } from '@/hooks';
+import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,10 +13,12 @@ export default function InboundDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { data: order, isLoading, error } = useInboundOrder(id);
     const updateItems = useUpdateInboundTicketItems();
+    const user = useAuthStore((state) => state.user);
 
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [localItemData, setLocalItemData] = useState<Record<number, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
 
     // Initialize state when order data is loaded
     useEffect(() => {
@@ -84,23 +87,65 @@ export default function InboundDetailScreen() {
                 receivedQuantity: localQuantities[item.id] || item.receivedQuantity || 0,
             }));
 
-            // Check if all items received
-            const allReceived = order.inboundOrderItems.every((item: InboundOrderItem) =>
-                (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)
-            );
-
             await updateItems.mutateAsync({
                 ticketId: order.id,
                 items: updatedItems,
             });
 
-            Alert.alert('Thành công', allReceived ? 'Đã hoàn tất nhận hàng' : 'Đã lưu thông tin nhận hàng');
-            router.back();
+            Alert.alert('Thành công', 'Đã lưu thông tin nhận hàng');
         } catch {
             Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Check if all items are received
+    const allItemsReceived = order?.inboundOrderItems?.every(
+        (item: InboundOrderItem) => (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)
+    ) ?? false;
+
+    const handleConfirmComplete = async () => {
+        if (!order || !user) return;
+        
+        Alert.alert(
+            'Xác nhận hoàn tất',
+            'Bạn có chắc chắn đã nhận đủ và kiểm tra tất cả hàng hóa? Sau khi xác nhận, phiếu nhập sẽ được đánh dấu hoàn thành.',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Xác nhận',
+                    style: 'default',
+                    onPress: async () => {
+                        setIsConfirming(true);
+                        try {
+                            // Update items with final quantities
+                            const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => ({
+                                id: item.id,
+                                productId: item.productId || 0,
+                                expectedQuantity: item.expectedQuantity,
+                                receivedQuantity: localQuantities[item.id] || item.receivedQuantity || 0,
+                            }));
+
+                            await updateItems.mutateAsync({
+                                ticketId: order.id,
+                                items: updatedItems,
+                            });
+
+                            Alert.alert(
+                                'Hoàn tất!',
+                                'Phiếu nhập kho đã được xác nhận hoàn thành. Hàng hóa đã được ghi nhận vào tồn kho.',
+                                [{ text: 'OK', onPress: () => router.back() }]
+                            );
+                        } catch {
+                            Alert.alert('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
+                        } finally {
+                            setIsConfirming(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     return (
@@ -222,15 +267,29 @@ export default function InboundDetailScreen() {
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
                     <Text style={styles.reportBtnText}>Báo lỗi</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.saveBtn, isSaving && styles.disabledBtn]}
-                    onPress={handleSave}
-                    disabled={isSaving}
-                >
-                    <Text style={styles.saveBtnText}>
-                        {isSaving ? 'Đang lưu...' : 'Hoàn tất nhận hàng'}
-                    </Text>
-                </TouchableOpacity>
+                
+                {!allItemsReceived ? (
+                    <TouchableOpacity
+                        style={[styles.saveBtn, isSaving && styles.disabledBtn]}
+                        onPress={handleSave}
+                        disabled={isSaving}
+                    >
+                        <Text style={styles.saveBtnText}>
+                            {isSaving ? 'Đang lưu...' : 'Lưu tiến độ'}
+                        </Text>
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.confirmBtn, isConfirming && styles.disabledBtn]}
+                        onPress={handleConfirmComplete}
+                        disabled={isConfirming}
+                    >
+                        <Feather name="check-circle" size={20} color="#fff" />
+                        <Text style={styles.confirmBtnText}>
+                            {isConfirming ? 'Đang xử lý...' : 'Xác nhận hoàn tất'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -496,6 +555,26 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         color: COLORS.textLight,
+    },
+    confirmBtn: {
+        flex: 1,
+        height: 56,
+        backgroundColor: COLORS.success,
+        borderRadius: 12,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        shadowColor: COLORS.success,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    confirmBtnText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
     },
     disabledBtn: {
         opacity: 0.6,
