@@ -119,13 +119,13 @@ export default function OutboundOrderDetailScreen() {
                             setIsProcessing(true);
                             await updateRequestStatus.mutateAsync({
                                 requestId: data.id,
-                                approverId: user?.userId ?? 0,
+                                approverId: user?.id ?? 0,
                                 status: 'Approved',
                             });
                             Alert.alert('Thành công', 'Yêu cầu đã được duyệt', [
                                 { text: 'OK', onPress: () => router.back() },
                             ]);
-                        } catch (err) {
+                        } catch {
                             Alert.alert('Lỗi', 'Không thể duyệt yêu cầu. Vui lòng thử lại.');
                         } finally {
                             setIsProcessing(false);
@@ -151,13 +151,13 @@ export default function OutboundOrderDetailScreen() {
                             setIsProcessing(true);
                             await updateRequestStatus.mutateAsync({
                                 requestId: data.id,
-                                approverId: user?.userId ?? 0,
+                                approverId: user?.id ?? 0,
                                 status: 'Rejected',
                             });
                             Alert.alert('Thành công', 'Yêu cầu đã bị từ chối', [
                                 { text: 'OK', onPress: () => router.back() },
                             ]);
-                        } catch (err) {
+                        } catch {
                             Alert.alert('Lỗi', 'Không thể từ chối yêu cầu. Vui lòng thử lại.');
                         } finally {
                             setIsProcessing(false);
@@ -183,12 +183,12 @@ export default function OutboundOrderDetailScreen() {
                             setIsProcessing(true);
                             await createTicket.mutateAsync({
                                 requestId: data.id,
-                                createdBy: user?.userId ?? 0,
+                                createdBy: user?.id ?? 0,
                             });
                             Alert.alert('Thành công', 'Đã tạo phiếu xuất kho', [
                                 { text: 'OK', onPress: () => router.back() },
                             ]);
-                        } catch (err) {
+                        } catch {
                             Alert.alert('Lỗi', 'Không thể tạo phiếu xuất kho. Vui lòng thử lại.');
                         } finally {
                             setIsProcessing(false);
@@ -214,12 +214,12 @@ export default function OutboundOrderDetailScreen() {
                             setIsProcessing(true);
                             await confirmOrder.mutateAsync({
                                 ticketId: data.id,
-                                performedBy: user?.userId ?? 0,
+                                performedBy: user?.id ?? 0,
                             });
                             Alert.alert('Thành công', 'Đơn xuất kho đã hoàn tất', [
                                 { text: 'OK', onPress: () => router.back() },
                             ]);
-                        } catch (err) {
+                        } catch {
                             Alert.alert('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
                         } finally {
                             setIsProcessing(false);

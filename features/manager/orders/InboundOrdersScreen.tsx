@@ -1,59 +1,231 @@
 import { Card, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrders } from '@/hooks/inbound-orders.hooks';
+import { useInboundRequests, useInboundTickets } from '@/hooks/inbound-orders.hooks';
+import { InboundOrder, InboundRequest } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-// Status config khớp với Backend
-type InboundStatusKey = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
-const STATUS_CONFIG: Record<InboundStatusKey, { label: string; color: string; bgColor: string }> = {
+// View mode - Requests (chờ duyệt) hoặc Tickets (đã duyệt, đang xử lý)
+type ViewMode = 'requests' | 'tickets';
+
+// Status config cho Request
+type RequestStatusKey = 'Pending' | 'Approved' | 'Rejected';
+const REQUEST_STATUS_CONFIG: Record<RequestStatusKey, { label: string; color: string; bgColor: string }> = {
+    Pending: { label: 'Chờ duyệt', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Approved: { label: 'Đã duyệt', color: COLORS.success, bgColor: COLORS.success + '20' },
+    Rejected: { label: 'Từ chối', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+};
+
+// Status config cho Ticket
+type TicketStatusKey = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
+const TICKET_STATUS_CONFIG: Record<TicketStatusKey, { label: string; color: string; bgColor: string }> = {
     Pending: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
     Processing: { label: 'Đang xử lý', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
     Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
     Cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
-const getStatusConfig = (status?: string) => {
-    return STATUS_CONFIG[status as InboundStatusKey] || STATUS_CONFIG.Pending;
+const getRequestStatusConfig = (status?: string) => {
+    return REQUEST_STATUS_CONFIG[status as RequestStatusKey] || REQUEST_STATUS_CONFIG.Pending;
+};
+
+const getTicketStatusConfig = (status?: string) => {
+    return TICKET_STATUS_CONFIG[status as TicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
 };
 
 export default function InboundOrdersScreen() {
     const router = useRouter();
-    const { data: inboundOrders = [], isLoading } = useInboundOrders();
+    const [viewMode, setViewMode] = useState<ViewMode>('requests');
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedStatus, setSelectedStatus] = useState<InboundStatusKey | 'all'>('all');
+    const [selectedRequestStatus, setSelectedRequestStatus] = useState<RequestStatusKey | 'all'>('all');
+    const [selectedTicketStatus, setSelectedTicketStatus] = useState<TicketStatusKey | 'all'>('all');
 
-    const filteredOrders = useMemo(() => {
-        let orders = inboundOrders;
+    // Fetch both requests and tickets
+    const { data: requests = [], isLoading: requestsLoading } = useInboundRequests();
+    const { data: tickets = [], isLoading: ticketsLoading } = useInboundTickets();
 
-        // Search filter
+    const isLoading = requestsLoading || ticketsLoading;
+
+    // Filter requests
+    const filteredRequests = useMemo(() => {
+        let items = requests;
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
-            orders = orders.filter(o =>
-                o.referenceCode?.toLowerCase().includes(query) ||
-                o.supplier?.name?.toLowerCase().includes(query) ||
-                String(o.id).includes(query)
+            items = items.filter(r =>
+                String(r.id).includes(query) ||
+                r.supplier?.name?.toLowerCase().includes(query)
             );
         }
-
-        // Status filter
-        if (selectedStatus !== 'all') {
-            orders = orders.filter(o => o.status === selectedStatus);
+        if (selectedRequestStatus !== 'all') {
+            items = items.filter(r => r.status === selectedRequestStatus);
         }
+        return items;
+    }, [requests, searchQuery, selectedRequestStatus]);
 
-        return orders;
-    }, [inboundOrders, searchQuery, selectedStatus]);
+    // Filter tickets
+    const filteredTickets = useMemo(() => {
+        let items = tickets;
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            items = items.filter(t =>
+                t.referenceCode?.toLowerCase().includes(query) ||
+                t.supplier?.name?.toLowerCase().includes(query) ||
+                String(t.id).includes(query)
+            );
+        }
+        if (selectedTicketStatus !== 'all') {
+            items = items.filter(t => t.status === selectedTicketStatus);
+        }
+        return items;
+    }, [tickets, searchQuery, selectedTicketStatus]);
 
-    const statusCounts = useMemo(() => {
-        return {
-            all: inboundOrders.length,
-            Pending: inboundOrders.filter(o => o.status === 'Pending').length,
-            Processing: inboundOrders.filter(o => o.status === 'Processing').length,
-            Completed: inboundOrders.filter(o => o.status === 'Completed').length,
-        };
-    }, [inboundOrders]);
+    // Counts for tabs
+    const requestCounts = useMemo(() => ({
+        all: requests.length,
+        Pending: requests.filter(r => r.status === 'Pending').length,
+        Approved: requests.filter(r => r.status === 'Approved').length,
+    }), [requests]);
+
+    const ticketCounts = useMemo(() => ({
+        all: tickets.length,
+        Pending: tickets.filter(t => t.status === 'Pending').length,
+        Processing: tickets.filter(t => t.status === 'Processing').length,
+        Completed: tickets.filter(t => t.status === 'Completed').length,
+    }), [tickets]);
+
+    const renderRequestCard = (request: InboundRequest) => {
+        const statusConfig = getRequestStatusConfig(request.status);
+        return (
+            <TouchableOpacity
+                key={`req-${request.id}`}
+                onPress={() => router.push({
+                    pathname: `/(manager-tabs)/(orders-inbound)/${request.id}`,
+                    params: { type: 'request' }
+                } as any)}
+            >
+                <Card style={styles.orderCard}>
+                    <View style={styles.cardHeader}>
+                        <View style={styles.cardHeaderLeft}>
+                            <Text style={styles.orderNumber}>REQ-{request.id}</Text>
+                            <Text style={styles.typeTag}>Yêu cầu nhập kho</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                            <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                                {statusConfig.label}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.cardDivider} />
+
+                    <View style={styles.cardRow}>
+                        <Feather name="truck" size={16} color={COLORS.textMuted} />
+                        <Text style={styles.cardLabel}>Nhà cung cấp:</Text>
+                        <Text style={styles.cardValue}>
+                            {request.supplier?.name || 'Chưa xác định'}
+                        </Text>
+                    </View>
+
+                    {request.warehouse && (
+                        <View style={styles.cardRow}>
+                            <Feather name="home" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.cardLabel}>Kho:</Text>
+                            <Text style={styles.cardValue}>{request.warehouse.name}</Text>
+                        </View>
+                    )}
+
+                    <View style={styles.cardRow}>
+                        <Feather name="package" size={16} color={COLORS.textMuted} />
+                        <Text style={styles.cardLabel}>Sản phẩm:</Text>
+                        <Text style={styles.cardValue}>
+                            {request.inboundOrderItems?.length || 0} mặt hàng
+                        </Text>
+                    </View>
+
+                    {request.createdAt && (
+                        <View style={styles.cardRow}>
+                            <Feather name="calendar" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.cardLabel}>Ngày tạo:</Text>
+                            <Text style={styles.cardValue}>
+                                {new Date(request.createdAt).toLocaleDateString('vi-VN')}
+                            </Text>
+                        </View>
+                    )}
+                </Card>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderTicketCard = (ticket: InboundOrder) => {
+        const statusConfig = getTicketStatusConfig(ticket.status);
+        return (
+            <TouchableOpacity
+                key={`tkt-${ticket.id}`}
+                onPress={() => router.push({
+                    pathname: `/(manager-tabs)/(orders-inbound)/${ticket.id}`,
+                    params: { type: 'ticket' }
+                } as any)}
+            >
+                <Card style={styles.orderCard}>
+                    <View style={styles.cardHeader}>
+                        <View style={styles.cardHeaderLeft}>
+                            <Text style={styles.orderNumber}>
+                                {ticket.referenceCode || `INB-${ticket.id}`}
+                            </Text>
+                            {ticket.inboundRequestId && (
+                                <Text style={styles.requisitionRef}>
+                                    Từ yêu cầu #{ticket.inboundRequestId}
+                                </Text>
+                            )}
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                            <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                                {statusConfig.label}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.cardDivider} />
+
+                    <View style={styles.cardRow}>
+                        <Feather name="truck" size={16} color={COLORS.textMuted} />
+                        <Text style={styles.cardLabel}>Nhà cung cấp:</Text>
+                        <Text style={styles.cardValue}>
+                            {ticket.supplier?.name || 'Chưa xác định'}
+                        </Text>
+                    </View>
+
+                    {ticket.warehouse && (
+                        <View style={styles.cardRow}>
+                            <Feather name="home" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.cardLabel}>Kho:</Text>
+                            <Text style={styles.cardValue}>{ticket.warehouse.name}</Text>
+                        </View>
+                    )}
+
+                    <View style={styles.cardRow}>
+                        <Feather name="package" size={16} color={COLORS.textMuted} />
+                        <Text style={styles.cardLabel}>Sản phẩm:</Text>
+                        <Text style={styles.cardValue}>
+                            {ticket.inboundOrderItems?.length || 0} mặt hàng
+                        </Text>
+                    </View>
+
+                    {ticket.createdAt && (
+                        <View style={styles.cardRow}>
+                            <Feather name="calendar" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.cardLabel}>Ngày tạo:</Text>
+                            <Text style={styles.cardValue}>
+                                {new Date(ticket.createdAt).toLocaleDateString('vi-VN')}
+                            </Text>
+                        </View>
+                    )}
+                </Card>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -66,147 +238,169 @@ export default function InboundOrdersScreen() {
                 searchValue={searchQuery}
                 onSearchChange={setSearchQuery}
             >
-                {/* Status tabs */}
-                <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false} 
+                {/* View Mode Toggle */}
+                <View style={styles.viewModeContainer}>
+                    <TouchableOpacity
+                        style={[styles.viewModeTab, viewMode === 'requests' && styles.viewModeTabActive]}
+                        onPress={() => setViewMode('requests')}
+                    >
+                        <Feather name="file-text" size={16} color={viewMode === 'requests' ? '#fff' : COLORS.textMuted} />
+                        <Text style={[styles.viewModeText, viewMode === 'requests' && styles.viewModeTextActive]}>
+                            Yêu cầu ({requestCounts.all})
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.viewModeTab, viewMode === 'tickets' && styles.viewModeTabActive]}
+                        onPress={() => setViewMode('tickets')}
+                    >
+                        <Feather name="clipboard" size={16} color={viewMode === 'tickets' ? '#fff' : COLORS.textMuted} />
+                        <Text style={[styles.viewModeText, viewMode === 'tickets' && styles.viewModeTextActive]}>
+                            Phiếu nhập ({ticketCounts.all})
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Status tabs based on view mode */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
                     style={styles.tabsScroll}
                     contentContainerStyle={styles.tabsContainer}
                 >
-                    <TouchableOpacity
-                        style={[styles.tab, selectedStatus === 'all' && styles.tabActive]}
-                        onPress={() => setSelectedStatus('all')}
-                    >
-                        <Text style={[styles.tabText, selectedStatus === 'all' && styles.tabTextActive]}>
-                            Tất cả
-                        </Text>
-                        <View style={[styles.tabCount, selectedStatus === 'all' && styles.tabCountActive]}>
-                            <Text style={[styles.tabCountText, selectedStatus === 'all' && styles.tabCountTextActive]}>
-                                {statusCounts.all}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, selectedStatus === 'Pending' && styles.tabActive]}
-                        onPress={() => setSelectedStatus('Pending')}
-                    >
-                        <Text style={[styles.tabText, selectedStatus === 'Pending' && styles.tabTextActive]}>
-                            Chờ xử lý
-                        </Text>
-                        <View style={[styles.tabCount, selectedStatus === 'Pending' && styles.tabCountActive]}>
-                            <Text style={[styles.tabCountText, selectedStatus === 'Pending' && styles.tabCountTextActive]}>
-                                {statusCounts.Pending}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, selectedStatus === 'Processing' && styles.tabActive]}
-                        onPress={() => setSelectedStatus('Processing')}
-                    >
-                        <Text style={[styles.tabText, selectedStatus === 'Processing' && styles.tabTextActive]}>
-                            Đang xử lý
-                        </Text>
-                        <View style={[styles.tabCount, selectedStatus === 'Processing' && styles.tabCountActive]}>
-                            <Text style={[styles.tabCountText, selectedStatus === 'Processing' && styles.tabCountTextActive]}>
-                                {statusCounts.Processing}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, selectedStatus === 'Completed' && styles.tabActive]}
-                        onPress={() => setSelectedStatus('Completed')}
-                    >
-                        <Text style={[styles.tabText, selectedStatus === 'Completed' && styles.tabTextActive]}>
-                            Hoàn tất
-                        </Text>
-                        <View style={[styles.tabCount, selectedStatus === 'Completed' && styles.tabCountActive]}>
-                            <Text style={[styles.tabCountText, selectedStatus === 'Completed' && styles.tabCountTextActive]}>
-                                {statusCounts.Completed}
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
+                    {viewMode === 'requests' ? (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.tab, selectedRequestStatus === 'all' && styles.tabActive]}
+                                onPress={() => setSelectedRequestStatus('all')}
+                            >
+                                <Text style={[styles.tabText, selectedRequestStatus === 'all' && styles.tabTextActive]}>
+                                    Tất cả
+                                </Text>
+                                <View style={[styles.tabCount, selectedRequestStatus === 'all' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedRequestStatus === 'all' && styles.tabCountTextActive]}>
+                                        {requestCounts.all}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.tab, selectedRequestStatus === 'Pending' && styles.tabActive]}
+                                onPress={() => setSelectedRequestStatus('Pending')}
+                            >
+                                <Text style={[styles.tabText, selectedRequestStatus === 'Pending' && styles.tabTextActive]}>
+                                    Chờ duyệt
+                                </Text>
+                                <View style={[styles.tabCount, selectedRequestStatus === 'Pending' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedRequestStatus === 'Pending' && styles.tabCountTextActive]}>
+                                        {requestCounts.Pending}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.tab, selectedRequestStatus === 'Approved' && styles.tabActive]}
+                                onPress={() => setSelectedRequestStatus('Approved')}
+                            >
+                                <Text style={[styles.tabText, selectedRequestStatus === 'Approved' && styles.tabTextActive]}>
+                                    Đã duyệt
+                                </Text>
+                                <View style={[styles.tabCount, selectedRequestStatus === 'Approved' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedRequestStatus === 'Approved' && styles.tabCountTextActive]}>
+                                        {requestCounts.Approved}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.tab, selectedTicketStatus === 'all' && styles.tabActive]}
+                                onPress={() => setSelectedTicketStatus('all')}
+                            >
+                                <Text style={[styles.tabText, selectedTicketStatus === 'all' && styles.tabTextActive]}>
+                                    Tất cả
+                                </Text>
+                                <View style={[styles.tabCount, selectedTicketStatus === 'all' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedTicketStatus === 'all' && styles.tabCountTextActive]}>
+                                        {ticketCounts.all}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.tab, selectedTicketStatus === 'Pending' && styles.tabActive]}
+                                onPress={() => setSelectedTicketStatus('Pending')}
+                            >
+                                <Text style={[styles.tabText, selectedTicketStatus === 'Pending' && styles.tabTextActive]}>
+                                    Chờ xử lý
+                                </Text>
+                                <View style={[styles.tabCount, selectedTicketStatus === 'Pending' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedTicketStatus === 'Pending' && styles.tabCountTextActive]}>
+                                        {ticketCounts.Pending}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.tab, selectedTicketStatus === 'Processing' && styles.tabActive]}
+                                onPress={() => setSelectedTicketStatus('Processing')}
+                            >
+                                <Text style={[styles.tabText, selectedTicketStatus === 'Processing' && styles.tabTextActive]}>
+                                    Đang xử lý
+                                </Text>
+                                <View style={[styles.tabCount, selectedTicketStatus === 'Processing' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedTicketStatus === 'Processing' && styles.tabCountTextActive]}>
+                                        {ticketCounts.Processing}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.tab, selectedTicketStatus === 'Completed' && styles.tabActive]}
+                                onPress={() => setSelectedTicketStatus('Completed')}
+                            >
+                                <Text style={[styles.tabText, selectedTicketStatus === 'Completed' && styles.tabTextActive]}>
+                                    Hoàn tất
+                                </Text>
+                                <View style={[styles.tabCount, selectedTicketStatus === 'Completed' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedTicketStatus === 'Completed' && styles.tabCountTextActive]}>
+                                        {ticketCounts.Completed}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        </>
+                    )}
                 </ScrollView>
             </TabScreenHeader>
 
             {/* Order List */}
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-                {filteredOrders.length === 0 ? (
-                    <Card style={styles.emptyCard}>
-                        <Feather name="inbox" size={48} color={COLORS.border} />
-                        <Text style={styles.emptyText}>Không có đơn nhập kho</Text>
-                        <Text style={styles.emptyHint}>
-                            {searchQuery ? 'Thử tìm kiếm khác' : 'Tạo đơn nhập kho mới để bắt đầu'}
-                        </Text>
-                    </Card>
+                {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                    </View>
+                ) : viewMode === 'requests' ? (
+                    filteredRequests.length === 0 ? (
+                        <Card style={styles.emptyCard}>
+                            <Feather name="inbox" size={48} color={COLORS.border} />
+                            <Text style={styles.emptyText}>Không có yêu cầu nhập kho</Text>
+                            <Text style={styles.emptyHint}>
+                                {searchQuery ? 'Thử tìm kiếm khác' : 'Tạo yêu cầu nhập kho mới để bắt đầu'}
+                            </Text>
+                        </Card>
+                    ) : (
+                        filteredRequests.map(renderRequestCard)
+                    )
                 ) : (
-                    filteredOrders.map(order => {
-                        const statusConfig = getStatusConfig(order.status);
-                        return (
-                            <TouchableOpacity
-                                key={order.id}
-                                onPress={() => router.push(`/(manager-tabs)/(orders-inbound)/${order.id}` as any)}
-                            >
-                                <Card style={styles.orderCard}>
-                                    <View style={styles.cardHeader}>
-                                        <View style={styles.cardHeaderLeft}>
-                                            <Text style={styles.orderNumber}>
-                                                {order.referenceCode || `INB-${order.id}`}
-                                            </Text>
-                                            {order.inboundRequestId && (
-                                                <Text style={styles.requisitionRef}>
-                                                    Yêu cầu #{order.inboundRequestId}
-                                                </Text>
-                                            )}
-                                        </View>
-                                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-                                            <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                                                {statusConfig.label}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.cardDivider} />
-
-                                    <View style={styles.cardRow}>
-                                        <Feather name="truck" size={16} color={COLORS.textMuted} />
-                                        <Text style={styles.cardLabel}>Nhà cung cấp:</Text>
-                                        <Text style={styles.cardValue}>
-                                            {order.supplier?.name || 'Chưa xác định'}
-                                        </Text>
-                                    </View>
-
-                                    {order.warehouse && (
-                                        <View style={styles.cardRow}>
-                                            <Feather name="home" size={16} color={COLORS.textMuted} />
-                                            <Text style={styles.cardLabel}>Kho:</Text>
-                                            <Text style={styles.cardValue}>{order.warehouse.name}</Text>
-                                        </View>
-                                    )}
-
-                                    <View style={styles.cardRow}>
-                                        <Feather name="package" size={16} color={COLORS.textMuted} />
-                                        <Text style={styles.cardLabel}>Sản phẩm:</Text>
-                                        <Text style={styles.cardValue}>
-                                            {order.inboundOrderItems?.length || 0} mặt hàng
-                                        </Text>
-                                    </View>
-
-                                    {order.createdAt && (
-                                        <View style={styles.cardRow}>
-                                            <Feather name="calendar" size={16} color={COLORS.textMuted} />
-                                            <Text style={styles.cardLabel}>Ngày tạo:</Text>
-                                            <Text style={styles.cardValue}>
-                                                {new Date(order.createdAt).toLocaleDateString('vi-VN')}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </Card>
-                            </TouchableOpacity>
-                        );
-                    })
+                    filteredTickets.length === 0 ? (
+                        <Card style={styles.emptyCard}>
+                            <Feather name="inbox" size={48} color={COLORS.border} />
+                            <Text style={styles.emptyText}>Không có phiếu nhập kho</Text>
+                            <Text style={styles.emptyHint}>
+                                {searchQuery ? 'Thử tìm kiếm khác' : 'Phiếu nhập sẽ được tạo từ yêu cầu đã duyệt'}
+                            </Text>
+                        </Card>
+                    ) : (
+                        filteredTickets.map(renderTicketCard)
+                    )
                 )}
             </ScrollView>
-        </View >
+        </View>
     );
 }
 
@@ -257,6 +451,34 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 14,
         color: COLORS.text,
+    },
+    viewModeContainer: {
+        flexDirection: 'row',
+        marginHorizontal: 20,
+        marginBottom: 12,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 12,
+        padding: 4,
+    },
+    viewModeTab: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 10,
+        gap: 6,
+    },
+    viewModeTabActive: {
+        backgroundColor: COLORS.primary,
+    },
+    viewModeText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+    },
+    viewModeTextActive: {
+        color: '#fff',
     },
     tabsScroll: {
         maxHeight: 50,
@@ -311,6 +533,12 @@ const styles = StyleSheet.create({
     contentContainer: {
         padding: 20,
     },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
     emptyCard: {
         alignItems: 'center',
         paddingVertical: 60,
@@ -343,6 +571,11 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: COLORS.text,
         marginBottom: 4,
+    },
+    typeTag: {
+        fontSize: 11,
+        color: COLORS.primary,
+        fontWeight: '600',
     },
     requisitionRef: {
         fontSize: 12,

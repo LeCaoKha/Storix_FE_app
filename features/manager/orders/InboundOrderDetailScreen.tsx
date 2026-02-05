@@ -4,7 +4,6 @@ import { useInboundRequest, useInboundTicket } from '@/hooks';
 import {
     useCreateInboundTicket,
     useUpdateInboundRequestStatus,
-    useUpdateInboundTicketItems,
 } from '@/hooks/inbound-orders.hooks';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
@@ -63,7 +62,6 @@ export default function InboundOrderDetailScreen() {
     // Mutations
     const updateRequestStatus = useUpdateInboundRequestStatus();
     const createTicket = useCreateInboundTicket();
-    const updateItems = useUpdateInboundTicketItems();
 
     const isLoading = requestLoading || ticketLoading;
     const error = requestError || ticketError;
@@ -115,13 +113,13 @@ export default function InboundOrderDetailScreen() {
                             setIsProcessing(true);
                             await updateRequestStatus.mutateAsync({
                                 requestId: data.id,
-                                approverId: user?.userId ?? 0,
+                                approverId: user?.id ?? 0,
                                 status: 'Approved',
                             });
                             Alert.alert('Thành công', 'Yêu cầu đã được duyệt', [
                                 { text: 'OK', onPress: () => router.back() },
                             ]);
-                        } catch (err) {
+                        } catch {
                             Alert.alert('Lỗi', 'Không thể duyệt yêu cầu. Vui lòng thử lại.');
                         } finally {
                             setIsProcessing(false);
@@ -147,13 +145,13 @@ export default function InboundOrderDetailScreen() {
                             setIsProcessing(true);
                             await updateRequestStatus.mutateAsync({
                                 requestId: data.id,
-                                approverId: user?.userId ?? 0,
+                                approverId: user?.id ?? 0,
                                 status: 'Rejected',
                             });
                             Alert.alert('Thành công', 'Yêu cầu đã bị từ chối', [
                                 { text: 'OK', onPress: () => router.back() },
                             ]);
-                        } catch (err) {
+                        } catch {
                             Alert.alert('Lỗi', 'Không thể từ chối yêu cầu. Vui lòng thử lại.');
                         } finally {
                             setIsProcessing(false);
@@ -179,12 +177,12 @@ export default function InboundOrderDetailScreen() {
                             setIsProcessing(true);
                             await createTicket.mutateAsync({
                                 requestId: data.id,
-                                createdBy: user?.userId ?? 0,
+                                createdBy: user?.id ?? 0,
                             });
                             Alert.alert('Thành công', 'Đã tạo phiếu nhập kho', [
                                 { text: 'OK', onPress: () => router.back() },
                             ]);
-                        } catch (err) {
+                        } catch {
                             Alert.alert('Lỗi', 'Không thể tạo phiếu nhập kho. Vui lòng thử lại.');
                         } finally {
                             setIsProcessing(false);
