@@ -1,38 +1,40 @@
-import { Card } from '@/components';
+import { Card, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundOrders } from '@/hooks/inbound-orders.hooks';
-import { InboundStatus } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const STATUS_CONFIG: Record<InboundStatus, { label: string; color: string; bgColor: string }> = {
-    scheduled: { label: 'Đã lên lịch', color: COLORS.primaryDark, bgColor: COLORS.primaryLight + '40' },
-    arrived: { label: 'Đã đến', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
-    receiving: { label: 'Đang nhận', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    putaway: { label: 'Đang cất', color: COLORS.slate700, bgColor: COLORS.slate200 },
-    completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
-    cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
-    pending: { label: 'Chờ duyệt', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    received: { label: 'Đã nhận', color: COLORS.success, bgColor: COLORS.success + '20' },
-    in_transit: { label: 'Đang về', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+// Status config khớp với Backend
+type InboundStatusKey = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
+const STATUS_CONFIG: Record<InboundStatusKey, { label: string; color: string; bgColor: string }> = {
+    Pending: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Processing: { label: 'Đang xử lý', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    Cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+};
+
+const getStatusConfig = (status?: string) => {
+    return STATUS_CONFIG[status as InboundStatusKey] || STATUS_CONFIG.Pending;
 };
 
 export default function InboundOrdersScreen() {
     const router = useRouter();
     const { data: inboundOrders = [], isLoading } = useInboundOrders();
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedStatus, setSelectedStatus] = useState<InboundStatus | 'all'>('all');
+    const [selectedStatus, setSelectedStatus] = useState<InboundStatusKey | 'all'>('all');
 
     const filteredOrders = useMemo(() => {
         let orders = inboundOrders;
 
         // Search filter
         if (searchQuery) {
+            const query = searchQuery.toLowerCase();
             orders = orders.filter(o =>
-                o.inboundNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                o.supplier?.toLowerCase().includes(searchQuery.toLowerCase())
+                o.referenceCode?.toLowerCase().includes(query) ||
+                o.supplier?.name?.toLowerCase().includes(query) ||
+                String(o.id).includes(query)
             );
         }
 
@@ -47,74 +49,84 @@ export default function InboundOrdersScreen() {
     const statusCounts = useMemo(() => {
         return {
             all: inboundOrders.length,
-            scheduled: inboundOrders.filter(o => o.status === 'scheduled').length,
-            receiving: inboundOrders.filter(o => o.status === 'receiving').length,
-            completed: inboundOrders.filter(o => o.status === 'completed').length,
+            Pending: inboundOrders.filter(o => o.status === 'Pending').length,
+            Processing: inboundOrders.filter(o => o.status === 'Processing').length,
+            Completed: inboundOrders.filter(o => o.status === 'Completed').length,
         };
     }, [inboundOrders]);
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <Text style={styles.title}>Đơn Nhập Kho</Text>
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={() => router.push('/(manager-tabs)/(orders-inbound)/create')}
-                    >
-                        <Feather name="plus" size={20} color="#fff" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Search */}
-                <View style={styles.searchContainer}>
-                    <Feather name="search" size={18} color={COLORS.textMuted} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Tìm theo mã đơn, nhà cung cấp..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholderTextColor={COLORS.textMuted}
-                    />
-                </View>
-
+            <TabScreenHeader
+                title="Đơn Nhập Kho"
+                showAddButton
+                onAddPress={() => router.push('/(manager-tabs)/(orders-inbound)/create')}
+                showSearch
+                searchPlaceholder="Tìm theo mã đơn, nhà cung cấp..."
+                searchValue={searchQuery}
+                onSearchChange={setSearchQuery}
+            >
                 {/* Status tabs */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs}>
+                <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false} 
+                    style={styles.tabsScroll}
+                    contentContainerStyle={styles.tabsContainer}
+                >
                     <TouchableOpacity
                         style={[styles.tab, selectedStatus === 'all' && styles.tabActive]}
                         onPress={() => setSelectedStatus('all')}
                     >
                         <Text style={[styles.tabText, selectedStatus === 'all' && styles.tabTextActive]}>
-                            Tất cả ({statusCounts.all})
+                            Tất cả
                         </Text>
+                        <View style={[styles.tabCount, selectedStatus === 'all' && styles.tabCountActive]}>
+                            <Text style={[styles.tabCountText, selectedStatus === 'all' && styles.tabCountTextActive]}>
+                                {statusCounts.all}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.tab, selectedStatus === 'scheduled' && styles.tabActive]}
-                        onPress={() => setSelectedStatus('scheduled')}
+                        style={[styles.tab, selectedStatus === 'Pending' && styles.tabActive]}
+                        onPress={() => setSelectedStatus('Pending')}
                     >
-                        <Text style={[styles.tabText, selectedStatus === 'scheduled' && styles.tabTextActive]}>
-                            Đã lên lịch ({statusCounts.scheduled})
+                        <Text style={[styles.tabText, selectedStatus === 'Pending' && styles.tabTextActive]}>
+                            Chờ xử lý
                         </Text>
+                        <View style={[styles.tabCount, selectedStatus === 'Pending' && styles.tabCountActive]}>
+                            <Text style={[styles.tabCountText, selectedStatus === 'Pending' && styles.tabCountTextActive]}>
+                                {statusCounts.Pending}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.tab, selectedStatus === 'receiving' && styles.tabActive]}
-                        onPress={() => setSelectedStatus('receiving')}
+                        style={[styles.tab, selectedStatus === 'Processing' && styles.tabActive]}
+                        onPress={() => setSelectedStatus('Processing')}
                     >
-                        <Text style={[styles.tabText, selectedStatus === 'receiving' && styles.tabTextActive]}>
-                            Đang nhận ({statusCounts.receiving})
+                        <Text style={[styles.tabText, selectedStatus === 'Processing' && styles.tabTextActive]}>
+                            Đang xử lý
                         </Text>
+                        <View style={[styles.tabCount, selectedStatus === 'Processing' && styles.tabCountActive]}>
+                            <Text style={[styles.tabCountText, selectedStatus === 'Processing' && styles.tabCountTextActive]}>
+                                {statusCounts.Processing}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.tab, selectedStatus === 'completed' && styles.tabActive]}
-                        onPress={() => setSelectedStatus('completed')}
+                        style={[styles.tab, selectedStatus === 'Completed' && styles.tabActive]}
+                        onPress={() => setSelectedStatus('Completed')}
                     >
-                        <Text style={[styles.tabText, selectedStatus === 'completed' && styles.tabTextActive]}>
-                            Hoàn tất ({statusCounts.completed})
+                        <Text style={[styles.tabText, selectedStatus === 'Completed' && styles.tabTextActive]}>
+                            Hoàn tất
                         </Text>
+                        <View style={[styles.tabCount, selectedStatus === 'Completed' && styles.tabCountActive]}>
+                            <Text style={[styles.tabCountText, selectedStatus === 'Completed' && styles.tabCountTextActive]}>
+                                {statusCounts.Completed}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
                 </ScrollView>
-            </View>
+            </TabScreenHeader>
 
             {/* Order List */}
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
@@ -128,7 +140,7 @@ export default function InboundOrdersScreen() {
                     </Card>
                 ) : (
                     filteredOrders.map(order => {
-                        const statusConfig = STATUS_CONFIG[order.status];
+                        const statusConfig = getStatusConfig(order.status);
                         return (
                             <TouchableOpacity
                                 key={order.id}
@@ -137,10 +149,12 @@ export default function InboundOrdersScreen() {
                                 <Card style={styles.orderCard}>
                                     <View style={styles.cardHeader}>
                                         <View style={styles.cardHeaderLeft}>
-                                            <Text style={styles.orderNumber}>{order.inboundNumber}</Text>
-                                            {order.requisitionNumber && (
+                                            <Text style={styles.orderNumber}>
+                                                {order.referenceCode || `INB-${order.id}`}
+                                            </Text>
+                                            {order.inboundRequestId && (
                                                 <Text style={styles.requisitionRef}>
-                                                    từ {order.requisitionNumber}
+                                                    Yêu cầu #{order.inboundRequestId}
                                                 </Text>
                                             )}
                                         </View>
@@ -156,30 +170,36 @@ export default function InboundOrdersScreen() {
                                     <View style={styles.cardRow}>
                                         <Feather name="truck" size={16} color={COLORS.textMuted} />
                                         <Text style={styles.cardLabel}>Nhà cung cấp:</Text>
-                                        <Text style={styles.cardValue}>{order.supplier}</Text>
+                                        <Text style={styles.cardValue}>
+                                            {order.supplier?.name || 'Chưa xác định'}
+                                        </Text>
                                     </View>
 
-                                    {order.poReference && (
+                                    {order.warehouse && (
                                         <View style={styles.cardRow}>
-                                            <Feather name="file-text" size={16} color={COLORS.textMuted} />
-                                            <Text style={styles.cardLabel}>PO:</Text>
-                                            <Text style={styles.cardValue}>{order.poReference}</Text>
+                                            <Feather name="home" size={16} color={COLORS.textMuted} />
+                                            <Text style={styles.cardLabel}>Kho:</Text>
+                                            <Text style={styles.cardValue}>{order.warehouse.name}</Text>
                                         </View>
                                     )}
 
                                     <View style={styles.cardRow}>
                                         <Feather name="package" size={16} color={COLORS.textMuted} />
                                         <Text style={styles.cardLabel}>Sản phẩm:</Text>
-                                        <Text style={styles.cardValue}>{order.items.length} mặt hàng</Text>
-                                    </View>
-
-                                    <View style={styles.cardRow}>
-                                        <Feather name="calendar" size={16} color={COLORS.textMuted} />
-                                        <Text style={styles.cardLabel}>Ngày dự kiến:</Text>
                                         <Text style={styles.cardValue}>
-                                            {new Date(order.expectedArrivalDate).toLocaleDateString('vi-VN')}
+                                            {order.inboundOrderItems?.length || 0} mặt hàng
                                         </Text>
                                     </View>
+
+                                    {order.createdAt && (
+                                        <View style={styles.cardRow}>
+                                            <Feather name="calendar" size={16} color={COLORS.textMuted} />
+                                            <Text style={styles.cardLabel}>Ngày tạo:</Text>
+                                            <Text style={styles.cardValue}>
+                                                {new Date(order.createdAt).toLocaleDateString('vi-VN')}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </Card>
                             </TouchableOpacity>
                         );
@@ -238,18 +258,25 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.text,
     },
-    tabs: {
+    tabsScroll: {
+        maxHeight: 50,
+    },
+    tabsContainer: {
         paddingHorizontal: 20,
+        paddingBottom: 12,
+        gap: 8,
     },
     tab: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        marginRight: 8,
         backgroundColor: '#f5f5f5',
+        gap: 8,
     },
     tabActive: {
-        backgroundColor: COLORS.primary + '15',
+        backgroundColor: COLORS.primary,
     },
     tabText: {
         fontSize: 13,
@@ -257,7 +284,26 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
     },
     tabTextActive: {
-        color: COLORS.primary,
+        color: '#fff',
+    },
+    tabCount: {
+        backgroundColor: '#e5e7eb',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        minWidth: 24,
+        alignItems: 'center',
+    },
+    tabCountActive: {
+        backgroundColor: 'rgba(255,255,255,0.25)',
+    },
+    tabCountText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: COLORS.textMuted,
+    },
+    tabCountTextActive: {
+        color: '#fff',
     },
     content: {
         flex: 1,

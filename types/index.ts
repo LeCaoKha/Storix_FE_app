@@ -14,3 +14,6 @@ export * from './warehouse';
 
 // Scanning types
 export * from './scanning';
+
+// Supplier types
+export * from './supplier';

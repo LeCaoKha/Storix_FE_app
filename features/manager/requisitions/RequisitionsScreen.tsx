@@ -1,11 +1,11 @@
-import { RequisitionCard } from '@/components';
+import { RequisitionCard, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useRequisitions } from '@/hooks';
 import type { RequisitionStatus } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type TabType = 'all' | RequisitionStatus;
 
@@ -23,6 +23,7 @@ export default function RequisitionsScreen() {
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const searchRequisitionsLocal = (query: string) => {
         const lowerQuery = query.toLowerCase();
         return requisitions.filter(req =>
@@ -53,7 +54,7 @@ export default function RequisitionsScreen() {
         return [...results].sort((a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-    }, [requisitions, activeTab, searchQuery]);
+    }, [requisitions, searchQuery, activeTab, searchRequisitionsLocal]);
 
     if (isLoading) {
         return (
@@ -64,48 +65,25 @@ export default function RequisitionsScreen() {
     }
 
     const handleCreateNew = () => {
-        router.push('/(manager-tabs)/(requisitions)/create' as any);
+        router.push('/(manager-tabs)/requisitions/create' as any);
     };
 
     const handleRequisitionPress = (id: number | string) => {
-        router.push(`/(manager-tabs)/(requisitions)/${id}` as any);
+        router.push(`/(manager-tabs)/requisitions/${id}` as any);
     };
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <View>
-                        <Text style={styles.title}>Phiếu Đề Xuất</Text>
-                        <Text style={styles.subtitle}>Quản lý đề xuất nhập/xuất kho</Text>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.createButton}
-                        onPress={handleCreateNew}
-                    >
-                        <Feather name="plus" size={20} color="#fff" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Search */}
-                <View style={styles.searchContainer}>
-                    <Feather name="search" size={18} color={COLORS.textMuted} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Tìm theo mã phiếu, SKU, mục đích..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholderTextColor={COLORS.textMuted}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Feather name="x" size={18} color={COLORS.textMuted} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
+            <TabScreenHeader
+                title="Phiếu Đề Xuất"
+                subtitle="Quản lý đề xuất nhập/xuất kho"
+                showAddButton
+                onAddPress={handleCreateNew}
+                showSearch
+                searchPlaceholder="Tìm theo mã phiếu, SKU, mục đích..."
+                searchValue={searchQuery}
+                onSearchChange={setSearchQuery}
+            >
                 {/* Tabs */}
                 <ScrollView
                     horizontal
@@ -137,7 +115,7 @@ export default function RequisitionsScreen() {
                         );
                     })}
                 </ScrollView>
-            </View>
+            </TabScreenHeader>
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
                 {filteredRequisitions.length === 0 ? (
                     <View style={styles.emptyState}>

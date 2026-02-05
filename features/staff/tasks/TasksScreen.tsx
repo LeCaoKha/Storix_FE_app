@@ -58,7 +58,7 @@ export default function TasksScreen() {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <SafeAreaHeader backgroundColor="#fff" style={styles.header}>
+            <SafeAreaHeader backgroundColor="#fff" showBackButton={false} style={styles.header}>
                 <Text style={styles.title}>Nhiệm Vụ Của Tôi</Text>
             </SafeAreaHeader>
 

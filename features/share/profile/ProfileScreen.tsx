@@ -25,15 +25,15 @@ export default function ProfileScreen() {
 
     const handleLogout = () => {
         Alert.alert(
-            'Logout',
-            'Are you sure you want to logout?',
+            'Đăng xuất',
+            'Bạn có chắc chắn muốn đăng xuất?',
             [
                 {
-                    text: 'Cancel',
+                    text: 'Hủy',
                     style: 'cancel',
                 },
                 {
-                    text: 'Logout',
+                    text: 'Đăng xuất',
                     style: 'destructive',
                     onPress: async () => {
                         await logout();
@@ -47,46 +47,46 @@ export default function ProfileScreen() {
     const menuItems = [
         {
             icon: 'user',
-            title: 'Personal Information',
-            subtitle: 'Update your profile',
+            title: 'Thông tin cá nhân',
+            subtitle: 'Cập nhật hồ sơ',
             onPress: () => { },
         },
         {
             icon: 'lock',
-            title: 'Change Password',
-            subtitle: 'Update your password',
+            title: 'Đổi mật khẩu',
+            subtitle: 'Cập nhật mật khẩu',
             onPress: () => { },
         },
         {
             icon: 'bell',
-            title: 'Notifications',
-            subtitle: 'Notification settings',
+            title: 'Thông báo',
+            subtitle: 'Cài đặt thông báo',
             onPress: () => { },
         },
         {
             icon: 'globe',
-            title: 'Language',
-            subtitle: 'English',
+            title: 'Ngôn ngữ',
+            subtitle: 'Tiếng Việt',
             onPress: () => { },
         },
         {
             icon: 'help-circle',
-            title: 'Help & Support',
-            subtitle: 'FAQs, Contact support',
+            title: 'Trợ giúp & Hỗ trợ',
+            subtitle: 'Câu hỏi thường gặp, Liên hệ',
             onPress: () => { },
         },
         {
             icon: 'info',
-            title: 'About',
-            subtitle: 'Version 1.0.0',
+            title: 'Giới thiệu',
+            subtitle: 'Phiên bản 1.0.0',
             onPress: () => { },
         },
     ];
 
     return (
         <View style={styles.container}>
-            <SafeAreaHeader backgroundColor="#fff" style={styles.safeHeader}>
-                <Text style={styles.headerTitle}>Account</Text>
+            <SafeAreaHeader backgroundColor="#fff" showBackButton={false} style={styles.safeHeader}>
+                <Text style={styles.headerTitle}>Tài khoản</Text>
             </SafeAreaHeader>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -103,37 +103,37 @@ export default function ProfileScreen() {
                         </View>
 
                         <Text style={styles.userName}>{userData.name}</Text>
-                        <Text style={styles.userRole}>{userData.roleId === 2 ? 'Warehouse Manager' : 'Warehouse Staff'}</Text>
+                        <Text style={styles.userRole}>{userData.roleId === 2 ? 'Quản lý kho' : 'Nhân viên kho'}</Text>
 
                         <View style={styles.userStats}>
                             <View style={styles.statItem}>
                                 <Feather name="package" size={20} color={COLORS.primary} />
                                 <Text style={styles.statValue}>127</Text>
-                                <Text style={styles.statLabel}>Completed</Text>
+                                <Text style={styles.statLabel}>Hoàn thành</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
                                 <Feather name="clock" size={20} color={COLORS.primary} />
                                 <Text style={styles.statValue}>95%</Text>
-                                <Text style={styles.statLabel}>Efficiency</Text>
+                                <Text style={styles.statLabel}>Hiệu suất</Text>
                             </View>
                             <View style={styles.statDivider} />
                             <View style={styles.statItem}>
                                 <Feather name="award" size={20} color={COLORS.primary} />
                                 <Text style={styles.statValue}>12</Text>
-                                <Text style={styles.statLabel}>Months</Text>
+                                <Text style={styles.statLabel}>Tháng</Text>
                             </View>
                         </View>
                     </Card>
 
                     {/* Employee Information */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Employee Information</Text>
+                        <Text style={styles.sectionTitle}>Thông tin nhân viên</Text>
                         <Card>
                             <View style={styles.infoRow}>
                                 <Feather name="credit-card" size={18} color={COLORS.textMuted} />
                                 <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>User ID</Text>
+                                    <Text style={styles.infoLabel}>Mã nhân viên</Text>
                                     <Text style={styles.infoValue}>{userData.id}</Text>
                                 </View>
                             </View>
@@ -149,7 +149,7 @@ export default function ProfileScreen() {
                             <View style={styles.infoRow}>
                                 <Feather name="home" size={18} color={COLORS.textMuted} />
                                 <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Company ID</Text>
+                                    <Text style={styles.infoLabel}>Mã công ty</Text>
                                     <Text style={styles.infoValue}>{userData.companyId}</Text>
                                 </View>
                             </View>
@@ -158,7 +158,7 @@ export default function ProfileScreen() {
 
                     {/* Settings Menu */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Settings</Text>
+                        <Text style={styles.sectionTitle}>Cài đặt</Text>
                         <Card style={styles.menuCard}>
                             {menuItems.map((item, index) => (
                                 <React.Fragment key={index}>
@@ -187,7 +187,7 @@ export default function ProfileScreen() {
                         onPress={handleLogout}
                     >
                         <Feather name="log-out" size={20} color="#EF4444" />
-                        <Text style={styles.logoutText}>Logout</Text>
+                        <Text style={styles.logoutText}>Đăng xuất</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>

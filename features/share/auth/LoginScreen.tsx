@@ -8,10 +8,12 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, To
 import { Button, Input } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useLogin } from '@/hooks/auth.hooks';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function LoginScreen() {
     const router = useRouter();
     const { mutateAsync: login, isPending: isLoading } = useLogin();
+    const loginStore = useAuthStore((state) => state.login);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -19,6 +21,17 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         try {
             const data = await login({ email, password });
+
+            // Save to store explicitly
+            loginStore(data.token, {
+                id: data.userId,
+                roleId: data.roleId,
+                companyId: data.companyId,
+                email: email,
+            });
+
+            // Small delay to ensure AsyncStorage write completes
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             // Navigate based on roleId
             // 2: Company Admin, 3: Manager
@@ -58,19 +71,19 @@ export default function LoginScreen() {
                             style={{ width: 150, height: 150, marginBottom: 16 }}
                             resizeMode="contain"
                         />
-                        <Text style={styles.appTagline}>Warehouse Management System</Text>
+                        <Text style={styles.appTagline}>Hệ thống Quản lý Kho hàng</Text>
                     </View>
                 </LinearGradient>
 
                 <View style={styles.contentContainer}>
                     <View style={styles.formCard}>
-                        <Text style={styles.formTitle}>Login</Text>
-                        <Text style={styles.formSubtitle}>Enter your credentials to continue</Text>
+                        <Text style={styles.formTitle}>Đăng nhập</Text>
+                        <Text style={styles.formSubtitle}>Nhập thông tin để tiếp tục</Text>
 
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Email</Text>
                             <Input
-                                placeholder="e.g. staff@storix.com"
+                                placeholder="ví dụ: staff@storix.com"
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
@@ -81,9 +94,9 @@ export default function LoginScreen() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Password</Text>
+                            <Text style={styles.label}>Mật khẩu</Text>
                             <Input
-                                placeholder="Enter password"
+                                placeholder="Nhập mật khẩu"
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry={!showPassword}
@@ -102,11 +115,11 @@ export default function LoginScreen() {
                         </View>
 
                         <TouchableOpacity style={styles.forgotPass}>
-                            <Text style={styles.forgotPassText}>Reset Password</Text>
+                            <Text style={styles.forgotPassText}>Quên mật khẩu?</Text>
                         </TouchableOpacity>
 
                         <Button
-                            title="Login"
+                            title="Đăng nhập"
                             onPress={handleLogin}
                             isLoading={isLoading}
                             style={styles.loginButton}
@@ -116,11 +129,11 @@ export default function LoginScreen() {
 
                         <View style={styles.helpSection}>
                             <Feather name="help-circle" size={16} color={COLORS.slate500} />
-                            <Text style={styles.helpText}>Need help? Contact System Admin</Text>
+                            <Text style={styles.helpText}>Cần hỗ trợ? Liên hệ Quản trị viên</Text>
                         </View>
                     </View>
 
-                    <Text style={styles.versionText}>v2.4.0 • Enterprise Edition</Text>
+                    <Text style={styles.versionText}>v2.4.0 • Phiên bản doanh nghiệp</Text>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>

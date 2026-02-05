@@ -1,8 +1,7 @@
-import { Card } from '@/components';
+import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useCreateOutboundOrder, useLinkOrderToRequisition, useRequisition } from '@/hooks';
 import { OutboundOrder } from '@/types/outbound-order';
-import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -114,14 +113,20 @@ export default function CreateOutboundOrderScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Feather name="arrow-left" size={24} color={COLORS.text} />
-                </TouchableOpacity>
-                <Text style={styles.title}>Tạo Đơn Xuất Kho</Text>
-                <View style={{ width: 24 }} />
-            </View>
+            <ScreenHeader
+                title="Tạo Đơn Xuất Kho"
+                rightButton={
+                    <TouchableOpacity
+                        style={[styles.submitButton, isCreating && styles.submitButtonDisabled]}
+                        onPress={handleCreate}
+                        disabled={isCreating}
+                    >
+                        <Text style={styles.submitButtonText}>
+                            {isCreating ? 'Đang tạo...' : 'Tạo'}
+                        </Text>
+                    </TouchableOpacity>
+                }
+            />
 
             <ScrollView style={styles.content}>
                 {requisition && (

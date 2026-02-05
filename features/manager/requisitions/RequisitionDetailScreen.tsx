@@ -1,4 +1,4 @@
-import { Card, RequisitionItemList, StatusBadge } from '@/components';
+import { Card, RequisitionItemList, ScreenHeader, StatusBadge } from '@/components';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
@@ -63,24 +63,17 @@ export default function RequisitionDetailScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.headerBackButton}
-                    onPress={() => router.back()}
-                >
-                    <Feather name="arrow-left" size={24} color={COLORS.text} />
-                </TouchableOpacity>
-                <View style={styles.headerContent}>
-                    <Text style={styles.headerTitle}>Chi tiết đề xuất</Text>
-                    <Text style={styles.headerSubtitle}>{requisition.requisitionNumber}</Text>
-                </View>
-                {canEdit && (
-                    <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-                        <Feather name="edit-2" size={20} color={COLORS.primary} />
-                    </TouchableOpacity>
-                )}
-            </View>
+            <ScreenHeader
+                title="Chi tiết đề xuất"
+                subtitle={requisition.requisitionNumber}
+                rightButton={
+                    canEdit ? (
+                        <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+                            <Feather name="edit-2" size={20} color={COLORS.primary} />
+                        </TouchableOpacity>
+                    ) : undefined
+                }
+            />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
                 {/* Status Card */}

@@ -1,47 +1,47 @@
-import { Card, SafeAreaHeader } from '@/components';
+import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useOutboundOrder, useUpdateOutboundOrder } from '@/hooks';
-import { OutboundOrderItem } from '@/types/outbound-order';
+import { useOutboundOrder, useUpdateOutboundTicketItems } from '@/hooks';
+import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function OutboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const { data: order, isLoading, error } = useOutboundOrder(id);
-    const updateOrder = useUpdateOutboundOrder();
+    const updateItems = useUpdateOutboundTicketItems();
 
-    const [localQuantities, setLocalQuantities] = useState<Record<string, number>>({});
-    const [verifiedItems, setVerifiedItems] = useState<Record<string, boolean>>({});
+    const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
+    const [verifiedItems, setVerifiedItems] = useState<Record<number, boolean>>({});
     const [isSaving, setIsSaving] = useState(false);
 
     // Initialize state when order data is loaded
     useEffect(() => {
-        if (order?.items) {
-            setLocalQuantities(
-                order.items.reduce((acc: Record<string, number>, item: OutboundOrderItem) => ({ ...acc, [item.id]: item.qtyPicked || 0 }), {})
-            );
+        if (order?.outboundOrderItems) {
+            const initialQty: Record<number, number> = {};
+            order.outboundOrderItems.forEach((item: OutboundOrderItem) => {
+                initialQty[item.id] = 0; // Số lượng đã lấy ban đầu = 0
+            });
+            setLocalQuantities(initialQty);
         }
     }, [order]);
 
-    // Business Logic: Sort items by location code for optimized path
+    // Sort items by product name for easier picking
     const sortedItems = React.useMemo(() => {
-        if (!order) return [];
-        return [...order.items].sort((a, b) => {
-            const locA = a.pickLocations[0]?.locationCode || '';
-            const locB = b.pickLocations[0]?.locationCode || '';
-            return locA.localeCompare(locB);
+        if (!order?.outboundOrderItems) return [];
+        return [...order.outboundOrderItems].sort((a, b) => {
+            const nameA = a.product?.name || '';
+            const nameB = b.product?.name || '';
+            return nameA.localeCompare(nameB);
         });
     }, [order]);
 
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <SafeAreaHeader showBackButton>
-                    <Text style={styles.headerTitle}>Đang tải...</Text>
-                </SafeAreaHeader>
+                <ScreenHeader title="Đang tải..." />
             </View>
         );
     }
@@ -49,9 +49,7 @@ export default function OutboundDetailScreen() {
     if (!order || error) {
         return (
             <View style={styles.container}>
-                <SafeAreaHeader showBackButton>
-                    <Text style={styles.headerTitle}>Lỗi</Text>
-                </SafeAreaHeader>
+                <ScreenHeader title="Lỗi" />
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
@@ -63,7 +61,7 @@ export default function OutboundDetailScreen() {
         );
     }
 
-    const handleVerifyItem = (itemId: string) => {
+    const handleVerifyItem = (itemId: number) => {
         setIsSaving(true);
         // Simulate scanning delay
         setTimeout(() => {
@@ -73,54 +71,46 @@ export default function OutboundDetailScreen() {
         }, 600);
     };
 
-    const handleUpdateQty = (itemId: string, increment: boolean) => {
+    const handleUpdateQty = (itemId: number, increment: boolean) => {
         if (!verifiedItems[itemId]) {
             Alert.alert('Lưu ý', 'Vui lòng quét mã sản phẩm để xác minh trước khi lấy hàng');
             return;
         }
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
-            const item = order.items.find((i: OutboundOrderItem) => i.id === itemId);
+            const item = order?.outboundOrderItems.find((i: OutboundOrderItem) => i.id === itemId);
+            const maxQty = item?.quantity || 9999;
             const newValue = increment
-                ? Math.min(current + 1, item?.qtyToPick || 9999)
+                ? Math.min(current + 1, maxQty)
                 : Math.max(current - 1, 0);
             return { ...prev, [itemId]: newValue };
         });
     };
 
     const handleSave = async () => {
+        if (!order) return;
         setIsSaving(true);
         try {
             // Update items with picked quantities
-            const updatedItems = order.items.map((item: OutboundOrderItem) => ({
-                ...item,
-                qtyPicked: localQuantities[item.id] || item.qtyPicked || 0,
+            const updatedItems = order.outboundOrderItems.map((item: OutboundOrderItem) => ({
+                id: item.id,
+                productId: item.productId || 0,
+                quantity: localQuantities[item.id] || item.quantity || 0,
             }));
 
             // Check if all items picked
-            const allPicked = order.items.every((item: OutboundOrderItem) =>
-                (localQuantities[item.id] || 0) >= item.qtyToPick
+            const allPicked = order.outboundOrderItems.every((item: OutboundOrderItem) =>
+                (localQuantities[item.id] || 0) >= (item.quantity || 0)
             );
 
-            // Determine new status
-            let newStatus = order.status;
-            if (allPicked && order.status !== 'ready') {
-                newStatus = 'ready';
-            } else if (order.status === 'open') {
-                newStatus = 'picking';
-            }
-
-            await updateOrder.mutateAsync({
-                id: order.id,
-                updates: {
-                    items: updatedItems,
-                    status: newStatus,
-                }
+            await updateItems.mutateAsync({
+                ticketId: order.id,
+                items: updatedItems,
             });
 
-            Alert.alert('Thành công', 'Đã cập nhật số lượng lấy hàng');
+            Alert.alert('Thành công', allPicked ? 'Đã hoàn tất lấy hàng' : 'Đã cập nhật số lượng lấy hàng');
             router.back();
-        } catch (error) {
+        } catch {
             Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
             setIsSaving(false);
@@ -129,55 +119,46 @@ export default function OutboundDetailScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" />
-            <SafeAreaHeader showBackButton backgroundColor="#fff" style={styles.header}>
-                <View>
-                    <Text style={styles.headerTitle}>Xuất Kho</Text>
-                    <Text style={styles.headerSubtitle}>{order.outboundNumber}</Text>
-                </View>
-            </SafeAreaHeader>
+            <ScreenHeader
+                title="Xuất Kho"
+                subtitle={order.note || `OUT-${order.id}`}
+            />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="user" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Khách hàng: <Text style={styles.boldText}>{order.customer}</Text></Text>
+                        <Text style={styles.infoText}>Người tạo: <Text style={styles.boldText}>{order.createdByNavigation?.email || 'N/A'}</Text></Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Feather name="map-pin" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Giao đến: <Text style={styles.boldText}>{order.destination}</Text></Text>
+                        <Text style={styles.infoText}>Giao đến: <Text style={styles.boldText}>{order.destination || 'N/A'}</Text></Text>
                     </View>
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Lộ trình lấy hàng tối ưu</Text>
-                    <Text style={styles.sectionSubtitle}>{order.items.length} mặt hàng</Text>
+                    <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
+                    <Text style={styles.sectionSubtitle}>{order.outboundOrderItems.length} mặt hàng</Text>
                 </View>
 
                 {sortedItems.map((item: OutboundOrderItem) => (
                     <Card key={item.id} style={[styles.itemCard, verifiedItems[item.id] ? styles.itemCardVerified : null]}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.productName}</Text>
+                                <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
                                 <View style={styles.skuRow}>
                                     <View style={styles.skuBadge}>
-                                        <Text style={styles.skuText}>{item.sku}</Text>
+                                        <Text style={styles.skuText}>{item.product?.sku || 'N/A'}</Text>
                                     </View>
-                                    {item.pickLocations.map((loc: any) => (
-                                        <View key={loc.locationCode} style={styles.locationBadge}>
-                                            <Feather name="layers" size={10} color={COLORS.primary} />
-                                            <Text style={styles.locationText}>{loc.locationCode}</Text>
-                                        </View>
-                                    ))}
                                 </View>
                             </View>
                             <View style={[styles.statusBadge, {
-                                backgroundColor: (localQuantities[item.id] || 0) >= item.qtyToPick ? COLORS.success + '20' : COLORS.warning + '20'
+                                backgroundColor: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? COLORS.success + '20' : COLORS.warning + '20'
                             }]}>
                                 <Text style={[styles.statusBadgeText, {
-                                    color: (localQuantities[item.id] || 0) >= item.qtyToPick ? COLORS.success : COLORS.warning
+                                    color: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? COLORS.success : COLORS.warning
                                 }]}>
-                                    {(localQuantities[item.id] || 0) >= item.qtyToPick ? 'Xong' : 'Chờ'}
+                                    {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? 'Xong' : 'Chờ'}
                                 </Text>
                             </View>
                         </View>
@@ -201,7 +182,7 @@ export default function OutboundDetailScreen() {
                                     <Text style={[styles.qtyValue, !verifiedItems[item.id] && { color: COLORS.border }]}>
                                         {localQuantities[item.id] || 0}
                                     </Text>
-                                    <Text style={styles.qtyTotal}>/ {item.qtyToPick}</Text>
+                                    <Text style={styles.qtyTotal}>/ {item.quantity || 0}</Text>
                                 </View>
                                 <TouchableOpacity
                                     style={styles.counterBtn}

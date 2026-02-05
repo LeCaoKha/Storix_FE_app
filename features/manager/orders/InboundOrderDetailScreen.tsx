@@ -1,40 +1,89 @@
-import { Card, SafeAreaHeader } from '@/components';
+import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrder, useUpdateInboundOrder } from '@/hooks';
-import { InboundStatus } from '@/types/inbound-order';
+import { useInboundRequest, useInboundTicket } from '@/hooks';
+import {
+    useCreateInboundTicket,
+    useUpdateInboundRequestStatus,
+    useUpdateInboundTicketItems,
+} from '@/hooks/inbound-orders.hooks';
+import { useAuthStore } from '@/stores/auth.store';
+import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
-const STATUS_CONFIG: Record<InboundStatus, { label: string; color: string; bgColor: string }> = {
-    scheduled: { label: 'Đã lên lịch', color: COLORS.primaryDark, bgColor: COLORS.primaryLight + '40' },
-    arrived: { label: 'Đã đến', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
-    receiving: { label: 'Đang nhận', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    putaway: { label: 'Đang cất', color: COLORS.slate700, bgColor: COLORS.slate200 },
-    completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
-    cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+// Status config cho Request (chờ duyệt)
+type InboundRequestStatusKey = 'Pending' | 'Approved' | 'Rejected';
+const REQUEST_STATUS_CONFIG: Record<InboundRequestStatusKey, { label: string; color: string; bgColor: string }> = {
+    Pending: { label: 'Chờ duyệt', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Approved: { label: 'Đã duyệt', color: COLORS.success, bgColor: COLORS.success + '20' },
+    Rejected: { label: 'Từ chối', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+};
+
+// Status config cho Ticket (đang xử lý)
+type InboundTicketStatusKey = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
+const TICKET_STATUS_CONFIG: Record<InboundTicketStatusKey, { label: string; color: string; bgColor: string }> = {
+    Pending: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Processing: { label: 'Đang xử lý', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    Cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+};
+
+const getRequestStatusConfig = (status?: string) => {
+    return REQUEST_STATUS_CONFIG[status as InboundRequestStatusKey] || REQUEST_STATUS_CONFIG.Pending;
+};
+
+const getTicketStatusConfig = (status?: string) => {
+    return TICKET_STATUS_CONFIG[status as InboundTicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
 };
 
 export default function InboundOrderDetailScreen() {
     const router = useRouter();
-    const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: order, isLoading, error } = useInboundOrder(id);
-    const updateOrder = useUpdateInboundOrder();
+    const { id, type = 'request' } = useLocalSearchParams<{ id: string; type?: 'request' | 'ticket' }>();
+    const { user } = useAuthStore();
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    // Fetch data based on type
+    const { data: request, isLoading: requestLoading, error: requestError } = useInboundRequest(
+        type === 'request' ? id : undefined
+    );
+    const { data: ticket, isLoading: ticketLoading, error: ticketError } = useInboundTicket(
+        type === 'ticket' ? id : undefined
+    );
+
+    // Mutations
+    const updateRequestStatus = useUpdateInboundRequestStatus();
+    const createTicket = useCreateInboundTicket();
+    const updateItems = useUpdateInboundTicketItems();
+
+    const isLoading = requestLoading || ticketLoading;
+    const error = requestError || ticketError;
+    const data = type === 'request' ? request : ticket;
 
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <SafeAreaHeader showBackButton>
-                    <Text style={styles.headerTitle}>Đang tải...</Text>
-                </SafeAreaHeader>
+                <ScreenHeader title="Đang tải..." />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
             </View>
         );
     }
 
-    if (!order || error) {
+    if (!data || error) {
         return (
             <View style={styles.container}>
+                <ScreenHeader title="Lỗi" />
                 <View style={styles.errorContainer}>
                     <Feather name="alert-circle" size={64} color={COLORS.border} />
                     <Text style={styles.errorTitle}>Không tìm thấy đơn nhập kho</Text>
@@ -46,29 +95,117 @@ export default function InboundOrderDetailScreen() {
         );
     }
 
-    const statusConfig = STATUS_CONFIG[order.status];
-    const canUpdateStatus = order.status !== 'completed' && order.status !== 'cancelled';
+    const isRequest = type === 'request';
+    const statusConfig = isRequest ? getRequestStatusConfig(data.status) : getTicketStatusConfig(data.status);
+    const canApproveReject = isRequest && data.status === 'Pending';
+    const canCreateTicket = isRequest && data.status === 'Approved';
 
-    const handleStatusUpdate = async (newStatus: InboundStatus) => {
-        try {
-            await updateOrder.mutateAsync({
-                id: order.id,
-                updates: { status: newStatus }
-            });
-            Alert.alert('Thành công', 'Đã cập nhật trạng thái');
-        } catch (error) {
-            Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
-        }
+    // Handle approve request
+    const handleApprove = () => {
+        Alert.alert(
+            'Duyệt yêu cầu',
+            'Bạn có chắc chắn muốn duyệt yêu cầu nhập kho này?',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Duyệt',
+                    style: 'default',
+                    onPress: async () => {
+                        try {
+                            setIsProcessing(true);
+                            await updateRequestStatus.mutateAsync({
+                                requestId: data.id,
+                                approverId: user?.userId ?? 0,
+                                status: 'Approved',
+                            });
+                            Alert.alert('Thành công', 'Yêu cầu đã được duyệt', [
+                                { text: 'OK', onPress: () => router.back() },
+                            ]);
+                        } catch (err) {
+                            Alert.alert('Lỗi', 'Không thể duyệt yêu cầu. Vui lòng thử lại.');
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
+
+    // Handle reject request
+    const handleReject = () => {
+        Alert.alert(
+            'Từ chối yêu cầu',
+            'Bạn có chắc chắn muốn từ chối yêu cầu nhập kho này?',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Từ chối',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setIsProcessing(true);
+                            await updateRequestStatus.mutateAsync({
+                                requestId: data.id,
+                                approverId: user?.userId ?? 0,
+                                status: 'Rejected',
+                            });
+                            Alert.alert('Thành công', 'Yêu cầu đã bị từ chối', [
+                                { text: 'OK', onPress: () => router.back() },
+                            ]);
+                        } catch (err) {
+                            Alert.alert('Lỗi', 'Không thể từ chối yêu cầu. Vui lòng thử lại.');
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    // Handle create ticket from approved request
+    const handleCreateTicket = () => {
+        Alert.alert(
+            'Tạo phiếu nhập kho',
+            'Tạo phiếu nhập kho từ yêu cầu đã duyệt?',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Tạo phiếu',
+                    style: 'default',
+                    onPress: async () => {
+                        try {
+                            setIsProcessing(true);
+                            await createTicket.mutateAsync({
+                                requestId: data.id,
+                                createdBy: user?.userId ?? 0,
+                            });
+                            Alert.alert('Thành công', 'Đã tạo phiếu nhập kho', [
+                                { text: 'OK', onPress: () => router.back() },
+                            ]);
+                        } catch (err) {
+                            Alert.alert('Lỗi', 'Không thể tạo phiếu nhập kho. Vui lòng thử lại.');
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    // Get items - support both request and ticket structure
+    const items = (data as any).inboundOrderItems || [];
+    const supplier = (data as any).supplier;
+    const warehouse = (data as any).warehouse;
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-            {/* Header */}
-            <SafeAreaHeader backgroundColor="#fff" showBackButton style={styles.header}>
-                <Text style={styles.headerTitle}>Chi Tiết Đơn Nhập</Text>
-                <Text style={styles.headerSubtitle}>{order.inboundNumber}</Text>
-            </SafeAreaHeader>
+            <ScreenHeader
+                title={isRequest ? 'Chi Tiết Yêu Cầu Nhập' : 'Chi Tiết Phiếu Nhập'}
+                subtitle={isRequest ? `REQ-${data.id}` : ((data as any).referenceCode || `INB-${data.id}`)}
+            />
 
             <ScrollView style={styles.content}>
                 {/* Status Card */}
@@ -81,6 +218,9 @@ export default function InboundOrderDetailScreen() {
                             </Text>
                         </View>
                     </View>
+                    <Text style={styles.typeLabel}>
+                        {isRequest ? 'Yêu cầu nhập kho' : 'Phiếu nhập kho'}
+                    </Text>
                 </Card>
 
                 {/* Supplier Info */}
@@ -89,20 +229,22 @@ export default function InboundOrderDetailScreen() {
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
                         <Text style={styles.infoLabel}>Nhà cung cấp:</Text>
-                        <Text style={styles.infoValue}>{order.supplier}</Text>
+                        <Text style={styles.infoValue}>
+                            {supplier?.name || 'Chưa xác định'}
+                        </Text>
                     </View>
-                    {order.supplierContact && (
+                    {warehouse && (
                         <View style={styles.infoRow}>
-                            <Feather name="phone" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoLabel}>Liên hệ:</Text>
-                            <Text style={styles.infoValue}>{order.supplierContact}</Text>
+                            <Feather name="home" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.infoLabel}>Kho:</Text>
+                            <Text style={styles.infoValue}>{warehouse.name}</Text>
                         </View>
                     )}
-                    {order.poReference && (
+                    {!isRequest && (data as any).inboundRequestId && (
                         <View style={styles.infoRow}>
                             <Feather name="file-text" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoLabel}>PO:</Text>
-                            <Text style={styles.infoValue}>{order.poReference}</Text>
+                            <Text style={styles.infoLabel}>Yêu cầu:</Text>
+                            <Text style={styles.infoValue}>#{(data as any).inboundRequestId}</Text>
                         </View>
                     )}
                 </Card>
@@ -110,48 +252,58 @@ export default function InboundOrderDetailScreen() {
                 {/* Dates */}
                 <Card style={styles.card}>
                     <Text style={styles.cardTitle}>Thời Gian</Text>
-                    <View style={styles.infoRow}>
-                        <Feather name="calendar" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoLabel}>Dự kiến:</Text>
-                        <Text style={styles.infoValue}>
-                            {new Date(order.expectedArrivalDate).toLocaleDateString('vi-VN')}
-                        </Text>
-                    </View>
-                    {order.actualArrivalDate && (
+                    {(data as any).createdAt && (
+                        <View style={styles.infoRow}>
+                            <Feather name="calendar" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.infoLabel}>Ngày tạo:</Text>
+                            <Text style={styles.infoValue}>
+                                {new Date((data as any).createdAt).toLocaleDateString('vi-VN')}
+                            </Text>
+                        </View>
+                    )}
+                    {isRequest && (data as any).approvedAt && (
                         <View style={styles.infoRow}>
                             <Feather name="check-circle" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoLabel}>Thực tế:</Text>
+                            <Text style={styles.infoLabel}>Ngày duyệt:</Text>
                             <Text style={styles.infoValue}>
-                                {new Date(order.actualArrivalDate).toLocaleDateString('vi-VN')}
+                                {new Date((data as any).approvedAt).toLocaleDateString('vi-VN')}
                             </Text>
+                        </View>
+                    )}
+                    {!isRequest && (data as any).createdByNavigation && (
+                        <View style={styles.infoRow}>
+                            <Feather name="user" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.infoLabel}>Người tạo:</Text>
+                            <Text style={styles.infoValue}>{(data as any).createdByNavigation.email}</Text>
                         </View>
                     )}
                 </Card>
 
                 {/* Items */}
                 <Card style={styles.card}>
-                    <Text style={styles.cardTitle}>Sản Phẩm ({order.items.length})</Text>
-                    {order.items.map((item, index) => (
+                    <Text style={styles.cardTitle}>
+                        Sản Phẩm ({items.length})
+                    </Text>
+                    {items.map((item: InboundOrderItem, index: number) => (
                         <View key={item.id}>
                             {index > 0 && <View style={styles.itemDivider} />}
                             <View style={styles.itemRow}>
                                 <View style={styles.itemLeft}>
-                                    <Text style={styles.itemName}>{item.productName}</Text>
-                                    <Text style={styles.itemSKU}>{item.sku}</Text>
-                                    {item.batchNumber && (
-                                        <Text style={styles.itemBatch}>Lô: {item.batchNumber}</Text>
+                                    <Text style={styles.itemName}>
+                                        {item.product?.name || `Sản phẩm #${item.productId}`}
+                                    </Text>
+                                    {item.product?.sku && (
+                                        <Text style={styles.itemSKU}>{item.product.sku}</Text>
                                     )}
                                 </View>
                                 <View style={styles.itemRight}>
-                                    <Text style={styles.itemQty}>
-                                        {item.receivedQty}/{item.expectedQty} {item.unit}
-                                    </Text>
-                                    {item.condition && (
-                                        <Text style={[
-                                            styles.itemCondition,
-                                            { color: item.condition === 'good' ? COLORS.success : COLORS.danger }
-                                        ]}>
-                                            {item.condition === 'good' ? 'Tốt' : 'Lỗi'}
+                                    {isRequest ? (
+                                        <Text style={styles.itemQty}>
+                                            {item.expectedQuantity || 0} {item.product?.unit || 'cái'}
+                                        </Text>
+                                    ) : (
+                                        <Text style={styles.itemQty}>
+                                            {item.receivedQuantity || 0}/{item.expectedQuantity || 0} {item.product?.unit || 'cái'}
                                         </Text>
                                     )}
                                 </View>
@@ -160,44 +312,60 @@ export default function InboundOrderDetailScreen() {
                     ))}
                 </Card>
 
-                {order.notes && (
-                    <Card style={styles.card}>
-                        <Text style={styles.cardTitle}>Ghi Chú</Text>
-                        <Text style={styles.notesText}>{order.notes}</Text>
-                    </Card>
-                )}
-
-                <View style={{ height: 100 }} />
+                <View style={{ height: 120 }} />
             </ScrollView>
 
-            {/* Quick Actions */}
-            {canUpdateStatus && (
+            {/* Action Buttons */}
+            {(canApproveReject || canCreateTicket) && (
                 <View style={styles.actionBar}>
-                    {order.status === 'scheduled' && (
-                        <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() => handleStatusUpdate('arrived')}
-                        >
-                            <Feather name="check" size={18} color="#fff" />
-                            <Text style={styles.actionButtonText}>Đánh dấu đã đến</Text>
-                        </TouchableOpacity>
+                    {canApproveReject && (
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.rejectButton]}
+                                onPress={handleReject}
+                                disabled={isProcessing}
+                            >
+                                {isProcessing ? (
+                                    <ActivityIndicator size="small" color={COLORS.danger} />
+                                ) : (
+                                    <>
+                                        <Feather name="x" size={18} color={COLORS.danger} />
+                                        <Text style={[styles.actionButtonText, styles.rejectButtonText]}>
+                                            Từ chối
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.approveButton]}
+                                onPress={handleApprove}
+                                disabled={isProcessing}
+                            >
+                                {isProcessing ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <>
+                                        <Feather name="check" size={18} color="#fff" />
+                                        <Text style={styles.actionButtonText}>Duyệt</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     )}
-                    {order.status === 'arrived' && (
+                    {canCreateTicket && (
                         <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() => handleStatusUpdate('receiving')}
+                            style={[styles.actionButton, styles.approveButton, styles.fullWidth]}
+                            onPress={handleCreateTicket}
+                            disabled={isProcessing}
                         >
-                            <Feather name="package" size={18} color="#fff" />
-                            <Text style={styles.actionButtonText}>Bắt đầu nhận hàng</Text>
-                        </TouchableOpacity>
-                    )}
-                    {order.status === 'receiving' && (
-                        <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() => handleStatusUpdate('completed')}
-                        >
-                            <Feather name="check-circle" size={18} color="#fff" />
-                            <Text style={styles.actionButtonText}>Hoàn tất</Text>
+                            {isProcessing ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <>
+                                    <Feather name="file-plus" size={18} color="#fff" />
+                                    <Text style={styles.actionButtonText}>Tạo phiếu nhập kho</Text>
+                                </>
+                            )}
                         </TouchableOpacity>
                     )}
                 </View>
@@ -210,6 +378,11 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     header: {
         paddingBottom: 16,
@@ -236,6 +409,11 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: COLORS.text,
         marginBottom: 12,
+    },
+    typeLabel: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        marginTop: 8,
     },
     statusRow: {
         flexDirection: 'row',
@@ -336,8 +514,12 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
     },
+    actionRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
     actionButton: {
-        backgroundColor: COLORS.primary,
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -345,9 +527,24 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         gap: 8,
     },
+    fullWidth: {
+        flex: undefined,
+        width: '100%',
+    },
+    approveButton: {
+        backgroundColor: COLORS.primary,
+    },
+    rejectButton: {
+        backgroundColor: COLORS.danger + '15',
+        borderWidth: 1,
+        borderColor: COLORS.danger + '40',
+    },
     actionButtonText: {
         fontSize: 15,
         fontWeight: '700',
         color: '#fff',
+    },
+    rejectButtonText: {
+        color: COLORS.danger,
     },
 });

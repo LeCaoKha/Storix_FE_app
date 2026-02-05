@@ -14,3 +14,6 @@ export * from './product.hooks';
 // Task hooks
 export * from './task.hooks';
 
+// Supplier hooks
+export * from './suppliers.hooks';
+

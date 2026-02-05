@@ -1,43 +1,40 @@
-import { Card, SafeAreaHeader } from '@/components';
+import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrder, useUpdateInboundOrder } from '@/hooks';
-import { InboundOrderItem } from '@/types/inbound-order';
+import { useInboundOrder, useUpdateInboundTicketItems } from '@/hooks';
+import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function InboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const { data: order, isLoading, error } = useInboundOrder(id);
-    const updateOrder = useUpdateInboundOrder();
+    const updateItems = useUpdateInboundTicketItems();
 
-    const [localQuantities, setLocalQuantities] = useState<Record<string, number>>({});
-    const [localItemData, setLocalItemData] = useState<Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});
+    const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
+    const [localItemData, setLocalItemData] = useState<Record<number, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});
     const [isSaving, setIsSaving] = useState(false);
 
     // Initialize state when order data is loaded
     useEffect(() => {
-        if (order?.items) {
+        if (order?.inboundOrderItems) {
             setLocalQuantities(
-                order.items.reduce((acc: Record<string, number>, item: InboundOrderItem) => ({ ...acc, [item.id]: item.receivedQty || 0 }), {})
+                order.inboundOrderItems.reduce((acc: Record<number, number>, item: InboundOrderItem) => ({ ...acc, [item.id]: item.receivedQuantity || 0 }), {})
             );
-            setLocalItemData(
-                order.items.reduce((acc: Record<string, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>, item: InboundOrderItem) => ({
-                    ...acc,
-                    [item.id]: { batch: item.batchNumber || '', expiry: typeof item.expiryDate === 'string' ? item.expiryDate : '', qc: 'good' }
-                }), {})
-            );
+            const initialData: Record<number, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }> = {};
+            order.inboundOrderItems.forEach((item: InboundOrderItem) => {
+                initialData[item.id] = { batch: '', expiry: '', qc: 'good' };
+            });
+            setLocalItemData(initialData);
         }
     }, [order]);
 
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <SafeAreaHeader showBackButton>
-                    <Text style={styles.headerTitle}>Đang tải...</Text>
-                </SafeAreaHeader>
+                <ScreenHeader title="Đang tải..." />
             </View>
         );
     }
@@ -45,9 +42,7 @@ export default function InboundDetailScreen() {
     if (!order || error) {
         return (
             <View style={styles.container}>
-                <SafeAreaHeader showBackButton>
-                    <Text style={styles.headerTitle}>Lỗi</Text>
-                </SafeAreaHeader>
+                <ScreenHeader title="Lỗi" />
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
@@ -59,18 +54,18 @@ export default function InboundDetailScreen() {
         );
     }
 
-    const handleUpdateQty = (itemId: string, increment: boolean) => {
+    const handleUpdateQty = (itemId: number, increment: boolean) => {
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
-            const item = order.items.find((i: InboundOrderItem) => i.id === itemId);
+            const item = order?.inboundOrderItems.find((i: InboundOrderItem) => i.id === itemId);
             const newValue = increment
-                ? Math.min(current + 1, item?.expectedQty || 9999)
+                ? Math.min(current + 1, item?.expectedQuantity || 9999)
                 : Math.max(current - 1, 0);
             return { ...prev, [itemId]: newValue };
         });
     };
 
-    const handleUpdateItemData = (itemId: string, field: string, value: string) => {
+    const handleUpdateItemData = (itemId: number, field: string, value: string) => {
         setLocalItemData(prev => ({
             ...prev,
             [itemId]: { ...prev[itemId], [field]: value }
@@ -78,41 +73,30 @@ export default function InboundDetailScreen() {
     };
 
     const handleSave = async () => {
+        if (!order) return;
         setIsSaving(true);
         try {
             // Update items with received quantities
-            const updatedItems = order.items.map((item: InboundOrderItem) => ({
-                ...item,
-                receivedQty: localQuantities[item.id] || item.receivedQty || 0,
-                batchNumber: localItemData[item.id]?.batch || item.batchNumber || '',
-                expiryDate: localItemData[item.id]?.expiry || item.expiryDate || '',
-                qc: localItemData[item.id]?.qc || 'good',
+            const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => ({
+                id: item.id,
+                productId: item.productId || 0,
+                expectedQuantity: item.expectedQuantity,
+                receivedQuantity: localQuantities[item.id] || item.receivedQuantity || 0,
             }));
 
             // Check if all items received
-            const allReceived = order.items.every((item: InboundOrderItem) =>
-                (localQuantities[item.id] || 0) >= item.expectedQty
+            const allReceived = order.inboundOrderItems.every((item: InboundOrderItem) =>
+                (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)
             );
 
-            // Determine new status
-            let newStatus = order.status;
-            if (allReceived && order.status !== 'completed') {
-                newStatus = 'completed';
-            } else if (order.status === 'scheduled') {
-                newStatus = 'receiving';
-            }
-
-            await updateOrder.mutateAsync({
-                id: order.id,
-                updates: {
-                    items: updatedItems,
-                    status: newStatus,
-                }
+            await updateItems.mutateAsync({
+                ticketId: order.id,
+                items: updatedItems,
             });
 
-            Alert.alert('Thành công', 'Đã lưu thông tin nhận hàng và số lô/hạn sử dụng');
+            Alert.alert('Thành công', allReceived ? 'Đã hoàn tất nhận hàng' : 'Đã lưu thông tin nhận hàng');
             router.back();
-        } catch (error) {
+        } catch {
             Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
             setIsSaving(false);
@@ -121,47 +105,44 @@ export default function InboundDetailScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" />
-            <SafeAreaHeader showBackButton backgroundColor="#fff" style={styles.header}>
-                <View>
-                    <Text style={styles.headerTitle}>Nhập Kho</Text>
-                    <Text style={styles.headerSubtitle}>{order.inboundNumber}</Text>
-                </View>
-            </SafeAreaHeader>
+            <ScreenHeader
+                title="Nhập Kho"
+                subtitle={order.referenceCode || `INB-${order.id}`}
+            />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Nhà cung cấp: <Text style={styles.boldText}>{order.supplier}</Text></Text>
+                        <Text style={styles.infoText}>Nhà cung cấp: <Text style={styles.boldText}>{order.supplier?.name || 'N/A'}</Text></Text>
                     </View>
-                    {order.poReference && (
+                    {order.referenceCode && (
                         <View style={styles.infoRow}>
                             <Feather name="file-text" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoText}>Mã PO: <Text style={styles.boldText}>{order.poReference}</Text></Text>
+                            <Text style={styles.infoText}>Mã tham chiếu: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
                         </View>
                     )}
                 </Card>
 
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{order.items.length} mặt hàng</Text>
+                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} mặt hàng</Text>
                 </View>
 
-                {order.items.map((item: InboundOrderItem) => (
+                {order.inboundOrderItems.map((item: InboundOrderItem) => (
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.productName}</Text>
-                                <Text style={styles.skuText}>SKU: {item.sku}</Text>
+                                <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                <Text style={styles.skuText}>SKU: {item.product?.sku || 'N/A'}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
-                                backgroundColor: (localQuantities[item.id] || 0) >= item.expectedQty ? COLORS.success + '20' : COLORS.warning + '20'
+                                backgroundColor: (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? COLORS.success + '20' : COLORS.warning + '20'
                             }]}>
                                 <Text style={[styles.statusBadgeText, {
-                                    color: (localQuantities[item.id] || 0) >= item.expectedQty ? COLORS.success : COLORS.warning
+                                    color: (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? COLORS.success : COLORS.warning
                                 }]}>
-                                    {(localQuantities[item.id] || 0) >= item.expectedQty ? 'Đủ' : 'Chờ'}
+                                    {(localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? 'Đủ' : 'Chờ'}
                                 </Text>
                             </View>
                         </View>
@@ -177,7 +158,7 @@ export default function InboundDetailScreen() {
                                 </TouchableOpacity>
                                 <View style={styles.qtyDisplay}>
                                     <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
-                                    <Text style={styles.qtyTotal}>/ {item.expectedQty}</Text>
+                                    <Text style={styles.qtyTotal}>/ {item.expectedQuantity || 0}</Text>
                                 </View>
                                 <TouchableOpacity
                                     style={styles.counterBtn}

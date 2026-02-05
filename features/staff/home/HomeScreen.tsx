@@ -10,9 +10,9 @@ export default function HomeScreen() {
 
     // Data from web app
     const todayTasks = [
-        { id: 1, type: "Picking", location: "Zone A - Shelf 5", items: 15, status: "In Progress", efficiency: "94%" },
-        { id: 2, type: "Putaway", location: "Zone B - Bin 12", items: 8, status: "Pending", efficiency: "-" },
-        { id: 3, type: "Counting", location: "Zone C", items: 45, status: "Completed", efficiency: "100%" },
+        { id: 1, type: "Lấy hàng", location: "Khu A - Kệ 5", items: 15, status: "Đang thực hiện", efficiency: "94%" },
+        { id: 2, type: "Xếp hàng", location: "Khu B - Ô 12", items: 8, status: "Chờ xử lý", efficiency: "-" },
+        { id: 3, type: "Kiểm kê", location: "Khu C", items: 45, status: "Hoàn thành", efficiency: "100%" },
     ];
 
     const navigateTo = (screen: string) => {
@@ -26,12 +26,12 @@ export default function HomeScreen() {
             <View style={styles.header}>
                 <View style={styles.headerRow}>
                     <View>
-                        <Text style={styles.greeting}>Hello, Staff</Text>
-                        <Text style={styles.date}>{new Date().toLocaleDateString()}</Text>
+                        <Text style={styles.greeting}>Xin chào, Nhân viên</Text>
+                        <Text style={styles.date}>{new Date().toLocaleDateString('vi-VN')}</Text>
                     </View>
                     <TouchableOpacity
                         style={styles.profileButton}
-                        onPress={() => router.push('/profile' as any)}
+                        onPress={() => router.push('/(staff-tabs)/profile' as any)}
                     >
                         <Feather name="user" size={24} color={COLORS.text} />
                     </TouchableOpacity>
@@ -39,7 +39,7 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Today's Tasks</Text>
+                <Text style={styles.sectionTitle}>Nhiệm vụ hôm nay</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
                     {todayTasks.map((task) => (
                         <Card key={task.id} style={styles.taskCard}>
@@ -48,13 +48,13 @@ export default function HomeScreen() {
                                     <Text style={styles.taskType}>{task.type}</Text>
                                     <Text style={styles.taskLocation}>{task.location}</Text>
                                 </View>
-                                {task.status === "In Progress" && <Feather name="clock" size={20} color="#eab308" />}
-                                {task.status === "Completed" && <Feather name="check-circle" size={20} color="#22c55e" />}
-                                {task.status === "Pending" && <Feather name="alert-circle" size={20} color={COLORS.textMuted} />}
+                                {task.status === "Đang thực hiện" && <Feather name="clock" size={20} color="#eab308" />}
+                                {task.status === "Hoàn thành" && <Feather name="check-circle" size={20} color="#22c55e" />}
+                                {task.status === "Chờ xử lý" && <Feather name="alert-circle" size={20} color={COLORS.textMuted} />}
                             </View>
 
                             <View style={styles.taskStats}>
-                                <Text style={styles.taskItems}>Items: {task.items}</Text>
+                                <Text style={styles.taskItems}>Sản phẩm: {task.items}</Text>
                                 {task.efficiency !== "-" && <Text style={styles.taskEfficiency}>{task.efficiency}</Text>}
                             </View>
 
@@ -62,10 +62,10 @@ export default function HomeScreen() {
                                 <Text style={styles.taskStatus}>{task.status}</Text>
                             </View>
 
-                            {task.status === "In Progress" && (
+                            {task.status === "Đang thực hiện" && (
                                 <TouchableOpacity style={styles.actionButton} onPress={() => navigateTo('Routes')}>
                                     <Feather name="navigation" size={16} color="#fff" />
-                                    <Text style={styles.actionButtonText}>View Route</Text>
+                                    <Text style={styles.actionButtonText}>Xem tuyến đường</Text>
                                 </TouchableOpacity>
                             )}
                         </Card>
@@ -81,11 +81,11 @@ export default function HomeScreen() {
                                 <Feather name="navigation" size={24} color="#fff" />
                             </View>
                             <View>
-                                <Text style={styles.routeTitle}>AI-Optimized Route</Text>
-                                <Text style={styles.routeSubtitle}>55m | 8 mins</Text>
+                                <Text style={styles.routeTitle}>Tuyến đường tối ưu AI</Text>
+                                <Text style={styles.routeSubtitle}>55m | 8 phút</Text>
                             </View>
                         </View>
-                        <Text style={styles.routeAction}>Tap to start picking</Text>
+                        <Text style={styles.routeAction}>Chạm để bắt đầu lấy hàng</Text>
                     </Card>
                 </TouchableOpacity>
             </View>
@@ -95,7 +95,7 @@ export default function HomeScreen() {
                     <TouchableOpacity style={styles.gridItem} onPress={() => navigateTo('Performance')}>
                         <Card style={styles.gridCard}>
                             <Feather name="trending-up" size={24} color={COLORS.primary} />
-                            <Text style={styles.gridLabel}>Performance</Text>
+                            <Text style={styles.gridLabel}>Hiệu suất</Text>
                             <Text style={styles.gridValue}>94%</Text>
                         </Card>
                     </TouchableOpacity>
@@ -103,15 +103,15 @@ export default function HomeScreen() {
                     <TouchableOpacity style={styles.gridItem} onPress={() => navigateTo('AISuggestions')}>
                         <Card style={styles.gridCard}>
                             <MaterialCommunityIcons name="brain" size={24} color={COLORS.secondary} />
-                            <Text style={styles.gridLabel}>AI Tips</Text>
-                            <Text style={styles.gridValue}>3 New</Text>
+                            <Text style={styles.gridLabel}>Gợi ý AI</Text>
+                            <Text style={styles.gridValue}>3 Mới</Text>
                         </Card>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.gridItem} onPress={() => navigateTo('Tasks')}>
                         <Card style={styles.gridCard}>
                             <Feather name="package" size={24} color="#22c55e" />
-                            <Text style={styles.gridLabel}>Total Items</Text>
+                            <Text style={styles.gridLabel}>Tổng sản phẩm</Text>
                             <Text style={styles.gridValue}>68</Text>
                         </Card>
                     </TouchableOpacity>
@@ -119,8 +119,8 @@ export default function HomeScreen() {
                     <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/orders' as any)}>
                         <Card style={styles.gridCard}>
                             <Feather name="clipboard" size={24} color="#F59E0B" />
-                            <Text style={styles.gridLabel}>Order Tickets</Text>
-                            <Text style={styles.gridValue}>4 Active</Text>
+                            <Text style={styles.gridLabel}>Phiếu đơn hàng</Text>
+                            <Text style={styles.gridValue}>4 Hoạt động</Text>
                         </Card>
                     </TouchableOpacity>
                 </View>

@@ -1,9 +1,9 @@
-import { Card, SafeAreaHeader } from '@/components';
+import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const mockTask = {
     id: '1',
@@ -71,13 +71,10 @@ export default function InventoryCountDetailScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" />
-            <SafeAreaHeader showBackButton backgroundColor="#fff" style={styles.header}>
-                <View>
-                    <Text style={styles.headerTitle}>Kiểm kê (Physical Count)</Text>
-                    <Text style={styles.headerSubtitle}>{mockTask.taskNumber}</Text>
-                </View>
-            </SafeAreaHeader>
+            <ScreenHeader
+                title="Kiểm kê (Physical Count)"
+                subtitle={mockTask.taskNumber}
+            />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Card style={styles.infoCard}>

@@ -1,9 +1,9 @@
-import { Card, SafeAreaHeader } from '@/components';
+import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PutawayDetailScreen() {
     const router = useRouter();
@@ -55,13 +55,10 @@ export default function PutawayDetailScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" />
-            <SafeAreaHeader showBackButton backgroundColor="#fff" style={styles.header}>
-                <View>
-                    <Text style={styles.headerTitle}>Xếp hàng (Putaway)</Text>
-                    <Text style={styles.headerSubtitle}>{mockTask.orderNumber}</Text>
-                </View>
-            </SafeAreaHeader>
+            <ScreenHeader
+                title="Xếp hàng (Putaway)"
+                subtitle={mockTask.orderNumber}
+            />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                 <Card style={styles.infoCard}>

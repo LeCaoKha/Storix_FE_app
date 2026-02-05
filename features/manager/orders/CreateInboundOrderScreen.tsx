@@ -1,10 +1,10 @@
-import { Card, SafeAreaHeader } from '@/components';
+import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useCreateInboundOrder, useLinkOrderToRequisition, useRequisition } from '@/hooks';
 import { InboundOrder } from '@/types/inbound-order';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateInboundOrderScreen() {
     const router = useRouter();
@@ -98,11 +98,20 @@ export default function CreateInboundOrderScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-            {/* Header */}
-            <SafeAreaHeader backgroundColor="#fff" showBackButton style={styles.header}>
-                <Text style={styles.title}>Tạo Đơn Nhập Kho</Text>
-            </SafeAreaHeader>
+            <ScreenHeader
+                title="Tạo Đơn Nhập Kho"
+                rightButton={
+                    <TouchableOpacity
+                        style={[styles.submitButton, isCreating && styles.submitButtonDisabled]}
+                        onPress={handleCreate}
+                        disabled={isCreating}
+                    >
+                        <Text style={styles.submitButtonText}>
+                            {isCreating ? 'Đang tạo...' : 'Tạo'}
+                        </Text>
+                    </TouchableOpacity>
+                }
+            />
 
             <ScrollView style={styles.content}>
                 {requisition && (

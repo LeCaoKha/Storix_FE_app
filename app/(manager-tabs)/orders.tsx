@@ -11,7 +11,7 @@ export default function OrdersScreen() {
     return (
         <View style={styles.container}>
             {/* Tab Header with SafeArea */}
-            <SafeAreaHeader backgroundColor="#fff" style={styles.tabHeader}>
+            <SafeAreaHeader backgroundColor="#fff" showBackButton={false} style={styles.tabHeader}>
                 <View style={styles.headerContent}>
                     <TouchableOpacity
                         style={[styles.tabButton, activeTab === 'inbound' && styles.tabButtonActive]}

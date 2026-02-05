@@ -1,4 +1,4 @@
-import { Card } from '@/components';
+import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useCreateRequisition } from '@/hooks';
 import { useProducts } from '@/hooks/product.hooks';
@@ -117,27 +117,20 @@ export default function CreateRequisitionScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.headerBackButton}
-                    onPress={() => router.back()}
-                >
-                    <Feather name="x" size={24} color={COLORS.text} />
-                </TouchableOpacity>
-                <View style={styles.headerContent}>
-                    <Text style={styles.headerTitle}>Tạo đề xuất mới</Text>
-                </View>
-                <TouchableOpacity
-                    style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                    onPress={handleSubmit}
-                    disabled={loading}
-                >
-                    <Text style={styles.submitButtonText}>
-                        {loading ? 'Đang tạo...' : 'Tạo'}
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            <ScreenHeader
+                title="Tạo đề xuất mới"
+                rightButton={
+                    <TouchableOpacity
+                        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                        onPress={handleSubmit}
+                        disabled={loading}
+                    >
+                        <Text style={styles.submitButtonText}>
+                            {loading ? 'Đang tạo...' : 'Tạo'}
+                        </Text>
+                    </TouchableOpacity>
+                }
+            />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
                 {/* Type Selection */}
