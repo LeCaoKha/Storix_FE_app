@@ -1,63 +1,97 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useCreateInboundTicket, useInboundRequest } from '@/hooks';
+import { useProducts } from '@/hooks/product.hooks';
+import { useWarehouseStaff } from '@/hooks/user.hooks';
+import { useAuthStore } from '@/stores/auth.store';
+import { getLatestPrice } from '@/types/product';
+import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CreateInboundOrderScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const requestId = params.requestId as string;
 
-    const { data: inboundRequest, isLoading: isLoadingRequest } = useInboundRequest(requestId);
+    // Support both requestId and requisitionId (they're the same in backend)
+    const requestId = (params.requestId || params.requisitionId) as string;
+    const user = useAuthStore((state) => state.user);
+
+    const { data: inboundRequest, isLoading: isLoadingRequest, error: requestError } = useInboundRequest(requestId);
+    const { data: products = [] } = useProducts(); // Fetch products with prices
+    const { data: staffList = [], isLoading: isLoadingStaff } = useWarehouseStaff(
+        inboundRequest?.warehouseId,
+        user?.companyId
+    );
     const { mutateAsync: createInboundTicket } = useCreateInboundTicket();
 
-    const [supplier, setSupplier] = useState('');
-    const [supplierContact, setSupplierContact] = useState('');
-    const [poReference, setPOReference] = useState('');
-    const [expectedDate, setExpectedDate] = useState(new Date());
+    // Enrich inbound request items with full product data (including productPrices)
+    const enrichedRequest = inboundRequest && products.length > 0 ? {
+        ...inboundRequest,
+        inboundOrderItems: inboundRequest.inboundOrderItems.map(item => {
+            const fullProduct = products.find(p => p.id === item.productId);
+            return {
+                ...item,
+                product: fullProduct || item.product // Use full product with prices if available
+            };
+        })
+    } : inboundRequest;
+
+    // Log React Query error if any
+    useEffect(() => {
+        if (requestError) {
+            console.error('[useInboundRequest ERROR]:', requestError);
+        }
+    }, [requestError]);
+
+    const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
+    const [showStaffPicker, setShowStaffPicker] = useState(false);
     const [notes, setNotes] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
+    // Comprehensive debug logging
     useEffect(() => {
-        if (inboundRequest) {
-            // Set supplier from inboundRequest if available
-            setSupplier(inboundRequest.supplier?.name || '');
-        }
-    }, [inboundRequest]);
+        console.log('=== Debug Info ===');
+        console.log('1. InboundRequest:', JSON.stringify(enrichedRequest, null, 2));
+        console.log('2. WarehouseId from request:', enrichedRequest?.warehouseId);
+        console.log('3. User companyId:', user?.companyId);
+        console.log('4. Staff List Length:', staffList?.length);
+        console.log('5. Staff List:', JSON.stringify(staffList, null, 2));
+        console.log('6. Is Loading Staff:', isLoadingStaff);
+        console.log('=================');
+    }, [enrichedRequest, staffList, isLoadingStaff, user]);
 
     const handleCreate = async () => {
-        if (!supplier.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập tên nhà cung cấp');
+        if (!selectedStaffId) {
+            Alert.alert('Lỗi', 'Vui lòng chọn nhân viên nhập kho');
             return;
         }
 
         setIsCreating(true);
         try {
-            // Create inbound ticket from the approved request
-            const payload = {
-                inboundRequestId: inboundRequest?.id || parseInt(requestId),
-                items: inboundRequest?.items?.map(item => ({
-                    productId: item.productId,
-                    expectedQuantity: item.expectedQuantity,
-                    actualQuantity: 0,
-                })) || []
-            };
-
-            const created = await createInboundTicket(payload);
+            const created = await createInboundTicket({
+                requestId: parseInt(requestId),
+                createdBy: user?.id || 0,
+                staffId: selectedStaffId,
+            });
 
             Alert.alert('Thành công', 'Đã tạo đơn nhập kho', [
                 {
                     text: 'OK',
                     onPress: () => {
                         router.back();
-                        router.push(`/(manager-tabs)/(orders-inbound)/${created.id}` as any);
+                        router.push({
+                            pathname: `/(manager-tabs)/(orders-inbound)/${created.id}`,
+                            params: { type: 'ticket' }
+                        } as any);
                     },
                 },
             ]);
-        } catch (error) {
-            Alert.alert('Lỗi', 'Không thể tạo đơn nhập kho');
+        } catch (error: any) {
+            console.error('Create ticket error:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Không thể tạo đơn nhập kho';
+            Alert.alert('Lỗi', errorMessage);
         } finally {
             setIsCreating(false);
         }
@@ -89,76 +123,154 @@ export default function CreateInboundOrderScreen() {
             />
 
             <ScrollView style={styles.content}>
-                {inboundRequest && (
+                {enrichedRequest && (
                     <Card style={styles.card}>
                         <Text style={styles.sectionTitle}>Từ Yêu Cầu Nhập Kho</Text>
-                        <Text style={styles.requisitionNumber}>Request #{inboundRequest.id}</Text>
-                        <Text style={styles.requisitionPurpose}>Trạng thái: {inboundRequest.status}</Text>
+                        <Text style={styles.requisitionNumber}>Request #{enrichedRequest.id}</Text>
+                        <Text style={styles.requisitionPurpose}>Trạng thái: {enrichedRequest.status}</Text>
                     </Card>
                 )}
 
                 <Card style={styles.card}>
-                    <Text style={styles.sectionTitle}>Thông Tin Nhà Cung Cấp</Text>
+                    <Text style={styles.sectionTitle}>Thông Tin Nhập Kho</Text>
 
                     <Text style={styles.label}>Nhà cung cấp *</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={supplier}
-                        onChangeText={setSupplier}
-                        placeholder="Nhập tên nhà cung cấp"
-                        placeholderTextColor={COLORS.textMuted}
-                    />
+                    <View style={[styles.input, styles.readOnlyField]}>
+                        <Text style={styles.readOnlyText}>
+                            {enrichedRequest?.supplier?.name || 'N/A'}
+                        </Text>
+                        <Feather name="lock" size={16} color={COLORS.textMuted} />
+                    </View>
 
-                    <Text style={styles.label}>Số điện thoại</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={supplierContact}
-                        onChangeText={setSupplierContact}
-                        placeholder="Nhập số điện thoại"
-                        keyboardType="phone-pad"
-                        placeholderTextColor={COLORS.textMuted}
-                    />
+                    <Text style={styles.label}>Ngày dự kiến nhận hàng *</Text>
+                    <View style={[styles.input, styles.readOnlyField]}>
+                        <Text style={styles.readOnlyText}>
+                            {enrichedRequest?.expectedArrivalDate
+                                ? new Date(enrichedRequest.expectedArrivalDate).toLocaleDateString('vi-VN')
+                                : 'N/A'
+                            }
+                        </Text>
+                        <Feather name="lock" size={16} color={COLORS.textMuted} />
+                    </View>
 
-                    <Text style={styles.label}>Mã PO</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={poReference}
-                        onChangeText={setPOReference}
-                        placeholder="Nhập mã Purchase Order"
-                        placeholderTextColor={COLORS.textMuted}
-                    />
+                    <Text style={styles.label}>Nhân viên nhập kho *</Text>
+                    <TouchableOpacity
+                        style={[styles.input, styles.selectField]}
+                        onPress={() => setShowStaffPicker(true)}
+                        disabled={isLoadingStaff}
+                    >
+                        <Text style={[styles.selectFieldText, !selectedStaffId && styles.placeholder]}>
+                            {isLoadingStaff
+                                ? 'Đang tải...'
+                                : selectedStaffId
+                                    ? staffList.find(s => s.id === selectedStaffId)?.fullName || 'Chọn nhân viên'
+                                    : 'Chọn nhân viên'
+                            }
+                        </Text>
+                        <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
+                    </TouchableOpacity>
                 </Card>
 
-                <Card style={styles.card}>
-                    <Text style={styles.sectionTitle}>Ghi Chú</Text>
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
-                        value={notes}
-                        onChangeText={setNotes}
-                        placeholder="Nhập ghi chú..."
-                        multiline
-                        numberOfLines={4}
-                        textAlignVertical="top"
-                        placeholderTextColor={COLORS.textMuted}
-                    />
-                </Card>
-
-                {inboundRequest && inboundRequest.items && inboundRequest.items.length > 0 && (
+                {enrichedRequest && enrichedRequest.inboundOrderItems && enrichedRequest.inboundOrderItems.length > 0 && (
                     <Card style={styles.card}>
                         <Text style={styles.sectionTitle}>
-                            Sản Phẩm ({inboundRequest.items.length})
+                            Sản Phẩm ({enrichedRequest.inboundOrderItems.length})
                         </Text>
-                        {inboundRequest.items.map(item => (
-                            <View key={item.id} style={styles.itemRow}>
-                                <Text style={styles.itemName}>{item.product?.name || `Product #${item.productId}`}</Text>
-                                <Text style={styles.itemQty}>
-                                    {item.expectedQuantity} pcs
-                                </Text>
-                            </View>
-                        ))}
+                        {enrichedRequest.inboundOrderItems.map((item, index) => {
+                            const latestPrice = item.product ? getLatestPrice(item.product as any) : 0;
+                            const totalPrice = latestPrice * (item.expectedQuantity || 0);
+                            return (
+                                <View key={item.id || index}>
+                                    {index > 0 && <View style={styles.itemDivider} />}
+                                    <View style={styles.itemRow}>
+                                        <View style={styles.itemInfo}>
+                                            <Text style={styles.itemName}>
+                                                {item.name || item.product?.name || `Product #${item.productId}`}
+                                            </Text>
+                                            {(item.sku || item.product?.sku) && (
+                                                <Text style={styles.itemSku}>SKU: {item.sku || item.product?.sku}</Text>
+                                            )}
+                                            {(item.product as any)?.productPrices && (item.product as any).productPrices.length > 0 && (
+                                                <View style={styles.priceContainer}>
+                                                    <View style={styles.priceRow}>
+                                                        <Feather name="tag" size={12} color="#6B7280" />
+                                                        <Text style={styles.priceUnit}>
+                                                            {latestPrice.toLocaleString('vi-VN')} ₫/đơn vị
+                                                        </Text>
+                                                    </View>
+                                                    <View style={styles.totalPriceRow}>
+                                                        <Feather name="dollar-sign" size={14} color="#22C55E" />
+                                                        <Text style={styles.totalPriceLabel}>Tổng:</Text>
+                                                        <Text style={styles.totalPriceValue}>
+                                                            {totalPrice.toLocaleString('vi-VN')} ₫
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Text style={styles.itemQty}>
+                                            {item.expectedQuantity} pcs
+                                        </Text>
+                                    </View>
+                                </View>
+                            );
+                        })}
                     </Card>
                 )}
             </ScrollView>
+
+            {/* Staff Picker Modal */}
+            <Modal
+                visible={showStaffPicker}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setShowStaffPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Chọn Nhân Viên</Text>
+                            <TouchableOpacity onPress={() => setShowStaffPicker(false)}>
+                                <Feather name="x" size={24} color={COLORS.text} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.modalContent}>
+                            {staffList.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <Text style={styles.emptyText}>Không có nhân viên nào</Text>
+                                </View>
+                            ) : (
+                                staffList.map(staff => (
+                                    <TouchableOpacity
+                                        key={staff.id}
+                                        style={[
+                                            styles.staffItem,
+                                            selectedStaffId === staff.id && styles.staffItemSelected
+                                        ]}
+                                        onPress={() => {
+                                            setSelectedStaffId(staff.id);
+                                            setShowStaffPicker(false);
+                                        }}
+                                    >
+                                        <View style={styles.staffInfo}>
+                                            <Text style={styles.staffName} numberOfLines={2}>
+                                                {staff.fullName}
+                                                {staff.roleId === 3 && <Text style={{ color: COLORS.warning }}> (Manager)</Text>}
+                                            </Text>
+                                            <Text style={styles.staffEmail} numberOfLines={1} ellipsizeMode="tail">
+                                                {staff.email}
+                                            </Text>
+                                        </View>
+                                        {selectedStaffId === staff.id && (
+                                            <Feather name="check" size={20} color={COLORS.primary} />
+                                        )}
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
             <View style={styles.footer}>
                 <TouchableOpacity
@@ -229,26 +341,90 @@ const styles = StyleSheet.create({
         color: COLORS.text,
         backgroundColor: '#fff',
     },
+    readOnlyField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#f5f5f5',
+    },
+    readOnlyText: {
+        fontSize: 14,
+        color: COLORS.text,
+        flex: 1,
+    },
+    selectField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    selectFieldText: {
+        fontSize: 14,
+        color: COLORS.text,
+        flex: 1,
+    },
+    placeholder: {
+        color: COLORS.textMuted,
+    },
     textArea: {
         minHeight: 100,
     },
     itemRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
         paddingVertical: 8,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-        marginTop: 8,
+    },
+    itemDivider: {
+        height: 1,
+        backgroundColor: COLORS.border,
+        marginVertical: 8,
+    },
+    itemInfo: {
+        flex: 1,
+        marginRight: 12,
     },
     itemName: {
-        flex: 1,
-        fontSize: 13,
+        fontSize: 14,
+        fontWeight: '600',
         color: COLORS.text,
+        marginBottom: 4,
     },
-    itemQty: {
+    itemSku: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+    },
+    priceContainer: {
+        marginTop: 6,
+        gap: 2,
+    },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    priceUnit: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    totalPriceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    totalPriceLabel: {
         fontSize: 13,
         fontWeight: '600',
         color: COLORS.text,
+    },
+    totalPriceValue: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#22C55E',
+    },
+    itemQty: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.primary,
     },
     footer: {
         backgroundColor: '#fff',
@@ -263,11 +439,90 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     createButtonDisabled: {
-        opacity: 0.5,
+        opacity: 0.6,
     },
     createButtonText: {
         fontSize: 16,
         fontWeight: '700',
         color: '#fff',
+    },
+    submitButton: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    submitButtonDisabled: {
+        opacity: 0.6,
+    },
+    submitButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '80%',
+        paddingBottom: 34,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.text,
+    },
+    modalContent: {
+        padding: 20,
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: COLORS.textMuted,
+    },
+    staffItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: '#f5f5f5',
+        marginBottom: 12,
+    },
+    staffItemSelected: {
+        backgroundColor: COLORS.primary + '15',
+        borderWidth: 2,
+        borderColor: COLORS.primary,
+    },
+    staffInfo: {
+        flex: 1,
+    },
+    staffName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.text,
+        marginBottom: 4,
+        flexWrap: 'wrap',
+    },
+    staffEmail: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        flexWrap: 'wrap',
     },
 });

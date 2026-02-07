@@ -34,6 +34,7 @@ export interface RequisitionItem {
   quantity: number;
   unit: string;
   notes?: string;
+  product?: import('./product').Product; // Full product data including prices
   // Metadata for inbound/outbound
   batchNumber?: string;
   lotNumber?: string;

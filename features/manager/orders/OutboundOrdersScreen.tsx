@@ -40,7 +40,7 @@ const getTicketStatusConfig = (status?: string) => {
 
 export default function OutboundOrdersScreen() {
     const router = useRouter();
-    const [viewMode, setViewMode] = useState<ViewMode>('requests');
+    const [viewMode, setViewMode] = useState<ViewMode>('tickets');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedRequestStatus, setSelectedRequestStatus] = useState<RequestStatusKey | 'all'>('all');
     const [selectedTicketStatus, setSelectedTicketStatus] = useState<TicketStatusKey | 'all'>('all');

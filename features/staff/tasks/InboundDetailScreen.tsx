@@ -107,7 +107,7 @@ export default function InboundDetailScreen() {
 
     const handleConfirmComplete = async () => {
         if (!order || !user) return;
-        
+
         Alert.alert(
             'Xác nhận hoàn tất',
             'Bạn có chắc chắn đã nhận đủ và kiểm tra tất cả hàng hóa? Sau khi xác nhận, phiếu nhập sẽ được đánh dấu hoàn thành.',
@@ -267,7 +267,7 @@ export default function InboundDetailScreen() {
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
                     <Text style={styles.reportBtnText}>Báo lỗi</Text>
                 </TouchableOpacity>
-                
+
                 {!allItemsReceived ? (
                     <TouchableOpacity
                         style={[styles.saveBtn, isSaving && styles.disabledBtn]}

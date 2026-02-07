@@ -1,6 +1,7 @@
 import { RequisitionCard, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useRequisitions } from '@/hooks';
+import { useAuthStore } from '@/stores/auth.store';
 import type { RequisitionStatus } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -18,7 +19,8 @@ const TABS: { key: TabType; label: string }[] = [
 
 export default function InboundRequisitionsScreen() {
     const router = useRouter();
-    const { data: requisitions = [], isLoading } = useRequisitions();
+    const user = useAuthStore((state) => state.user);
+    const { data: requisitions = [], isLoading } = useRequisitions(user?.companyId);
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
 

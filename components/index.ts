@@ -12,4 +12,5 @@ export { TaskCard } from './ui/TaskCard';
 export { RequisitionItemList } from './requisitions/ItemList';
 export { RequisitionCard } from './requisitions/RequisitionCard';
 export { StatusBadge } from './requisitions/StatusBadge';
+export { Calendar } from './ui/Calendar';
 

@@ -92,7 +92,10 @@ export default function CreateOutboundOrderScreen() {
                     text: 'OK',
                     onPress: () => {
                         router.back();
-                        router.push(`/(manager-tabs)/(orders-outbound)/${created.id}` as any);
+                        router.push({
+                            pathname: `/(manager-tabs)/(orders-outbound)/${created.id}`,
+                            params: { type: 'ticket' }
+                        } as any);
                     },
                 },
             ]);

@@ -1,124 +1,71 @@
 import { GoodsRequisition, RequisitionStatus } from '@/types/requisition';
 import { api } from './axios.instance';
 
-export const getRequisitions = async (): Promise<GoodsRequisition[]> => {
-    // Current BE doesn't have a list endpoint, using mock data
+export const getRequisitions = async (companyId: number): Promise<GoodsRequisition[]> => {
     try {
-        const res = await api.get('/api/InventoryInbound/requests/1'); // Try with companyId=1
-        // If we get data, transform it
+        const res = await api.get(`/api/InventoryInbound/requests/${companyId}`);
+        
         if (res.data && Array.isArray(res.data)) {
             return res.data.map((item: any) => ({
                 id: item.id,
-                requisitionNumber: `REQ-${item.id}`,
+                requisitionNumber: item.code || `REQ-${item.id}`,
                 type: 'inbound' as const,
-                status: (item.status || 'pending').toLowerCase() as RequisitionStatus,
-                warehouseId: item.warehouseId || 1,
-                supplierId: item.supplierId || 1,
-                requestedBy: item.requestedBy || 1,
-                purpose: item.purpose || 'Nhập hàng',
-                notes: item.notes || '',
-                expectedDate: item.expectedDate || new Date().toISOString(),
+                status: (item.status || 'Pending').toLowerCase() as RequisitionStatus,
+                warehouseId: item.warehouseId || 0,
+                warehouse: item.warehouse?.name || '',
+                supplierId: item.supplierId || 0,
+                supplier: item.supplier?.name || '',
+                requestedBy: item.requestedBy || 0,
+                createdByName: item.requestedByUser?.fullName || '',
+                purpose: 'Nhập hàng', // Fixed - backend only has Note field
+                notes: item.note || '',
+                expectedDate: item.expectedArrivalDate || new Date().toISOString(),
                 createdAt: item.createdAt || new Date().toISOString(),
-                updatedAt: item.updatedAt || new Date().toISOString(),
-                items: [],
+                updatedAt: item.createdAt || new Date().toISOString(),
+                reviewedByName: item.approvedByUser?.fullName,
+                reviewedAt: item.approvedAt,
+                items: (item.inboundOrderItems || []).map((orderItem: any) => ({
+                    id: orderItem.id,
+                    sku: orderItem.sku || '',
+                    productName: orderItem.name || '',
+                    quantity: orderItem.expectedQuantity || 0,
+                    unit: 'Cái',
+                })),
             }));
         }
+        return [];
     } catch (error) {
-        console.warn('API not available, using mock data');
+        console.error('Error fetching requisitions:', error);
+        return [];
     }
-
-    // Return mock data for demo
-    return [
-        {
-            id: 1,
-            requisitionNumber: 'REQ-2026-001',
-            type: 'inbound',
-            status: 'pending',
-            warehouseId: 1,
-            warehouse: 'Kho chính HCM',
-            supplierId: 1,
-            supplier: 'Dell Vietnam',
-            requestedBy: 1,
-            purpose: 'Nhập laptop mới cho quý 1/2026',
-            notes: 'Ưu tiên hàng có sẵn',
-            expectedDate: new Date('2026-02-15').toISOString(),
-            createdAt: new Date('2026-02-01').toISOString(),
-            updatedAt: new Date('2026-02-01').toISOString(),
-            items: [
-                {
-                    id: 1,
-                    sku: 'DELL-XPS-001',
-                    productName: 'Dell XPS 15',
-                    quantity: 50,
-                    unit: 'chiếc',
-                },
-                {
-                    id: 2,
-                    sku: 'DELL-INS-002',
-                    productName: 'Dell Inspiron 14',
-                    quantity: 100,
-                    unit: 'chiếc',
-                },
-            ],
-        },
-        {
-            id: 2,
-            requisitionNumber: 'REQ-2026-002',
-            type: 'outbound',
-            status: 'approved',
-            warehouseId: 1,
-            warehouse: 'Kho chính HCM',
-            supplierId: 2,
-            requestedBy: 2,
-            purpose: 'Xuất hàng cho khách hàng ABC Corp',
-            notes: 'Giao trước 10h sáng',
-            expectedDate: new Date('2026-02-10').toISOString(),
-            createdAt: new Date('2026-02-03').toISOString(),
-            updatedAt: new Date('2026-02-04').toISOString(),
-            items: [
-                {
-                    id: 3,
-                    sku: 'DELL-XPS-001',
-                    productName: 'Dell XPS 15',
-                    quantity: 20,
-                    unit: 'chiếc',
-                },
-            ],
-        },
-    ];
 };
 
 export const createRequisition = async (
     data: {
         warehouseId: number;
         supplierId: number;
-        note?: string;
-        expectedArrivalDate?: string;
-        orderDiscount?: number;
-        items: {
-            productId: number;
-            expectedQuantity: number;
-            price?: number;
-            lineDiscount?: number;
-        }[];
+        note: string;
+        expectedDate: string;
+        items: { productId: number; expectedQuantity: number; price: number; lineDiscount: number }[];
     },
     userId: number
 ): Promise<GoodsRequisition> => {
     const beRequest = {
-        warehouseId: data.warehouseId,
-        supplierId: data.supplierId,
-        requestedBy: userId,
-        note: data.note || '',
-        expectedArrivalDate: data.expectedArrivalDate || new Date().toISOString().split('T')[0],
-        orderDiscount: data.orderDiscount || 0,
-        items: data.items.map(item => ({
-            productId: item.productId,
-            expectedQuantity: item.expectedQuantity,
-            price: item.price || 0,
-            lineDiscount: item.lineDiscount || 0,
-        })),
+        WarehouseId: data.warehouseId,
+        SupplierId: data.supplierId,
+        RequestedBy: userId,
+        Note: data.note,
+        ExpectedArrivalDate: data.expectedDate,
+        OrderDiscount: 0,
+        Items: data.items.map(item => ({
+            ProductId: item.productId,
+            ExpectedQuantity: item.expectedQuantity,
+            Price: item.price,
+            LineDiscount: item.lineDiscount
+        }))
     };
 
+    console.log('Sending request to API:', JSON.stringify(beRequest, null, 2));
     const res = await api.post('/api/InventoryInbound/create-inbound-request', beRequest);
 
     return {
@@ -142,5 +89,170 @@ export const createRequisition = async (
             unit: 'pcs',
         })),
     };
+};
+
+export const getRequisitionById = async (companyId: number, id: number): Promise<GoodsRequisition | null> => {
+    try {
+        const res = await api.get(`/api/InventoryInbound/requests/${companyId}/${id}`);
+        
+        if (res.data) {
+            const item = res.data;
+            return {
+                id: item.id,
+                requisitionNumber: item.code || `REQ-${item.id}`,
+                type: 'inbound' as const,
+                status: (item.status || 'Pending').toLowerCase() as RequisitionStatus,
+                warehouseId: item.warehouseId || 0,
+                warehouse: item.warehouse?.name || '',
+                supplierId: item.supplierId || 0,
+                supplier: item.supplier?.name || '',
+                requestedBy: item.requestedBy || 0,
+                createdByName: item.requestedByUser?.fullName || '',
+                purpose: 'Nhập hàng', // Fixed - backend only has Note field
+                notes: item.note || '',
+                expectedDate: item.expectedArrivalDate || new Date().toISOString(),
+                createdAt: item.createdAt || new Date().toISOString(),
+                updatedAt: item.createdAt || new Date().toISOString(),
+                reviewedByName: item.approvedByUser?.fullName,
+                reviewedAt: item.approvedAt,
+                items: (item.inboundOrderItems || []).map((orderItem: any) => ({
+                    id: orderItem.id,
+                    sku: orderItem.sku || '',
+                    productName: orderItem.name || '',
+                    quantity: orderItem.expectedQuantity || 0,
+                    unit: 'Cái',
+                })),
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching requisition detail:', error);
+        return null;
+    }
+};
+
+// ========== OUTBOUND APIs ==========
+
+export const getOutboundRequisitions = async (companyId: number): Promise<GoodsRequisition[]> => {
+    try {
+        const res = await api.get(`/api/InventoryOutbound/requests/${companyId}`);
+        
+        if (res.data && Array.isArray(res.data)) {
+            return res.data.map((item: any) => ({
+                id: item.id,
+                requisitionNumber: item.code || `OUT-${item.id}`,
+                type: 'outbound' as const,
+                status: (item.status || 'Pending').toLowerCase() as RequisitionStatus,
+                warehouseId: item.warehouseId || 0,
+                warehouse: item.warehouse?.name || '',
+                supplierId: 0, // outbound doesn't have supplier
+                supplier: item.destination || 'Khách hàng',
+                requestedBy: item.requestedBy || 0,
+                createdByName: item.requestedByUser?.fullName || '',
+                purpose: 'Xuất hàng',
+                notes: item.destination || '',
+                expectedDate: item.createdAt || new Date().toISOString(),
+                createdAt: item.createdAt || new Date().toISOString(),
+                updatedAt: item.createdAt || new Date().toISOString(),
+                reviewedByName: item.approvedByUser?.fullName,
+                reviewedAt: item.approvedAt,
+                items: (item.items || []).map((orderItem: any) => ({
+                    id: orderItem.id,
+                    sku: orderItem.productId?.toString() || '',
+                    productName: orderItem.productName || '',
+                    quantity: orderItem.quantity || 0,
+                    unit: 'Cái',
+                })),
+            }));
+        }
+        return [];
+    } catch (error) {
+        console.error('Error fetching outbound requisitions:', error);
+        return [];
+    }
+};
+
+export const createOutboundRequisition = async (
+    data: {
+        warehouseId: number;
+        destination: string;
+        items: { productId: number; quantity: number }[];
+    },
+    userId: number
+): Promise<GoodsRequisition> => {
+    const beRequest = {
+        WarehouseId: data.warehouseId,
+        Destination: data.destination,
+        RequestedBy: userId,
+        Items: data.items.map(item => ({
+            ProductId: item.productId,
+            Quantity: item.quantity
+        }))
+    };
+
+    console.log('Sending outbound request to API:', JSON.stringify(beRequest, null, 2));
+    const res = await api.post('/api/InventoryOutbound/create-outbound-request', beRequest);
+
+    return {
+        id: res.data.id,
+        requisitionNumber: `OUT-${res.data.id}`,
+        type: 'outbound',
+        status: (res.data.status || 'Pending').toLowerCase() as RequisitionStatus,
+        warehouseId: res.data.warehouseId,
+        supplierId: 0,
+        requestedBy: res.data.requestedBy,
+        purpose: 'Xuất kho',
+        notes: res.data.destination || '',
+        expectedDate: new Date().toISOString(),
+        createdAt: res.data.createdAt || new Date().toISOString(),
+        updatedAt: res.data.createdAt || new Date().toISOString(),
+        items: data.items.map(item => ({
+            id: item.productId,
+            sku: '',
+            productName: '',
+            quantity: item.quantity,
+            unit: 'pcs',
+        })),
+    };
+};
+
+export const getOutboundRequisitionById = async (companyId: number, id: number): Promise<GoodsRequisition | null> => {
+    try {
+        const res = await api.get(`/api/InventoryOutbound/requests/${companyId}/${id}`);
+        
+        if (res.data) {
+            const item = res.data;
+            return {
+                id: item.id,
+                requisitionNumber: item.code || `OUT-${item.id}`,
+                type: 'outbound' as const,
+                status: (item.status || 'Pending').toLowerCase() as RequisitionStatus,
+                warehouseId: item.warehouseId || 0,
+                warehouse: item.warehouse?.name || '',
+                supplierId: 0,
+                supplier: item.destination || 'Khách hàng',
+                requestedBy: item.requestedBy || 0,
+                createdByName: item.requestedByUser?.fullName || '',
+                purpose: 'Xuất hàng',
+                notes: item.destination || '',
+                expectedDate: item.createdAt || new Date().toISOString(),
+                createdAt: item.createdAt || new Date().toISOString(),
+                updatedAt: item.createdAt || new Date().toISOString(),
+                reviewedByName: item.approvedByUser?.fullName,
+                reviewedAt: item.approvedAt,
+                items: (item.items || []).map((orderItem: any) => ({
+                    id: orderItem.id,
+                    sku: orderItem.productId?.toString() || '',
+                    productName: orderItem.productName || '',
+                    quantity: orderItem.quantity || 0,
+                    unit: 'Cái',
+                })),
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching outbound requisition detail:', error);
+        return null;
+    }
 };
 

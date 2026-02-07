@@ -15,6 +15,14 @@ export interface InboundOrderItem {
   productId?: number;
   expectedQuantity?: number;
   receivedQuantity?: number;
+  // Direct fields from backend (not nested in product object)
+  name?: string;
+  sku?: string;
+  description?: string;
+  typeId?: number;
+  price?: number;
+  lineDiscount?: number;
+  // Nested product object for backward compatibility
   product?: {
     id: number;
     name: string;
@@ -29,6 +37,7 @@ export interface InboundOrder {
   warehouseId?: number;
   supplierId?: number;
   createdBy?: number;
+  staffId?: number;
   referenceCode?: string;
   status?: string;
   createdAt?: string;
@@ -52,18 +61,43 @@ export interface InboundRequest {
   warehouseId?: number;
   supplierId?: number;
   requestedBy?: number;
+  approvedBy?: number;
   status?: InboundRequestStatus;
+  totalPrice?: number;
+  orderDiscount?: number;
+  finalPrice?: number;
+  code?: string;
+  note?: string;
+  expectedArrivalDate?: string; // Backend field name
   createdAt?: string;
   approvedAt?: string;
-  approverId?: number;
   inboundOrderItems: InboundOrderItem[];
   supplier?: {
     id: number;
     name: string;
+    phone?: string;
+    email?: string;
   };
   warehouse?: {
     id: number;
     name: string;
+    address?: string;
+    description?: string;
+    width?: number;
+    height?: number;
+    length?: number;
+  };
+  requestedByUser?: {
+    id: number;
+    fullName: string;
+    email: string;
+    phone?: string;
+  };
+  approvedByUser?: {
+    id: number;
+    fullName: string;
+    email: string;
+    phone?: string;
   };
 }
 

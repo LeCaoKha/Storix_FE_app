@@ -1,26 +1,40 @@
-import { createOutboundRequest } from '@/services/outbound-order.api';
-import { createRequisition, getRequisitions } from '@/services/requisition.api';
+import {
+    createOutboundRequisition,
+    createRequisition,
+    getOutboundRequisitionById,
+    getOutboundRequisitions,
+    getRequisitionById,
+    getRequisitions
+} from '@/services/requisition.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-export const useRequisitions = () => {
+export const useRequisitions = (companyId: number | undefined) => {
     return useQuery({
-        queryKey: ['requisitions'],
-        queryFn: getRequisitions,
+        queryKey: ['requisitions', companyId],
+        queryFn: () => getRequisitions(companyId!),
+        enabled: !!companyId,
     });
 };
 
 export const useRequisition = (id: number | string | undefined) => {
     const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const { user } = useAuthStore();
 
     return useQuery({
-        queryKey: ['requisitions', numericId],
+        queryKey: ['requisitions', user?.companyId, numericId],
         queryFn: async () => {
-            if (!numericId) return null;
-            const all = await getRequisitions();
-            return all.find((r) => r.id === numericId) || null;
+            if (!numericId || !user?.companyId) return null;
+            
+            // Try to fetch from inbound first
+            const inbound = await getRequisitionById(user.companyId, numericId).catch(() => null);
+            if (inbound) return inbound;
+            
+            // If not found in inbound, try outbound
+            const outbound = await getOutboundRequisitionById(user.companyId, numericId).catch(() => null);
+            return outbound;
         },
-        enabled: !!numericId,
+        enabled: !!numericId && !!user?.companyId,
     });
 };
 
@@ -57,16 +71,33 @@ export const useCreateOutboundRequisition = () => {
             warehouseId: number;
             destination: string;
             items: { productId: number; quantity: number }[];
-        }) => createOutboundRequest({
-            warehouseId: data.warehouseId,
-            destination: data.destination,
-            requestedBy: user?.id || 0,
-            items: data.items,
-        }),
+        }) => createOutboundRequisition(data, user?.id || 0),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['requisitions'] });
-            queryClient.invalidateQueries({ queryKey: ['outbound-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['outbound-requisitions'] });
         },
+    });
+};
+
+export const useOutboundRequisitions = (companyId: number | undefined) => {
+    return useQuery({
+        queryKey: ['outbound-requisitions', companyId],
+        queryFn: () => getOutboundRequisitions(companyId!),
+        enabled: !!companyId,
+    });
+};
+
+export const useOutboundRequisition = (id: number | string | undefined) => {
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const { user } = useAuthStore();
+
+    return useQuery({
+        queryKey: ['outbound-requisitions', user?.companyId, numericId],
+        queryFn: async () => {
+            if (!numericId || !user?.companyId) return null;
+            return getOutboundRequisitionById(user.companyId, numericId);
+        },
+        enabled: !!numericId && !!user?.companyId,
     });
 };
 

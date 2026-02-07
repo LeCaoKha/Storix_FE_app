@@ -1,15 +1,15 @@
 import type {
-    CreateInboundRequestPayload,
-    InboundOrder,
-    UpdateInboundItemPayload
+  CreateInboundRequestPayload,
+  InboundOrder,
+  UpdateInboundItemPayload
 } from '@/types/inbound-order';
 import { api } from './axios.instance';
 
 // Re-export types để tiện sử dụng
 export type {
-    CreateInboundRequestPayload, InboundOrder,
-    InboundOrderItem,
-    InboundRequest, UpdateInboundItemPayload, UpdateInboundRequestStatusPayload
+  CreateInboundRequestPayload, InboundOrder,
+  InboundOrderItem,
+  InboundRequest, UpdateInboundItemPayload, UpdateInboundRequestStatusPayload
 } from '@/types/inbound-order';
 
 // ============== API Functions ==============
@@ -40,9 +40,10 @@ export const updateInboundRequestStatus = async (
 /**
  * Tạo phiếu nhập (ticket) từ yêu cầu đã duyệt
  */
-export const createInboundTicket = async (requestId: number, createdBy: number) => {
+export const createInboundTicket = async (requestId: number, createdBy: number, staffId?: number) => {
   const res = await api.post(`/api/InventoryInbound/create-inbound-ticket/${requestId}/tickets`, {
-    createdBy,
+    CreatedBy: createdBy,
+    StaffId: staffId || 0,
   });
   return res.data as InboundOrder;
 };
@@ -75,12 +76,18 @@ export const getAllInboundTickets = async (companyId: number) => {
   return res.data;
 };
 
-/**
- * Lấy chi tiết yêu cầu nhập kho theo ID
- */
 export const getInboundRequestById = async (companyId: number, requestId: number) => {
-  const res = await api.get(`/api/InventoryInbound/requests/${companyId}/${requestId}`);
-  return res.data;
+  console.log(`[API] Fetching inbound request - companyId: ${companyId}, requestId: ${requestId}`);
+  try {
+    const res = await api.get(`/api/InventoryInbound/requests/${companyId}/${requestId}`);
+    console.log('[API] Inbound request response:', JSON.stringify(res.data, null, 2));
+    return res.data;
+  } catch (error: any) {
+    console.error('[API ERROR] getInboundRequestById failed:', error);
+    console.error('[API ERROR] Error response:', error.response?.data);
+    console.error('[API ERROR] Error status:', error.response?.status);
+    throw error;
+  }
 };
 
 /**

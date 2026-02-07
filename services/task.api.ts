@@ -1,90 +1,112 @@
-import { Task } from '@/types/order';
+import { InboundOrder } from '@/types/inbound-order';
+import { Task, TaskPriority, TaskStatus, TaskType } from '@/types/order';
+import { OutboundOrder } from '@/types/outbound-order';
+import { api } from './axios.instance';
 
-// export const getTasks = async (): Promise<Task[]> => {
-//   const res = await api.get('/tasks');
-//   return res.data;
-// }
+/**
+ * Lấy tất cả tasks của staff hiện tại
+ * Tasks được lấy từ InboundOrders và OutboundOrders được gán cho staff
+ */
+export const getTasks = async (staffId: number, companyId: number): Promise<Task[]> => {
+    try {
+        const tasks: Task[] = [];
 
-export const getTasks = async (): Promise<Task[]> => {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
+        // Fetch inbound tickets
+        try {
+            const inboundRes = await api.get<InboundOrder[]>(`/api/InventoryInbound/tickets/${companyId}`);
+            const inboundTickets = inboundRes.data || [];
+            
+            // Filter by staffId and transform to Task
+            const inboundTasks = inboundTickets
+                .filter(ticket => ticket.staffId === staffId)
+                .map(ticket => ({
+                    id: `inbound-${ticket.id}`,
+                    title: `Nhập kho: ${ticket.referenceCode || `INB-${ticket.id}`}`,
+                    description: `Nhận hàng từ ${ticket.supplier?.name || 'nhà cung cấp'} với ${ticket.inboundOrderItems?.length || 0} mặt hàng`,
+                    type: TaskType.INBOUND,
+                    status: mapInboundStatus(ticket.status),
+                    priority: TaskPriority.MEDIUM, // Default priority
+                    assignedTo: String(staffId),
+                    relatedOrderId: String(ticket.id),
+                    location: ticket.warehouse?.name,
+                    createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                    updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                }));
+            
+            tasks.push(...inboundTasks);
+        } catch (err) {
+            console.warn('[getTasks] Failed to fetch inbound tickets:', err);
+        }
 
-    // Mock data from TasksScreen.tsx
-    return [
-        {
-            id: '1',
-            type: 'outbound',
-            orderNumber: 'OUT-2026-001',
-            orderId: 'out-001',
-            status: 'in_progress',
-            priority: 'high',
-            itemCount: 3,
-            assignedDateTime: new Date('2026-01-30T10:00:00'),
-            warehouse: 'WH-HCM-01',
-            customerOrSupplier: 'ABC Electronics Co.',
-            progress: 100,
-        },
-        {
-            id: '2',
-            type: 'inbound',
-            orderNumber: 'IN-2026-002',
-            orderId: 'inb-002',
-            status: 'in_progress',
-            priority: 'medium',
-            itemCount: 3,
-            assignedDateTime: new Date('2026-01-30T09:00:00'),
-            warehouse: 'WH-HCM-01',
-            customerOrSupplier: 'Tech Supplies Vietnam',
-            progress: 0,
-        },
-        {
-            id: '3',
-            type: 'outbound',
-            orderNumber: 'OUT-2026-003',
-            orderId: 'out-003',
-            status: 'pending',
-            priority: 'medium',
-            itemCount: 5,
-            assignedDateTime: new Date('2026-01-30T08:00:00'),
-            warehouse: 'WH-HCM-01',
-            customerOrSupplier: 'XYZ Retail Ltd.',
-        },
-        {
-            id: '4',
-            type: 'count',
-            orderNumber: 'CNT-2026-001',
-            orderId: 'cnt-001',
-            status: 'in_progress',
-            priority: 'high',
-            itemCount: 3,
-            assignedDateTime: new Date('2026-01-31T14:00:00'),
-            warehouse: 'WH-HCM-01',
-            location: 'Zone A - Rack 04',
-        },
-        {
-            id: '5',
-            type: 'inbound',
-            orderNumber: 'IN-2026-004',
-            orderId: 'inb-004',
-            status: 'completed',
-            priority: 'low',
-            itemCount: 8,
-            assignedDateTime: new Date('2026-01-29T07:00:00'),
-            warehouse: 'WH-HCM-01',
-            customerOrSupplier: 'Global Imports Inc.',
-            progress: 100,
-        },
-        {
-            id: '6',
-            type: 'putaway',
-            orderNumber: 'PUT-2026-001',
-            orderId: 'put-001',
-            status: 'pending',
-            priority: 'low',
-            itemCount: 12,
-            assignedDateTime: new Date('2026-01-28T15:00:00'),
-            warehouse: 'WH-HCM-01',
-            location: 'Zone B - Rack 12',
-        },
-    ];
+        // Fetch outbound tickets
+        try {
+            const outboundRes = await api.get<OutboundOrder[]>(`/api/InventoryOutbound/tickets/${companyId}`);
+            const outboundTickets = outboundRes.data || [];
+            
+            // Filter by staffId and transform to Task
+            const outboundTasks = outboundTickets
+                .filter(ticket => ticket.staffId === staffId)
+                .map(ticket => ({
+                    id: `outbound-${ticket.id}`,
+                    title: `Xuất kho: OUT-${ticket.id}`,
+                    description: `Lấy hàng giao đến ${ticket.destination || 'khách hàng'} với ${ticket.outboundOrderItems?.length || 0} mặt hàng`,
+                    type: TaskType.OUTBOUND,
+                    status: mapOutboundStatus(ticket.status),
+                    priority: TaskPriority.MEDIUM, // Default priority
+                    assignedTo: String(staffId),
+                    relatedOrderId: String(ticket.id),
+                    location: ticket.warehouse?.name,
+                    createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                    updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                }));
+            
+            tasks.push(...outboundTasks);
+        } catch (err) {
+            console.warn('[getTasks] Failed to fetch outbound tickets:', err);
+        }
+
+        // Sort by created date (newest first)
+        tasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+        console.log(`[getTasks] Found ${tasks.length} tasks for staff ${staffId}`);
+        return tasks;
+    } catch (error) {
+        console.error('[getTasks] Error:', error);
+        return [];
+    }
 };
+
+function mapInboundStatus(status?: string): TaskStatus {
+    switch (status?.toLowerCase()) {
+        case 'created':
+        case 'pending':
+            return TaskStatus.PENDING;
+        case 'processing':
+            return TaskStatus.IN_PROGRESS;
+        case 'completed':
+            return TaskStatus.COMPLETED;
+        case 'cancelled':
+            return TaskStatus.CANCELLED;
+        default:
+            return TaskStatus.PENDING;
+    }
+}
+
+function mapOutboundStatus(status?: string): TaskStatus {
+    switch (status?.toLowerCase()) {
+        case 'pending':
+            return TaskStatus.PENDING;
+        case 'picking':
+        case 'packing':
+        case 'packed':
+        case 'ready':
+            return TaskStatus.IN_PROGRESS;
+        case 'shipped':
+        case 'completed':
+            return TaskStatus.COMPLETED;
+        case 'cancelled':
+            return TaskStatus.CANCELLED;
+        default:
+            return TaskStatus.PENDING;
+    }
+}

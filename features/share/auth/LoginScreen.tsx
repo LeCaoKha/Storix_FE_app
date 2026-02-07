@@ -21,7 +21,7 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         try {
             const data = await login({ email, password });
-            
+
             console.log('Login response:', {
                 hasToken: !!data.accessToken,
                 tokenLength: data.accessToken?.length,
@@ -30,18 +30,45 @@ export default function LoginScreen() {
                 companyId: data.companyId
             });
 
-            // Save to store explicitly
-            loginStore(data.accessToken, {
-                id: data.userId,
-                roleId: data.roleId,
-                companyId: data.companyId,
-                email: email,
-            });
-            
+            // Fetch complete user profile to get warehouse assignment
+            try {
+                const { getUserProfile } = await import('@/services/user.api');
+                const userProfile = await getUserProfile(data.userId);
+
+                console.log('User profile fetched:', {
+                    warehouseId: userProfile.warehouseId,
+                    warehouseName: userProfile.warehouseName
+                });
+
+                // Save to store with complete profile data
+                loginStore(data.accessToken, {
+                    id: data.userId,
+                    roleId: data.roleId,
+                    companyId: data.companyId,
+                    email: email,
+                    fullName: userProfile.fullName,
+                    phone: userProfile.phone,
+                    warehouseId: userProfile.warehouseId,
+                    warehouseName: userProfile.warehouseName,
+                    roleName: userProfile.roleName,
+                    status: userProfile.status,
+                });
+            } catch (profileError) {
+                console.warn('Failed to fetch user profile, using basic info:', profileError);
+                // Fallback to basic info if profile fetch fails
+                loginStore(data.accessToken, {
+                    id: data.userId,
+                    roleId: data.roleId,
+                    companyId: data.companyId,
+                    email: email,
+                });
+            }
+
             console.log('After loginStore - checking store state:', {
                 hasToken: !!useAuthStore.getState().token,
                 tokenLength: useAuthStore.getState().token?.length,
-                hasUser: !!useAuthStore.getState().user
+                hasUser: !!useAuthStore.getState().user,
+                hasWarehouse: !!useAuthStore.getState().user?.warehouseId
             });
 
             // Small delay to ensure AsyncStorage write completes
@@ -135,7 +162,7 @@ export default function LoginScreen() {
                         <Button
                             title="Đăng nhập"
                             onPress={handleLogin}
-                            isLoading={isLoading}
+                            loading={isLoading}
                             style={styles.loginButton}
                         />
 

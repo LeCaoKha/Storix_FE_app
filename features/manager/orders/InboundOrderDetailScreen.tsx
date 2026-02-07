@@ -162,35 +162,12 @@ export default function InboundOrderDetailScreen() {
         );
     };
 
-    // Handle create ticket from approved request
+    // Handle navigate to create ticket screen
     const handleCreateTicket = () => {
-        Alert.alert(
-            'Tạo phiếu nhập kho',
-            'Tạo phiếu nhập kho từ yêu cầu đã duyệt?',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Tạo phiếu',
-                    style: 'default',
-                    onPress: async () => {
-                        try {
-                            setIsProcessing(true);
-                            await createTicket.mutateAsync({
-                                requestId: data.id,
-                                createdBy: user?.id ?? 0,
-                            });
-                            Alert.alert('Thành công', 'Đã tạo phiếu nhập kho', [
-                                { text: 'OK', onPress: () => router.back() },
-                            ]);
-                        } catch {
-                            Alert.alert('Lỗi', 'Không thể tạo phiếu nhập kho. Vui lòng thử lại.');
-                        } finally {
-                            setIsProcessing(false);
-                        }
-                    },
-                },
-            ]
-        );
+        router.push({
+            pathname: '/(manager-tabs)/(orders-inbound)/create',
+            params: { requestId: data.id }
+        } as any);
     };
 
     // Get items - support both request and ticket structure

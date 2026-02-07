@@ -1,4 +1,3 @@
-import TasksScreen from '@/features/staff/tasks/TasksScreen';
+import StaffOrdersListScreen from '@/features/staff/orders/StaffOrdersListScreen';
 
-// TODO: Create OrdersListScreen - using TasksScreen as placeholder for now
-export default TasksScreen;
+export default StaffOrdersListScreen;

@@ -1,6 +1,6 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrder, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,7 +10,7 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 export default function StaffInboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: order, isLoading, error } = useInboundOrder(id);
+    const { data: order, isLoading, error } = useInboundTicket(id);
     const updateItems = useUpdateInboundTicketItems();
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [localItemData, setLocalItemData] = useState<Record<number, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});

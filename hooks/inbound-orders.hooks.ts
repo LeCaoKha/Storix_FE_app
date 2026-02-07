@@ -1,15 +1,15 @@
 import {
-    getInboundRequestById as apiGetInboundRequestById,
-    getInboundTicketById as apiGetInboundTicketById,
-    createInboundRequest,
-    createInboundTicket,
-    getAllInboundRequests,
-    getAllInboundTickets,
-    updateInboundRequestStatus,
-    updateInboundTicketItems,
-    type InboundOrder as ApiInboundOrder,
-    type CreateInboundRequestPayload,
-    type UpdateInboundItemPayload,
+  getInboundRequestById as apiGetInboundRequestById,
+  getInboundTicketById as apiGetInboundTicketById,
+  createInboundRequest,
+  createInboundTicket,
+  getAllInboundRequests,
+  getAllInboundTickets,
+  updateInboundRequestStatus,
+  updateInboundTicketItems,
+  type InboundOrder as ApiInboundOrder,
+  type CreateInboundRequestPayload,
+  type UpdateInboundItemPayload,
 } from '@/services/inbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { InboundRequest } from '@/types/inbound-order';
@@ -56,9 +56,13 @@ const getInboundRequests = async (companyId: number): Promise<InboundRequest[]> 
  */
 const getInboundRequestById = async (companyId: number, id: number): Promise<InboundRequest | null> => {
   try {
-    return await apiGetInboundRequestById(companyId, id);
-  } catch (error) {
-    console.error(`Error fetching inbound request ${id}:`, error);
+    console.log(`[Hook] Calling getInboundRequestById - companyId: ${companyId}, id: ${id}`);
+    const result = await apiGetInboundRequestById(companyId, id);
+    console.log('[Hook] getInboundRequestById result:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error: any) {
+    console.error('[Hook] getInboundRequestById error:', error);
+    console.error('[Hook] Error response:', error?.response?.data);
     return null;
   }
 };
@@ -119,10 +123,25 @@ export const useInboundRequest = (id: number | string | undefined) => {
   const companyId = user?.companyId ?? 0;
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
+  console.log('[useInboundRequest] Hook params:', {
+    rawId: id,
+    numericId,
+    companyId,
+    isEnabled: !!numericId && !isNaN(numericId as number) && !!companyId,
+    checks: {
+      hasNumericId: !!numericId,
+      isNotNaN: !isNaN(numericId as number),
+      hasCompanyId: !!companyId
+    }
+  });
+
   return useQuery({
     queryKey: inboundOrderKeys.requestDetail(numericId ?? 0),
-    queryFn: () => getInboundRequestById(companyId, numericId!),
-    enabled: !!numericId && !isNaN(numericId) && !!companyId,
+    queryFn: () => {
+      console.log('[useInboundRequest] queryFn executing...');
+      return getInboundRequestById(companyId, numericId!);
+    },
+    enabled: !!numericId && !isNaN(numericId as number) && !!companyId,
   });
 };
 
@@ -227,8 +246,8 @@ export const useCreateInboundTicket = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ requestId, createdBy }: { requestId: number; createdBy: number }) =>
-      createInboundTicket(requestId, createdBy),
+    mutationFn: ({ requestId, createdBy, staffId }: { requestId: number; createdBy: number; staffId?: number }) =>
+      createInboundTicket(requestId, createdBy, staffId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.all });
     },

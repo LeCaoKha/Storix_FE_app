@@ -51,8 +51,8 @@ export default function RequisitionDetailScreen() {
 
     const handleCreateOrder = () => {
         const route = requisition.type === 'inbound'
-            ? `/manager/orders/inbound/create?requisitionId=${requisition.id}`
-            : `/manager/orders/outbound/create?requisitionId=${requisition.id}`;
+            ? `/(manager-tabs)/(orders-inbound)/create?requisitionId=${requisition.id}`
+            : `/(manager-tabs)/(orders-outbound)/create?requisitionId=${requisition.id}`;
         router.push(route as any);
     };
 
@@ -159,14 +159,31 @@ export default function RequisitionDetailScreen() {
                             <Text style={styles.detailValue}>{requisition.warehouse}</Text>
                         </View>
                     </View>
-                </Card>
-
-                {/* Purpose */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Mục đích</Text>
-                </View>
-                <Card style={styles.card}>
-                    <Text style={styles.purposeText}>{requisition.purpose}</Text>
+                    
+                    {/* Show supplier for inbound or destination for outbound */}
+                    {(requisition.type === 'inbound' && requisition.supplier) || 
+                     (requisition.type === 'outbound' && requisition.notes) ? (
+                        <>
+                            <View style={styles.detailDivider} />
+                            <View style={styles.detailRow}>
+                                <View style={styles.detailIcon}>
+                                    <Feather 
+                                        name={requisition.type === 'inbound' ? 'truck' : 'send'} 
+                                        size={16} 
+                                        color={COLORS.textMuted} 
+                                    />
+                                </View>
+                                <View style={styles.detailContent}>
+                                    <Text style={styles.detailLabel}>
+                                        {requisition.type === 'inbound' ? 'Nhà cung cấp' : 'Địa điểm xuất'}
+                                    </Text>
+                                    <Text style={styles.detailValue}>
+                                        {requisition.type === 'inbound' ? requisition.supplier : requisition.notes}
+                                    </Text>
+                                </View>
+                            </View>
+                        </>
+                    ) : null}
                 </Card>
 
                 {/* Items */}
@@ -176,8 +193,8 @@ export default function RequisitionDetailScreen() {
                 </View>
                 <RequisitionItemList items={requisition.items} showNotes />
 
-                {/* Notes */}
-                {requisition.notes && (
+                {/* Notes - Only show for inbound since outbound uses notes for destination */}
+                {requisition.notes && requisition.type === 'inbound' && (
                     <>
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Ghi chú</Text>
@@ -260,7 +277,9 @@ export default function RequisitionDetailScreen() {
                         onPress={handleCreateOrder}
                     >
                         <Feather name="plus-circle" size={20} color="#fff" />
-                        <Text style={styles.createOrderButtonText}>Tạo đơn hàng</Text>
+                        <Text style={styles.createOrderButtonText}>
+                            {requisition.type === 'inbound' ? 'Tạo phiếu nhập kho' : 'Tạo phiếu xuất kho'}
+                        </Text>
                     </TouchableOpacity>
                 </View>
             )}

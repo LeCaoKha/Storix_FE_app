@@ -44,15 +44,69 @@ export default function ManagerTabLayout() {
             />
 
             {/* Hide all other routes from tab bar */}
-            <Tabs.Screen name="index" options={{ href: null }} />
-            <Tabs.Screen name="(orders-inbound)" options={{ href: null }} />
-            <Tabs.Screen name="(orders-inbound)/[id]" options={{ href: null }} />
-            <Tabs.Screen name="(orders-inbound)/create" options={{ href: null }} />
-            <Tabs.Screen name="(orders-outbound)" options={{ href: null }} />
-            <Tabs.Screen name="(orders-outbound)/[id]" options={{ href: null }} />
-            <Tabs.Screen name="(orders-outbound)/create" options={{ href: null }} />
-            <Tabs.Screen name="requisitions/[id]" options={{ href: null }} />
-            <Tabs.Screen name="requisitions/create" options={{ href: null }} />
+            <Tabs.Screen 
+                name="index" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="requisitions/[id]" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="requisitions/create" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="(orders-inbound)" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="(orders-inbound)/[id]" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="(orders-inbound)/create" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="(orders-outbound)" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="(orders-outbound)/[id]" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="(orders-outbound)/create" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
         </Tabs>
     );
 }

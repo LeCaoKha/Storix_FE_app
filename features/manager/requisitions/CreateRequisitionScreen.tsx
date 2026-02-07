@@ -1,10 +1,11 @@
-import { Card, ScreenHeader } from '@/components';
+import { Calendar, Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useCreateOutboundRequisition, useCreateRequisition } from '@/hooks';
+import { useCreateOutboundRequisition, useCreateRequisition, useUserById } from '@/hooks';
 import { useProducts } from '@/hooks/product.hooks';
 import { useSuppliers } from '@/hooks/suppliers.hooks';
 import { api } from '@/services/axios.instance';
 import { useAuthStore } from '@/stores/auth.store';
+import { getLatestPrice } from '@/types/product';
 import type { RequisitionItem, RequisitionType } from '@/types/requisition';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -12,6 +13,7 @@ import React, { useEffect, useState } from 'react';
 import {
     Alert,
     FlatList,
+    Image,
     Modal,
     ScrollView,
     StyleSheet,
@@ -32,14 +34,22 @@ export default function CreateRequisitionScreen() {
     const token = useAuthStore((state) => state.token);
     const companyId = user?.companyId;
 
+    // Fetch fresh user data to get warehouse information
+    const { data: freshUserData } = useUserById(user?.id);
+    const currentWarehouseName = freshUserData?.warehouseName || user?.warehouseName;
+    const currentWarehouseId = freshUserData?.warehouseId || user?.warehouseId;
+
     const [type, setType] = useState<RequisitionType>('inbound');
     const [warehouseId, setWarehouseId] = useState<number | null>(null);
     const [supplierId, setSupplierId] = useState<number | null>(null);
     const [destination, setDestination] = useState<string>('');
+    const [note, setNote] = useState<string>('');
+    const [expectedDate, setExpectedDate] = useState<string>(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     const [warehouses, setWarehouses] = useState<any[]>([]);
     const [loadingWarehouses, setLoadingWarehouses] = useState(false);
     const [items, setItems] = useState<RequisitionItem[]>([]);
     const [showProductPicker, setShowProductPicker] = useState(false);
+    const [showCalendar, setShowCalendar] = useState(false);
     const [showWarehousePicker, setShowWarehousePicker] = useState(false);
     const [showSupplierPicker, setShowSupplierPicker] = useState(false);
     const [productSearch, setProductSearch] = useState('');
@@ -49,18 +59,21 @@ export default function CreateRequisitionScreen() {
         let mounted = true;
 
         const loadWarehouses = async () => {
-            // Ưu tiên: Nếu user đã có warehouse assignment, auto-select luôn
-            if (user?.warehouseId && !warehouseId) {
-                console.log('Auto-selecting warehouse from user profile:', user.warehouseId);
-                setWarehouseId(user.warehouseId);
+            // Ưu tiên: Nếu user đã có warehouse assignment, auto-select luôn và không cho đổi
+            const userWarehouseId = freshUserData?.warehouseId || user?.warehouseId;
+            const userWarehouseName = freshUserData?.warehouseName || user?.warehouseName;
+
+            if (userWarehouseId && !warehouseId) {
+                console.log('Auto-selecting warehouse from user profile:', userWarehouseId);
+                setWarehouseId(userWarehouseId);
 
                 // Tạo mock warehouse entry để hiển thị tên
-                if (user.warehouseName) {
+                if (userWarehouseName) {
                     setWarehouses([{
-                        warehouseId: user.warehouseId,
-                        id: user.warehouseId,
-                        warehouseName: user.warehouseName,
-                        name: user.warehouseName
+                        warehouseId: userWarehouseId,
+                        id: userWarehouseId,
+                        warehouseName: userWarehouseName,
+                        name: userWarehouseName
                     }]);
                 }
                 return; // Không cần load warehouse list nữa
@@ -117,14 +130,24 @@ export default function CreateRequisitionScreen() {
         return () => {
             mounted = false;
         };
-    }, []); // Chỉ chạy 1 lần khi mount
+    }, [freshUserData]); // Re-run when fresh user data is loaded
 
     // Auto-select first supplier
     useEffect(() => {
         if (suppliers.length > 0 && !supplierId) {
-            setSupplierId(suppliers[0].supplierId);
+            console.log('Auto-selecting first supplier:', suppliers[0]);
+            setSupplierId(suppliers[0].supplierId || suppliers[0].id || null);
         }
-    }, [suppliers]);
+    }, [suppliers, supplierId]);
+
+    // Debug: Log when supplierId changes
+    useEffect(() => {
+        if (supplierId) {
+            const selected = suppliers.find(s => (s.supplierId || s.id) === supplierId);
+            console.log('Selected supplier ID:', supplierId);
+            console.log('Selected supplier data:', selected);
+        }
+    }, [supplierId, suppliers]);
 
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
@@ -144,6 +167,7 @@ export default function CreateRequisitionScreen() {
             productName: product.name,
             quantity: 1,
             unit: product.unit || 'Cái',
+            product: product, // Store full product for price access
         };
 
         setItems([...items, newItem]);
@@ -179,6 +203,10 @@ export default function CreateRequisitionScreen() {
                 Alert.alert('Lỗi', 'Vui lòng chọn nhà cung cấp');
                 return;
             }
+            if (!note || note.trim() === '') {
+                Alert.alert('Lỗi', 'Vui lòng nhập ghi chú');
+                return;
+            }
         } else if (type === 'outbound') {
             if (!destination || destination.trim() === '') {
                 Alert.alert('Lỗi', 'Vui lòng nhập địa điểm xuất kho');
@@ -207,14 +235,20 @@ export default function CreateRequisitionScreen() {
 
         try {
             if (type === 'inbound') {
-                await createRequisition({
+                const requestData = {
                     warehouseId: warehouseId!,
                     supplierId: supplierId!,
+                    note: note.trim(),
+                    expectedDate: expectedDate,
                     items: items.map(i => ({
                         productId: i.id,
-                        expectedQuantity: i.quantity
-                    })),
-                });
+                        expectedQuantity: i.quantity,
+                        price: 0,
+                        lineDiscount: 0
+                    }))
+                };
+                console.log('Creating inbound requisition with data:', requestData);
+                await createRequisition(requestData);
                 Alert.alert('Thành công', 'Phiếu đề nghị nhập kho đã được tạo', [
                     { text: 'OK', onPress: () => router.back() },
                 ]);
@@ -231,9 +265,27 @@ export default function CreateRequisitionScreen() {
                     { text: 'OK', onPress: () => router.back() },
                 ]);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Create requisition error:', error);
-            Alert.alert('Lỗi', 'Không thể tạo phiếu đề nghị. Vui lòng kiểm tra lại thông tin.');
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            console.error('Error message:', error.message);
+
+            let errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Không thể tạo phiếu đề nghị';
+
+            // Improve stock error message for outbound
+            if (type === 'outbound' && errorMessage.includes('Insufficient stock')) {
+                const match = errorMessage.match(/ProductId (\d+).*Available: (\d+)/);
+                if (match) {
+                    const productId = match[1];
+                    const available = match[2];
+                    const product = items.find(i => i.id === parseInt(productId));
+                    const productName = product?.productName || `Sản phẩm #${productId}`;
+                    errorMessage = `Không đủ hàng trong kho!\n\n${productName}\nTồn kho: ${available}\nYêu cầu: ${product?.quantity || 'N/A'}\n\nVui lòng chọn sản phẩm khác hoặc giảm số lượng.`;
+                }
+            }
+
+            Alert.alert('Lỗi', errorMessage);
         }
     };
 
@@ -306,60 +358,70 @@ export default function CreateRequisitionScreen() {
                 <View style={styles.row}>
                     <View style={[styles.section, { flex: 1, marginRight: 8 }]}>
                         <Text style={styles.sectionTitle}>Kho *</Text>
-                        <TouchableOpacity
-                            style={styles.selectField}
-                            onPress={() => {
-                                if (warehouses.length === 0 && !loadingWarehouses) {
-                                    Alert.alert(
-                                        'Không có kho',
-                                        'Không tìm thấy kho nào. Bạn có muốn nhập ID kho thủ công không?',
-                                        [
-                                            { text: 'Hủy', style: 'cancel' },
-                                            {
-                                                text: 'Nhập thủ công',
-                                                onPress: () => {
-                                                    Alert.prompt(
-                                                        'Nhập ID Kho',
-                                                        'Vui lòng nhập ID kho (số nguyên)',
-                                                        [
-                                                            { text: 'Hủy', style: 'cancel' },
-                                                            {
-                                                                text: 'OK',
-                                                                onPress: (value?: string) => {
-                                                                    const id = parseInt(value || '0');
-                                                                    if (id > 0) {
-                                                                        setWarehouseId(id);
-                                                                    } else {
-                                                                        Alert.alert('Lỗi', 'ID kho không hợp lệ');
+                        {currentWarehouseId ? (
+                            // Read-only field when user has warehouse assigned
+                            <View style={[styles.selectField, styles.readOnlyField]}>
+                                <Text style={styles.selectFieldText}>
+                                    {currentWarehouseName || `Kho #${currentWarehouseId}`}
+                                </Text>
+                                <Feather name="lock" size={20} color={COLORS.textMuted} />
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.selectField}
+                                onPress={() => {
+                                    if (warehouses.length === 0 && !loadingWarehouses) {
+                                        Alert.alert(
+                                            'Không có kho',
+                                            'Không tìm thấy kho nào. Bạn có muốn nhập ID kho thủ công không?',
+                                            [
+                                                { text: 'Hủy', style: 'cancel' },
+                                                {
+                                                    text: 'Nhập thủ công',
+                                                    onPress: () => {
+                                                        Alert.prompt(
+                                                            'Nhập ID Kho',
+                                                            'Vui lòng nhập ID kho (số nguyên)',
+                                                            [
+                                                                { text: 'Hủy', style: 'cancel' },
+                                                                {
+                                                                    text: 'OK',
+                                                                    onPress: (value?: string) => {
+                                                                        const id = parseInt(value || '0');
+                                                                        if (id > 0) {
+                                                                            setWarehouseId(id);
+                                                                        } else {
+                                                                            Alert.alert('Lỗi', 'ID kho không hợp lệ');
+                                                                        }
                                                                     }
                                                                 }
-                                                            }
-                                                        ],
-                                                        'plain-text',
-                                                        '',
-                                                        'number-pad'
-                                                    );
+                                                            ],
+                                                            'plain-text',
+                                                            '',
+                                                            'number-pad'
+                                                        );
+                                                    }
                                                 }
-                                            }
-                                        ]
-                                    );
-                                } else {
-                                    setShowWarehousePicker(true);
-                                }
-                            }}
-                            disabled={loadingWarehouses}
-                        >
-                            <Text style={[styles.selectFieldText, !warehouseId && styles.placeholder]}>
-                                {loadingWarehouses
-                                    ? 'Đang tải...'
-                                    : warehouseId
-                                        ? warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.warehouseName || warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.name || `Kho #${warehouseId}`
-                                        : 'Chọn kho'
-                                }
-                            </Text>
-                            <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
-                        </TouchableOpacity>
-                        {warehouses.length === 0 && !loadingWarehouses && (
+                                            ]
+                                        );
+                                    } else {
+                                        setShowWarehousePicker(true);
+                                    }
+                                }}
+                                disabled={loadingWarehouses}
+                            >
+                                <Text style={[styles.selectFieldText, !warehouseId && styles.placeholder]}>
+                                    {loadingWarehouses
+                                        ? 'Đang tải...'
+                                        : warehouseId
+                                            ? warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.warehouseName || warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.name || `Kho #${warehouseId}`
+                                            : 'Chọn kho'
+                                    }
+                                </Text>
+                                <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
+                            </TouchableOpacity>
+                        )}
+                        {warehouses.length === 0 && !loadingWarehouses && !currentWarehouseId && (
                             <Text style={styles.warningText}>⚠️ Không tìm thấy kho. Nhấn để nhập thủ công.</Text>
                         )}
                     </View>
@@ -375,7 +437,10 @@ export default function CreateRequisitionScreen() {
                                     {loadingSuppliers
                                         ? 'Đang tải...'
                                         : supplierId
-                                            ? suppliers.find(s => s.supplierId === supplierId)?.supplierName || `NCC #${supplierId}`
+                                            ? (() => {
+                                                const selected = suppliers.find(s => (s.supplierId || s.id) === supplierId);
+                                                return selected?.supplierName || selected?.name || selected?.email || `NCC #${supplierId}`;
+                                            })()
                                             : 'Chọn NCC'
                                     }
                                 </Text>
@@ -395,6 +460,48 @@ export default function CreateRequisitionScreen() {
                         </View>
                     )}
                 </View>
+
+                {/* Note and Expected Date (for inbound only) */}
+                {type === 'inbound' && (
+                    <>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Ghi chú *</Text>
+                            <TextInput
+                                style={[styles.inputField, styles.textArea]}
+                                placeholder="Nhập ghi chú, mục đích nhập hàng..."
+                                placeholderTextColor={COLORS.textMuted}
+                                value={note}
+                                onChangeText={setNote}
+                                multiline
+                                numberOfLines={3}
+                            />
+                        </View>
+
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Ngày dự kiến nhận hàng *</Text>
+                            <TouchableOpacity
+                                style={styles.selectField}
+                                onPress={() => setShowCalendar(true)}
+                            >
+                                <View style={styles.datePickerContent}>
+                                    <Feather name="calendar" size={18} color={COLORS.primary} style={{ marginRight: 8 }} />
+                                    <Text style={styles.selectFieldText}>
+                                        {expectedDate || 'Chọn ngày'}
+                                    </Text>
+                                </View>
+                                <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
+                            </TouchableOpacity>
+                            <Text style={styles.hintText}>Vui lòng chọn ngày dự kiến hàng về kho</Text>
+                        </View>
+                    </>
+                )}
+
+                <Calendar
+                    visible={showCalendar}
+                    onClose={() => setShowCalendar(false)}
+                    initialDate={expectedDate}
+                    onSelectDate={(date) => setExpectedDate(date)}
+                />
 
                 {/* Items */}
                 <View style={styles.section}>
@@ -417,34 +524,67 @@ export default function CreateRequisitionScreen() {
                         </Card>
                     ) : (
                         <Card style={styles.itemsCard}>
-                            {items.map((item, index) => (
-                                <View key={item.id}>
-                                    <View style={styles.itemRow}>
-                                        <View style={styles.itemInfo}>
-                                            <Text style={styles.itemName}>{item.productName}</Text>
-                                            <Text style={styles.itemSku}>SKU: {item.sku}</Text>
-                                        </View>
-                                        <View style={styles.itemActions}>
-                                            <View style={styles.quantityInput}>
-                                                <TextInput
-                                                    style={styles.quantityInputField}
-                                                    value={String(item.quantity)}
-                                                    onChangeText={(text) => handleUpdateQuantity(item.id, text)}
-                                                    keyboardType="number-pad"
-                                                />
-                                                <Text style={styles.quantityUnit}>{item.unit}</Text>
+                            {items.map((item, index) => {
+                                const latestPrice = item.product ? getLatestPrice(item.product) : 0;
+                                const totalPrice = latestPrice * item.quantity;
+                                return (
+                                    <View key={item.id}>
+                                        <View style={styles.itemRow}>
+                                            <View style={styles.itemInfo}>
+                                                <Text style={styles.itemName}>{item.productName}</Text>
+                                                <Text style={styles.itemSku}>SKU: {item.sku}</Text>
+                                                {item.product?.productPrices && item.product.productPrices.length > 0 && (
+                                                    <View style={styles.priceContainer}>
+                                                        <View style={styles.priceRow}>
+                                                            <Feather name="tag" size={12} color="#6B7280" />
+                                                            <Text style={styles.priceUnit}>
+                                                                {latestPrice.toLocaleString('vi-VN')} ₫/đơn vị
+                                                            </Text>
+                                                        </View>
+                                                        <View style={styles.totalPriceRow}>
+                                                            <Feather name="dollar-sign" size={14} color="#22C55E" />
+                                                            <Text style={styles.totalPriceLabel}>Tổng:</Text>
+                                                            <Text style={styles.totalPriceValue}>
+                                                                {totalPrice.toLocaleString('vi-VN')} ₫
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                )}
                                             </View>
-                                            <TouchableOpacity
-                                                style={styles.removeButton}
-                                                onPress={() => handleRemoveItem(item.id)}
-                                            >
-                                                <Feather name="x" size={18} color="#EF4444" />
-                                            </TouchableOpacity>
+                                            <View style={styles.itemActions}>
+                                                <View style={styles.quantityInput}>
+                                                    <TouchableOpacity
+                                                        onPress={() => handleUpdateQuantity(item.id, String(Math.max(1, item.quantity - 1)))}
+                                                        style={styles.quantityButton}
+                                                    >
+                                                        <Feather name="minus" size={16} color={COLORS.primary} />
+                                                    </TouchableOpacity>
+                                                    <TextInput
+                                                        style={styles.quantityInputField}
+                                                        value={String(item.quantity)}
+                                                        onChangeText={(text) => handleUpdateQuantity(item.id, text)}
+                                                        keyboardType="number-pad"
+                                                    />
+                                                    <TouchableOpacity
+                                                        onPress={() => handleUpdateQuantity(item.id, String(item.quantity + 1))}
+                                                        style={styles.quantityButton}
+                                                    >
+                                                        <Feather name="plus" size={16} color={COLORS.primary} />
+                                                    </TouchableOpacity>
+                                                    <Text style={styles.quantityUnit}>{item.unit}</Text>
+                                                </View>
+                                                <TouchableOpacity
+                                                    style={styles.removeButton}
+                                                    onPress={() => handleRemoveItem(item.id)}
+                                                >
+                                                    <Feather name="x" size={18} color="#EF4444" />
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
+                                        {index < items.length - 1 && <View style={styles.itemDivider} />}
                                     </View>
-                                    {index < items.length - 1 && <View style={styles.itemDivider} />}
-                                </View>
-                            ))}
+                                );
+                            })}
                         </Card>
                     )}
                 </View>
@@ -485,24 +625,43 @@ export default function CreateRequisitionScreen() {
                         <FlatList
                             data={filteredProducts}
                             keyExtractor={item => String(item.id)}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={styles.productItem}
-                                    onPress={() => handleAddProduct(item)}
-                                >
-                                    <View style={styles.productIcon}>
-                                        <Feather name="package" size={20} color={COLORS.primary} />
-                                    </View>
-                                    <View style={styles.productInfo}>
-                                        <Text style={styles.productName}>{item.name}</Text>
-                                        <Text style={styles.productSku}>SKU: {item.sku || 'N/A'}</Text>
-                                        <Text style={styles.productStock}>
-                                            Đơn vị: {item.unit || 'Cái'}
-                                        </Text>
-                                    </View>
-                                    <Feather name="plus-circle" size={24} color={COLORS.primary} />
-                                </TouchableOpacity>
-                            )}
+                            renderItem={({ item }) => {
+                                const latestPrice = getLatestPrice(item);
+                                return (
+                                    <TouchableOpacity
+                                        style={styles.productItem}
+                                        onPress={() => handleAddProduct(item)}
+                                    >
+                                        <View style={styles.productIcon}>
+                                            {item.image ? (
+                                                <Image
+                                                    source={{ uri: item.image }}
+                                                    style={styles.productImage}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <Feather name="package" size={20} color={COLORS.primary} />
+                                            )}
+                                        </View>
+                                        <View style={styles.productInfo}>
+                                            <Text style={styles.productName}>{item.name}</Text>
+                                            <Text style={styles.productSku}>SKU: {item.sku || 'N/A'}</Text>
+                                            <Text style={styles.productStock}>
+                                                Đơn vị: {item.unit || 'Cái'}
+                                            </Text>
+                                            {item.productPrices && item.productPrices.length > 0 && (
+                                                <View style={styles.priceRowModal}>
+                                                    <Feather name="tag" size={12} color="#22C55E" />
+                                                    <Text style={styles.productPriceText}>
+                                                        {latestPrice.toLocaleString('vi-VN')} ₫
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Feather name="plus-circle" size={24} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                );
+                            }}
                             contentContainerStyle={styles.productList}
                         />
                     )}
@@ -585,15 +744,15 @@ export default function CreateRequisitionScreen() {
                     ) : (
                         <FlatList
                             data={suppliers}
-                            keyExtractor={item => String(item.supplierId)}
+                            keyExtractor={item => String(item.supplierId || item.id)}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
                                     style={[
                                         styles.listItem,
-                                        item.supplierId === supplierId && styles.listItemSelected
+                                        (item.supplierId || item.id) === supplierId && styles.listItemSelected
                                     ]}
                                     onPress={() => {
-                                        setSupplierId(item.supplierId);
+                                        setSupplierId(item.supplierId || item.id || null);
                                         setShowSupplierPicker(false);
                                     }}
                                 >
@@ -601,12 +760,17 @@ export default function CreateRequisitionScreen() {
                                         <Feather name="truck" size={20} color={COLORS.primary} />
                                     </View>
                                     <View style={styles.listItemInfo}>
-                                        <Text style={styles.listItemName}>{item.supplierName}</Text>
-                                        {item.email && (
+                                        <Text style={styles.listItemName}>
+                                            {item.supplierName || item.name || item.email || `NCC #${item.supplierId || item.id}`}
+                                        </Text>
+                                        {(item.email && (item.supplierName || item.name)) && (
                                             <Text style={styles.listItemMeta}>{item.email}</Text>
                                         )}
+                                        {item.phone && (
+                                            <Text style={styles.listItemMeta}>{item.phone}</Text>
+                                        )}
                                     </View>
-                                    {item.supplierId === supplierId && (
+                                    {(item.supplierId || item.id) === supplierId && (
                                         <Feather name="check" size={20} color={COLORS.primary} />
                                     )}
                                 </TouchableOpacity>
@@ -683,8 +847,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
         borderRadius: 12,
-        padding: 14,
-        fontSize: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 15,
         color: COLORS.text,
     },
     selectField: {
@@ -692,11 +857,25 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
         borderRadius: 12,
-        padding: 14,
-        fontSize: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    textArea: {
+        height: 80,
+        textAlignVertical: 'top',
+    },
+    datePickerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    hintText: {
+        fontSize: 11,
+        color: COLORS.textMuted,
+        marginTop: 4,
+        fontStyle: 'italic',
     },
     selectFieldText: {
         fontSize: 14,
@@ -705,6 +884,10 @@ const styles = StyleSheet.create({
     },
     placeholder: {
         color: COLORS.textMuted,
+    },
+    readOnlyField: {
+        backgroundColor: '#f5f5f5',
+        opacity: 0.8,
     },
     warningText: {
         fontSize: 11,
@@ -811,6 +994,34 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: COLORS.textMuted,
     },
+    priceContainer: {
+        marginTop: 6,
+        gap: 2,
+    },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    priceUnit: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    totalPriceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    totalPriceLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.text,
+    },
+    totalPriceValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#22C55E',
+    },
     itemActions: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -823,6 +1034,11 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         paddingHorizontal: 12,
         gap: 6,
+    },
+    quantityButton: {
+        padding: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     quantityInputField: {
         width: 50,
@@ -893,10 +1109,16 @@ const styles = StyleSheet.create({
     productIcon: {
         width: 44,
         height: 44,
-        borderRadius: 22,
+        borderRadius: 8,
         backgroundColor: COLORS.primary + '15',
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden',
+    },
+    productImage: {
+        width: 44,
+        height: 44,
+        borderRadius: 8,
     },
     productInfo: {
         flex: 1,
@@ -915,6 +1137,17 @@ const styles = StyleSheet.create({
     productStock: {
         fontSize: 12,
         color: COLORS.textMuted,
+    },
+    priceRowModal: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 4,
+    },
+    productPriceText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#22C55E',
     },
     listContainer: {
         padding: 20,
