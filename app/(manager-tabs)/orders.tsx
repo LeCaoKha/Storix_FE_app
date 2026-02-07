@@ -21,6 +21,7 @@ export default function OrdersScreen() {
                             Đơn Nhập Kho
                         </Text>
                     </TouchableOpacity>
+                    <View style={styles.tabDivider} />
                     <TouchableOpacity
                         style={[styles.tabButton, activeTab === 'outbound' && styles.tabButtonActive]}
                         onPress={() => setActiveTab('outbound')}
@@ -51,7 +52,11 @@ const styles = StyleSheet.create({
     },
     headerContent: {
         flexDirection: 'row',
-        paddingHorizontal: 20,
+        marginHorizontal: -16, // Compensate for SafeAreaHeader's paddingHorizontal: 16
+    },
+    tabDivider: {
+        width: 1,
+        backgroundColor: COLORS.border,
     },
     tabButton: {
         flex: 1,

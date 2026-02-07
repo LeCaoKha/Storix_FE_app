@@ -1,3 +1,4 @@
+import { createOutboundRequest } from '@/services/outbound-order.api';
 import { createRequisition, getRequisitions } from '@/services/requisition.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,10 +32,40 @@ export const useCreateRequisition = () => {
         mutationFn: (data: {
             warehouseId: number;
             supplierId: number;
-            items: { productId: number; expectedQuantity: number }[];
+            note?: string;
+            expectedArrivalDate?: string;
+            orderDiscount?: number;
+            items: {
+                productId: number;
+                expectedQuantity: number;
+                price?: number;
+                lineDiscount?: number;
+            }[];
         }) => createRequisition(data, user?.id || 0),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['requisitions'] });
+        },
+    });
+};
+
+export const useCreateOutboundRequisition = () => {
+    const queryClient = useQueryClient();
+    const { user } = useAuthStore();
+
+    return useMutation({
+        mutationFn: (data: {
+            warehouseId: number;
+            destination: string;
+            items: { productId: number; quantity: number }[];
+        }) => createOutboundRequest({
+            warehouseId: data.warehouseId,
+            destination: data.destination,
+            requestedBy: user?.id || 0,
+            items: data.items,
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['requisitions'] });
+            queryClient.invalidateQueries({ queryKey: ['outbound-requests'] });
         },
     });
 };

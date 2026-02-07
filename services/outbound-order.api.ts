@@ -107,3 +107,35 @@ export const confirmOutboundOrder = async (ticketId: number, performedBy: number
   });
   return res.data as OutboundOrder;
 };
+
+/**
+ * Lấy tất cả yêu cầu xuất kho của công ty (requests - chờ duyệt)
+ */
+export const getAllOutboundRequests = async (companyId: number) => {
+  const res = await api.get(`/api/InventoryOutbound/requests/${companyId}`);
+  return res.data;
+};
+
+/**
+ * Lấy tất cả phiếu xuất kho của công ty (tickets - đang xử lý)
+ */
+export const getAllOutboundTickets = async (companyId: number) => {
+  const res = await api.get(`/api/InventoryOutbound/tickets/${companyId}`);
+  return res.data;
+};
+
+/**
+ * Lấy chi tiết yêu cầu xuất kho theo ID
+ */
+export const getOutboundRequestById = async (companyId: number, requestId: number) => {
+  const res = await api.get(`/api/InventoryOutbound/requests/${companyId}/${requestId}`);
+  return res.data;
+};
+
+/**
+ * Lấy chi tiết phiếu xuất kho theo ID
+ */
+export const getOutboundTicketById = async (companyId: number, ticketId: number) => {
+  const res = await api.get(`/api/InventoryOutbound/tickets/${companyId}/${ticketId}`);
+  return res.data;
+};

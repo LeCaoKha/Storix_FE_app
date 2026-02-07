@@ -58,3 +58,35 @@ export const updateInboundTicketItems = async (
   const res = await api.put(`/api/InventoryInbound/tickets/${ticketId}/items`, items);
   return res.data as InboundOrder;
 };
+
+/**
+ * Lấy tất cả yêu cầu nhập kho của công ty (requests - chờ duyệt)
+ */
+export const getAllInboundRequests = async (companyId: number) => {
+  const res = await api.get(`/api/InventoryInbound/requests/${companyId}`);
+  return res.data;
+};
+
+/**
+ * Lấy tất cả phiếu nhập kho của công ty (tickets - đang xử lý)
+ */
+export const getAllInboundTickets = async (companyId: number) => {
+  const res = await api.get(`/api/InventoryInbound/tickets/${companyId}`);
+  return res.data;
+};
+
+/**
+ * Lấy chi tiết yêu cầu nhập kho theo ID
+ */
+export const getInboundRequestById = async (companyId: number, requestId: number) => {
+  const res = await api.get(`/api/InventoryInbound/requests/${companyId}/${requestId}`);
+  return res.data;
+};
+
+/**
+ * Lấy chi tiết phiếu nhập kho theo ID
+ */
+export const getInboundTicketById = async (companyId: number, ticketId: number) => {
+  const res = await api.get(`/api/InventoryInbound/tickets/${companyId}/${ticketId}`);
+  return res.data;
+};

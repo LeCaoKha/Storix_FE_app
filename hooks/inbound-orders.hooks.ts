@@ -1,13 +1,17 @@
-import { api } from '@/services/axios.instance';
 import {
-  createInboundRequest,
-  createInboundTicket,
-  updateInboundRequestStatus,
-  updateInboundTicketItems,
-  type InboundOrder as ApiInboundOrder,
-  type CreateInboundRequestPayload,
-  type UpdateInboundItemPayload,
+    getInboundRequestById as apiGetInboundRequestById,
+    getInboundTicketById as apiGetInboundTicketById,
+    createInboundRequest,
+    createInboundTicket,
+    getAllInboundRequests,
+    getAllInboundTickets,
+    updateInboundRequestStatus,
+    updateInboundTicketItems,
+    type InboundOrder as ApiInboundOrder,
+    type CreateInboundRequestPayload,
+    type UpdateInboundItemPayload,
 } from '@/services/inbound-order.api';
+import { useAuthStore } from '@/stores/auth.store';
 import { InboundRequest } from '@/types/inbound-order';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -34,10 +38,9 @@ export const inboundOrderKeys = {
 /**
  * Lấy danh sách yêu cầu nhập kho (requests - chờ duyệt)
  */
-const getInboundRequests = async (): Promise<InboundRequest[]> => {
+const getInboundRequests = async (companyId: number): Promise<InboundRequest[]> => {
   try {
-    const response = await api.get('/api/InventoryInbound/get-all-inbound-requests');
-    return response.data;
+    return await getAllInboundRequests(companyId);
   } catch (error: any) {
     if (error.response?.status === 404) {
       console.warn('Inbound requests endpoint not implemented yet');
@@ -51,10 +54,9 @@ const getInboundRequests = async (): Promise<InboundRequest[]> => {
 /**
  * Lấy chi tiết yêu cầu nhập kho
  */
-const getInboundRequestById = async (id: number): Promise<InboundRequest | null> => {
+const getInboundRequestById = async (companyId: number, id: number): Promise<InboundRequest | null> => {
   try {
-    const response = await api.get(`/api/InventoryInbound/get-inbound-request-by-id/${id}`);
-    return response.data;
+    return await apiGetInboundRequestById(companyId, id);
   } catch (error) {
     console.error(`Error fetching inbound request ${id}:`, error);
     return null;
@@ -64,13 +66,12 @@ const getInboundRequestById = async (id: number): Promise<InboundRequest | null>
 /**
  * Lấy danh sách phiếu nhập kho (tickets - đã duyệt)
  */
-const getInboundTickets = async (): Promise<ApiInboundOrder[]> => {
+const getInboundTickets = async (companyId: number): Promise<ApiInboundOrder[]> => {
   try {
-    const response = await api.get('/api/InventoryInbound/get-all-inbound-tickets');
-    return response.data;
+    return await getAllInboundTickets(companyId);
   } catch (error: any) {
     if (error?.response?.status === 404) {
-      console.warn('⚠️ API endpoint /get-all-inbound-tickets not implemented yet');
+      console.warn('⚠️ API endpoint not implemented yet');
     } else {
       console.error('Error fetching inbound tickets:', error);
     }
@@ -81,10 +82,9 @@ const getInboundTickets = async (): Promise<ApiInboundOrder[]> => {
 /**
  * Lấy chi tiết phiếu nhập kho
  */
-const getInboundTicketById = async (id: number): Promise<ApiInboundOrder | null> => {
+const getInboundTicketById = async (companyId: number, id: number): Promise<ApiInboundOrder | null> => {
   try {
-    const response = await api.get(`/api/InventoryInbound/get-inbound-ticket-by-id/${id}`);
-    return response.data;
+    return await apiGetInboundTicketById(companyId, id);
   } catch (error: any) {
     if (error?.response?.status === 404) {
       console.warn(`⚠️ Ticket ${id} not found or API not implemented`);
@@ -101,9 +101,13 @@ const getInboundTicketById = async (id: number): Promise<ApiInboundOrder | null>
  * Hook lấy danh sách yêu cầu nhập kho (chờ duyệt - cho Manager)
  */
 export const useInboundRequests = () => {
+  const { user } = useAuthStore();
+  const companyId = user?.companyId ?? 0;
+
   return useQuery({
     queryKey: inboundOrderKeys.requests(),
-    queryFn: getInboundRequests,
+    queryFn: () => getInboundRequests(companyId),
+    enabled: !!companyId,
   });
 };
 
@@ -111,12 +115,14 @@ export const useInboundRequests = () => {
  * Hook lấy chi tiết yêu cầu nhập kho
  */
 export const useInboundRequest = (id: number | string | undefined) => {
+  const { user } = useAuthStore();
+  const companyId = user?.companyId ?? 0;
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
   return useQuery({
     queryKey: inboundOrderKeys.requestDetail(numericId ?? 0),
-    queryFn: () => getInboundRequestById(numericId!),
-    enabled: !!numericId && !isNaN(numericId),
+    queryFn: () => getInboundRequestById(companyId, numericId!),
+    enabled: !!numericId && !isNaN(numericId) && !!companyId,
   });
 };
 
@@ -124,9 +130,13 @@ export const useInboundRequest = (id: number | string | undefined) => {
  * Hook lấy danh sách phiếu nhập kho (đã duyệt - cho Staff xử lý)
  */
 export const useInboundTickets = () => {
+  const { user } = useAuthStore();
+  const companyId = user?.companyId ?? 0;
+
   return useQuery({
     queryKey: inboundOrderKeys.tickets(),
-    queryFn: getInboundTickets,
+    queryFn: () => getInboundTickets(companyId),
+    enabled: !!companyId,
   });
 };
 
@@ -134,12 +144,14 @@ export const useInboundTickets = () => {
  * Hook lấy chi tiết phiếu nhập kho
  */
 export const useInboundTicket = (id: number | string | undefined) => {
+  const { user } = useAuthStore();
+  const companyId = user?.companyId ?? 0;
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
   return useQuery({
     queryKey: inboundOrderKeys.ticketDetail(numericId ?? 0),
-    queryFn: () => getInboundTicketById(numericId!),
-    enabled: !!numericId && !isNaN(numericId),
+    queryFn: () => getInboundTicketById(companyId, numericId!),
+    enabled: !!numericId && !isNaN(numericId) && !!companyId,
   });
 };
 
@@ -148,9 +160,13 @@ export const useInboundTicket = (id: number | string | undefined) => {
  * @deprecated Use useInboundTickets or useInboundRequests instead
  */
 export const useInboundOrders = () => {
+  const { user } = useAuthStore();
+  const companyId = user?.companyId ?? 0;
+
   return useQuery({
     queryKey: inboundOrderKeys.lists(),
-    queryFn: getInboundTickets,
+    queryFn: () => getInboundTickets(companyId),
+    enabled: !!companyId,
   });
 };
 

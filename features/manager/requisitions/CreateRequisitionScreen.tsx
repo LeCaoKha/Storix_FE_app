@@ -1,6 +1,6 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useCreateRequisition } from '@/hooks';
+import { useCreateOutboundRequisition, useCreateRequisition } from '@/hooks';
 import { useProducts } from '@/hooks/product.hooks';
 import { useSuppliers } from '@/hooks/suppliers.hooks';
 import { api } from '@/services/axios.instance';
@@ -23,7 +23,9 @@ import {
 
 export default function CreateRequisitionScreen() {
     const router = useRouter();
-    const { mutateAsync: createRequisition, isPending: loading } = useCreateRequisition();
+    const { mutateAsync: createRequisition, isPending: loadingInbound } = useCreateRequisition();
+    const { mutateAsync: createOutboundRequisition, isPending: loadingOutbound } = useCreateOutboundRequisition();
+    const loading = loadingInbound || loadingOutbound;
     const { data: products = [], isLoading: loadingProducts } = useProducts();
     const { data: suppliers = [], isLoading: loadingSuppliers } = useSuppliers();
     const user = useAuthStore((state) => state.user);
@@ -33,6 +35,7 @@ export default function CreateRequisitionScreen() {
     const [type, setType] = useState<RequisitionType>('inbound');
     const [warehouseId, setWarehouseId] = useState<number | null>(null);
     const [supplierId, setSupplierId] = useState<number | null>(null);
+    const [destination, setDestination] = useState<string>('');
     const [warehouses, setWarehouses] = useState<any[]>([]);
     const [loadingWarehouses, setLoadingWarehouses] = useState(false);
     const [items, setItems] = useState<RequisitionItem[]>([]);
@@ -44,13 +47,30 @@ export default function CreateRequisitionScreen() {
     // Load warehouses - chỉ chạy 1 lần khi component mount
     useEffect(() => {
         let mounted = true;
-        
+
         const loadWarehouses = async () => {
+            // Ưu tiên: Nếu user đã có warehouse assignment, auto-select luôn
+            if (user?.warehouseId && !warehouseId) {
+                console.log('Auto-selecting warehouse from user profile:', user.warehouseId);
+                setWarehouseId(user.warehouseId);
+
+                // Tạo mock warehouse entry để hiển thị tên
+                if (user.warehouseName) {
+                    setWarehouses([{
+                        warehouseId: user.warehouseId,
+                        id: user.warehouseId,
+                        warehouseName: user.warehouseName,
+                        name: user.warehouseName
+                    }]);
+                }
+                return; // Không cần load warehouse list nữa
+            }
+
             if (!companyId) {
                 console.log('No companyId available');
                 return;
             }
-            
+
             if (!token) {
                 console.log('No token available, please login again');
                 Alert.alert('Lỗi', 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
@@ -59,23 +79,23 @@ export default function CreateRequisitionScreen() {
 
             setLoadingWarehouses(true);
             console.log('Loading warehouses for companyId:', companyId);
-            
+
             try {
                 const res = await api.get(`/api/company-warehouses/${companyId}/assignments`);
                 if (!mounted) return;
-                
+
                 console.log('Warehouses loaded successfully:', res.data?.length || 0);
                 setWarehouses(res.data || []);
-                
-                // Auto-select first warehouse if available
+
+                // Auto-select first warehouse if available (chỉ khi chưa có từ user profile)
                 if (res.data && res.data.length > 0 && !warehouseId) {
                     setWarehouseId(res.data[0].warehouseId || res.data[0].id);
                 }
             } catch (error: any) {
                 if (!mounted) return;
-                
+
                 console.warn('Warehouse endpoint not available:', error.response?.status);
-                
+
                 // For 403/404, just allow manual warehouse ID entry
                 if (error.response?.status === 403 || error.response?.status === 404) {
                     console.log('Warehouses endpoint not available - user can enter warehouse ID manually');
@@ -93,7 +113,7 @@ export default function CreateRequisitionScreen() {
         };
 
         loadWarehouses();
-        
+
         return () => {
             mounted = false;
         };
@@ -143,11 +163,6 @@ export default function CreateRequisitionScreen() {
     };
 
     const handleSubmit = async () => {
-        if (type === 'outbound') {
-            Alert.alert('Thông báo', 'Backend hiện chưa hỗ trợ tạo phiếu xuất kho. Vui lòng liên hệ Admin.');
-            return;
-        }
-
         if (!companyId) {
             Alert.alert('Lỗi', 'Không tìm thấy thông tin công ty. Vui lòng đăng nhập lại.');
             return;
@@ -158,9 +173,17 @@ export default function CreateRequisitionScreen() {
             return;
         }
 
-        if (!supplierId) {
-            Alert.alert('Lỗi', 'Vui lòng chọn nhà cung cấp');
-            return;
+        // Validate based on type
+        if (type === 'inbound') {
+            if (!supplierId) {
+                Alert.alert('Lỗi', 'Vui lòng chọn nhà cung cấp');
+                return;
+            }
+        } else if (type === 'outbound') {
+            if (!destination || destination.trim() === '') {
+                Alert.alert('Lỗi', 'Vui lòng nhập địa điểm xuất kho');
+                return;
+            }
         }
 
         if (items.length === 0) {
@@ -183,28 +206,41 @@ export default function CreateRequisitionScreen() {
         }
 
         try {
-            await createRequisition({
-                warehouseId: warehouseId!,
-                supplierId: supplierId!,
-                items: items.map(i => ({
-                    productId: i.id,
-                    expectedQuantity: i.quantity
-                })),
-            });
-
-            Alert.alert('Thành công', 'Phiếu đề xuất nhập kho đã được tạo', [
-                { text: 'OK', onPress: () => router.back() },
-            ]);
+            if (type === 'inbound') {
+                await createRequisition({
+                    warehouseId: warehouseId!,
+                    supplierId: supplierId!,
+                    items: items.map(i => ({
+                        productId: i.id,
+                        expectedQuantity: i.quantity
+                    })),
+                });
+                Alert.alert('Thành công', 'Phiếu đề nghị nhập kho đã được tạo', [
+                    { text: 'OK', onPress: () => router.back() },
+                ]);
+            } else {
+                await createOutboundRequisition({
+                    warehouseId: warehouseId!,
+                    destination: destination.trim(),
+                    items: items.map(i => ({
+                        productId: i.id,
+                        quantity: i.quantity
+                    })),
+                });
+                Alert.alert('Thành công', 'Phiếu đề nghị xuất kho đã được tạo', [
+                    { text: 'OK', onPress: () => router.back() },
+                ]);
+            }
         } catch (error) {
             console.error('Create requisition error:', error);
-            Alert.alert('Lỗi', 'Không thể tạo phiếu đề xuất. Vui lòng kiểm tra lại thông tin.');
+            Alert.alert('Lỗi', 'Không thể tạo phiếu đề nghị. Vui lòng kiểm tra lại thông tin.');
         }
     };
 
     return (
         <View style={styles.container}>
             <ScreenHeader
-                title="Tạo đề xuất mới"
+                title="Tạo đề nghị mới"
                 rightButton={
                     <TouchableOpacity
                         style={[styles.submitButton, loading && styles.submitButtonDisabled]}
@@ -221,7 +257,7 @@ export default function CreateRequisitionScreen() {
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
                 {/* Type Selection */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Loại đề xuất *</Text>
+                    <Text style={styles.sectionTitle}>Loại đề nghị *</Text>
                     <View style={styles.typeCards}>
                         <TouchableOpacity
                             style={[styles.typeCard, type === 'inbound' && styles.typeCardActive]}
@@ -238,32 +274,29 @@ export default function CreateRequisitionScreen() {
                                 Nhập kho
                             </Text>
                             <Text style={styles.typeCardDescription}>
-                                Đề xuất nhập hàng từ nhà cung cấp
+                                Đề nghị nhập hàng từ nhà cung cấp
                             </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={[
                                 styles.typeCard,
-                                type === 'outbound' && styles.typeCardActive,
-                                { opacity: 0.5 }
+                                type === 'outbound' && styles.typeCardActive
                             ]}
-                            onPress={() => {
-                                Alert.alert('Thông báo', 'Tính năng xuất kho đang được Backend phát triển.');
-                            }}
+                            onPress={() => setType('outbound')}
                         >
-                            <View style={[styles.typeCardIcon, type === 'outbound' && styles.typeCardIconActive, { backgroundColor: '#ccc' }]}>
+                            <View style={[styles.typeCardIcon, type === 'outbound' && styles.typeCardIconActive]}>
                                 <Feather
-                                    name="lock"
-                                    size={24}
-                                    color="#fff"
+                                    name="arrow-up-circle"
+                                    size={28}
+                                    color={type === 'outbound' ? '#fff' : '#10B981'}
                                 />
                             </View>
                             <Text style={[styles.typeCardTitle, type === 'outbound' && styles.typeCardTitleActive]}>
                                 Xuất kho
                             </Text>
                             <Text style={styles.typeCardDescription}>
-                                (Đang phát triển backend)
+                                Đề nghị xuất hàng ra khỏi kho
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -320,8 +353,8 @@ export default function CreateRequisitionScreen() {
                                 {loadingWarehouses
                                     ? 'Đang tải...'
                                     : warehouseId
-                                    ? warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.warehouseName || warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.name || `Kho #${warehouseId}`
-                                    : 'Chọn kho'
+                                        ? warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.warehouseName || warehouses.find(w => (w.warehouseId || w.id) === warehouseId)?.name || `Kho #${warehouseId}`
+                                        : 'Chọn kho'
                                 }
                             </Text>
                             <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
@@ -330,24 +363,37 @@ export default function CreateRequisitionScreen() {
                             <Text style={styles.warningText}>⚠️ Không tìm thấy kho. Nhấn để nhập thủ công.</Text>
                         )}
                     </View>
-                    <View style={[styles.section, { flex: 1, marginLeft: 8 }]}>
-                        <Text style={styles.sectionTitle}>Nhà CC *</Text>
-                        <TouchableOpacity
-                            style={styles.selectField}
-                            onPress={() => setShowSupplierPicker(true)}
-                            disabled={loadingSuppliers}
-                        >
-                            <Text style={[styles.selectFieldText, !supplierId && styles.placeholder]}>
-                                {loadingSuppliers
-                                    ? 'Đang tải...'
-                                    : supplierId
-                                    ? suppliers.find(s => s.supplierId === supplierId)?.supplierName || `NCC #${supplierId}`
-                                    : 'Chọn NCC'
-                                }
-                            </Text>
-                            <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
-                        </TouchableOpacity>
-                    </View>
+                    {type === 'inbound' ? (
+                        <View style={[styles.section, { flex: 1, marginLeft: 8 }]}>
+                            <Text style={styles.sectionTitle}>Nhà CC *</Text>
+                            <TouchableOpacity
+                                style={styles.selectField}
+                                onPress={() => setShowSupplierPicker(true)}
+                                disabled={loadingSuppliers}
+                            >
+                                <Text style={[styles.selectFieldText, !supplierId && styles.placeholder]}>
+                                    {loadingSuppliers
+                                        ? 'Đang tải...'
+                                        : supplierId
+                                            ? suppliers.find(s => s.supplierId === supplierId)?.supplierName || `NCC #${supplierId}`
+                                            : 'Chọn NCC'
+                                    }
+                                </Text>
+                                <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <View style={[styles.section, { flex: 1, marginLeft: 8 }]}>
+                            <Text style={styles.sectionTitle}>Đ/điểm *</Text>
+                            <TextInput
+                                style={styles.inputField}
+                                placeholder="Nhập địa điểm xuất kho"
+                                placeholderTextColor={COLORS.textMuted}
+                                value={destination}
+                                onChangeText={setDestination}
+                            />
+                        </View>
+                    )}
                 </View>
 
                 {/* Items */}

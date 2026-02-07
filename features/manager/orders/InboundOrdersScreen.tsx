@@ -230,7 +230,6 @@ export default function InboundOrdersScreen() {
     return (
         <View style={styles.container}>
             <TabScreenHeader
-                title="Đơn Nhập Kho"
                 showAddButton
                 onAddPress={() => router.push('/(manager-tabs)/(orders-inbound)/create')}
                 showSearch
@@ -455,6 +454,7 @@ const styles = StyleSheet.create({
     viewModeContainer: {
         flexDirection: 'row',
         marginHorizontal: 20,
+        marginTop: 16,
         marginBottom: 12,
         backgroundColor: '#f0f0f0',
         borderRadius: 12,
@@ -486,7 +486,6 @@ const styles = StyleSheet.create({
     tabsContainer: {
         paddingHorizontal: 20,
         paddingBottom: 12,
-        gap: 8,
     },
     tab: {
         flexDirection: 'row',

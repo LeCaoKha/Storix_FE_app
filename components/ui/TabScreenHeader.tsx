@@ -4,7 +4,7 @@ import React from 'react';
 import { StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface TabScreenHeaderProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   onAddPress?: () => void;
   showAddButton?: boolean;
@@ -30,28 +30,37 @@ export const TabScreenHeader: React.FC<TabScreenHeaderProps> = ({
     <>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.title}>{title}</Text>
-            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        {title && (
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.title}>{title}</Text>
+              {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+            </View>
+            {showAddButton && onAddPress && (
+              <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
+                <Feather name="plus" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
-          {showAddButton && onAddPress && (
-            <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
-              <Feather name="plus" size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
 
         {showSearch && onSearchChange && (
-          <View style={styles.searchContainer}>
-            <Feather name="search" size={18} color={COLORS.textMuted} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={searchPlaceholder}
-              value={searchValue}
-              onChangeText={onSearchChange}
-              placeholderTextColor={COLORS.textMuted}
-            />
+          <View style={styles.searchRow}>
+            <View style={styles.searchContainer}>
+              <Feather name="search" size={18} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={searchPlaceholder}
+                value={searchValue}
+                onChangeText={onSearchChange}
+                placeholderTextColor={COLORS.textMuted}
+              />
+            </View>
+            {showAddButton && onAddPress && (
+              <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
+                <Feather name="plus" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -64,7 +73,7 @@ export const TabScreenHeader: React.FC<TabScreenHeaderProps> = ({
 const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
-    paddingTop: 60, // Safe area top + padding
+    paddingTop: 16, // Minimal padding for compact header
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
@@ -94,13 +103,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F6F8FA',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    height: 40,
   },
   searchInput: {
     flex: 1,

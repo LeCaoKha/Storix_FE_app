@@ -16,14 +16,12 @@ const TABS: { key: TabType; label: string }[] = [
     { key: 'rejected', label: 'Từ chối' },
 ];
 
-
-export default function RequisitionsScreen() {
+export default function InboundRequisitionsScreen() {
     const router = useRouter();
     const { data: requisitions = [], isLoading } = useRequisitions();
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     const searchRequisitionsLocal = (query: string) => {
         const lowerQuery = query.toLowerCase();
         return requisitions.filter(req =>
@@ -36,13 +34,22 @@ export default function RequisitionsScreen() {
         );
     };
 
-    // Filter requisitions
+    // Filter INBOUND requisitions only
     const filteredRequisitions = useMemo(() => {
-        let results = requisitions;
+        // Filter by type first
+        let results = requisitions.filter(req => req.type === 'inbound');
 
         // Apply search
         if (searchQuery.trim()) {
-            results = searchRequisitionsLocal(searchQuery);
+            const lowerQuery = searchQuery.toLowerCase();
+            results = results.filter(req =>
+                req.requisitionNumber.toLowerCase().includes(lowerQuery) ||
+                req.purpose.toLowerCase().includes(lowerQuery) ||
+                req.items.some(item =>
+                    item.sku.toLowerCase().includes(lowerQuery) ||
+                    item.productName.toLowerCase().includes(lowerQuery)
+                )
+            );
         }
 
         // Apply status filter
@@ -54,7 +61,7 @@ export default function RequisitionsScreen() {
         return [...results].sort((a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-    }, [requisitions, searchQuery, activeTab, searchRequisitionsLocal]);
+    }, [requisitions, searchQuery, activeTab]);
 
     if (isLoading) {
         return (
@@ -75,8 +82,6 @@ export default function RequisitionsScreen() {
     return (
         <View style={styles.container}>
             <TabScreenHeader
-                title="Phiếu Đề Xuất"
-                subtitle="Quản lý đề xuất nhập/xuất kho"
                 showAddButton
                 onAddPress={handleCreateNew}
                 showSearch
@@ -94,8 +99,8 @@ export default function RequisitionsScreen() {
                     {TABS.map(tab => {
                         const isActive = activeTab === tab.key;
                         const count = tab.key === 'all'
-                            ? requisitions.length
-                            : requisitions.filter(r => r.status === tab.key).length;
+                            ? filteredRequisitions.length
+                            : requisitions.filter(r => r.type === 'inbound' && r.status === tab.key).length;
 
                         return (
                             <TouchableOpacity
@@ -121,18 +126,18 @@ export default function RequisitionsScreen() {
                     <View style={styles.emptyState}>
                         <Feather name="inbox" size={64} color={COLORS.border} />
                         <Text style={styles.emptyTitle}>
-                            {searchQuery ? 'Không tìm thấy kết quả' : 'Chưa có phiếu đề xuất'}
+                            {searchQuery ? 'Không tìm thấy kết quả' : 'Chưa có phiếu đề nghị'}
                         </Text>
                         <Text style={styles.emptyText}>
                             {searchQuery
                                 ? 'Thử tìm kiếm với từ khóa khác'
-                                : 'Tạo phiếu đề xuất nhập/xuất kho mới'
+                                : 'Tạo phiếu đề nghị nhập kho mới'
                             }
                         </Text>
                         {!searchQuery && (
                             <TouchableOpacity style={styles.emptyButton} onPress={handleCreateNew}>
                                 <Feather name="plus" size={18} color="#fff" />
-                                <Text style={styles.emptyButtonText}>Tạo đề xuất mới</Text>
+                                <Text style={styles.emptyButtonText}>Tạo đề nghị mới</Text>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -156,52 +161,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
-    },
-    header: {
-        backgroundColor: '#fff',
-        paddingBottom: 0,
-    },
-    headerTop: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        paddingHorizontal: 20,
-        paddingTop: 60,
-        marginBottom: 16,
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginBottom: 4,
-    },
-    subtitle: {
-        fontSize: 14,
-        color: COLORS.textMuted,
-    },
-    createButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f5f5f5',
-        marginHorizontal: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 12,
-        gap: 10,
-        marginBottom: 16,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 14,
-        color: COLORS.text,
     },
     tabsScroll: {
         maxHeight: 50,

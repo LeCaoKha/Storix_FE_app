@@ -1,15 +1,18 @@
-import { api } from '@/services/axios.instance';
 import {
-  confirmOutboundOrder,
-  createOutboundRequest,
-  createOutboundTicket,
-  getInventoryAvailability,
-  updateOutboundRequestStatus,
-  updateOutboundTicketItems,
-  updateOutboundTicketStatus,
-  type OutboundOrder as ApiOutboundOrder,
-  type CreateOutboundRequestPayload,
-  type UpdateOutboundItemPayload,
+    getOutboundRequestById as apiGetOutboundRequestById,
+    getOutboundTicketById as apiGetOutboundTicketById,
+    confirmOutboundOrder,
+    createOutboundRequest,
+    createOutboundTicket,
+    getAllOutboundRequests,
+    getAllOutboundTickets,
+    getInventoryAvailability,
+    updateOutboundRequestStatus,
+    updateOutboundTicketItems,
+    updateOutboundTicketStatus,
+    type OutboundOrder as ApiOutboundOrder,
+    type CreateOutboundRequestPayload,
+    type UpdateOutboundItemPayload,
 } from '@/services/outbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { OutboundRequest } from '@/types/outbound-order';
@@ -39,16 +42,16 @@ export const outboundOrderKeys = {
 
 /**
  * Lấy danh sách yêu cầu xuất kho (requests - chờ duyệt)
- * NOTE: Backend chưa có endpoint get-all-outbound-requests/{companyId}
- * Cần liên hệ Backend team để thêm endpoint này
  */
 const getOutboundRequests = async (companyId: number): Promise<OutboundRequest[]> => {
   try {
-    // TODO: Backend cần thêm endpoint này
-    const response = await api.get(`/api/InventoryOutbound/get-all-outbound-requests/${companyId}`);
-    return response.data;
-  } catch {
-    console.warn('Outbound requests API not available (Backend needs to add endpoint)');
+    return await getAllOutboundRequests(companyId);
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      console.warn('Outbound requests API not available');
+    } else {
+      console.error('Error fetching outbound requests:', error);
+    }
     return [];
   }
 };
@@ -58,25 +61,25 @@ const getOutboundRequests = async (companyId: number): Promise<OutboundRequest[]
  */
 const getOutboundRequestById = async (companyId: number, id: number): Promise<OutboundRequest | null> => {
   try {
-    const response = await api.get(`/api/InventoryOutbound/get-outbound-request-by-id/${companyId}/${id}`);
-    return response.data;
-  } catch {
-    console.warn(`Outbound request ${id} not found`);
+    return await apiGetOutboundRequestById(companyId, id);
+  } catch (error) {
+    console.error(`Error fetching outbound request ${id}:`, error);
     return null;
   }
 };
 
 /**
  * Lấy danh sách phiếu xuất kho (tickets - đã duyệt)
- * NOTE: Backend chưa có endpoint get-all-outbound-tickets/{companyId}
  */
 const getOutboundTickets = async (companyId: number): Promise<ApiOutboundOrder[]> => {
   try {
-    // TODO: Backend cần thêm endpoint này
-    const response = await api.get(`/api/InventoryOutbound/get-all-outbound-tickets/${companyId}`);
-    return response.data;
-  } catch {
-    console.warn('Outbound tickets API not available (Backend needs to add endpoint)');
+    return await getAllOutboundTickets(companyId);
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      console.warn('Outbound tickets API not available');
+    } else {
+      console.error('Error fetching outbound tickets:', error);
+    }
     return [];
   }
 };
@@ -86,10 +89,9 @@ const getOutboundTickets = async (companyId: number): Promise<ApiOutboundOrder[]
  */
 const getOutboundTicketById = async (companyId: number, id: number): Promise<ApiOutboundOrder | null> => {
   try {
-    const response = await api.get(`/api/InventoryOutbound/get-outbound-ticket-by-id/${companyId}/${id}`);
-    return response.data;
-  } catch {
-    console.warn(`Outbound ticket ${id} not found`);
+    return await apiGetOutboundTicketById(companyId, id);
+  } catch (error) {
+    console.error(`Error fetching outbound ticket ${id}:`, error);
     return null;
   }
 };

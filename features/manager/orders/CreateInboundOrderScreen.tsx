@@ -143,16 +143,16 @@ export default function CreateInboundOrderScreen() {
                     />
                 </Card>
 
-                {requisition && requisition.items.length > 0 && (
+                {inboundRequest && inboundRequest.items && inboundRequest.items.length > 0 && (
                     <Card style={styles.card}>
                         <Text style={styles.sectionTitle}>
-                            Sản Phẩm ({requisition.items.length})
+                            Sản Phẩm ({inboundRequest.items.length})
                         </Text>
-                        {requisition.items.map(item => (
+                        {inboundRequest.items.map(item => (
                             <View key={item.id} style={styles.itemRow}>
-                                <Text style={styles.itemName}>{item.productName}</Text>
+                                <Text style={styles.itemName}>{item.product?.name || `Product #${item.productId}`}</Text>
                                 <Text style={styles.itemQty}>
-                                    {item.quantity} {item.unit}
+                                    {item.expectedQuantity} pcs
                                 </Text>
                             </View>
                         ))}
