@@ -5,6 +5,7 @@ import {
     useCreateInboundTicket,
     useUpdateInboundRequestStatus,
 } from '@/hooks/inbound-orders.hooks';
+import { exportInboundRequest, exportInboundTicket } from '@/services/inbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Linking,
     ScrollView,
     StyleSheet,
     Text,
@@ -38,11 +40,15 @@ const TICKET_STATUS_CONFIG: Record<InboundTicketStatusKey, { label: string; colo
 };
 
 const getRequestStatusConfig = (status?: string) => {
-    return REQUEST_STATUS_CONFIG[status as InboundRequestStatusKey] || REQUEST_STATUS_CONFIG.Pending;
+    if (!status) return REQUEST_STATUS_CONFIG.Pending;
+    const normalizedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    return REQUEST_STATUS_CONFIG[normalizedStatus as InboundRequestStatusKey] || REQUEST_STATUS_CONFIG.Pending;
 };
 
 const getTicketStatusConfig = (status?: string) => {
-    return TICKET_STATUS_CONFIG[status as InboundTicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
+    if (!status) return TICKET_STATUS_CONFIG.Pending;
+    const normalizedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    return TICKET_STATUS_CONFIG[normalizedStatus as InboundTicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
 };
 
 export default function InboundOrderDetailScreen() {
@@ -170,6 +176,29 @@ export default function InboundOrderDetailScreen() {
         } as any);
     };
 
+    // Handle export
+    const handleExport = async (format: 'csv' | 'excel') => {
+        try {
+            let exportUrl = '';
+            if (isRequest) {
+                exportUrl = await exportInboundRequest(data.id, format);
+            } else {
+                exportUrl = await exportInboundTicket(data.id, format);
+            }
+
+            Alert.alert(
+                'Xuất file',
+                `Đang chuẩn bị xuất file ${format.toUpperCase()}. Bạn muốn tải về?`,
+                [
+                    { text: 'Hủy', style: 'cancel' },
+                    { text: 'Tải về', onPress: () => Linking.openURL(exportUrl) }
+                ]
+            );
+        } catch (error) {
+            Alert.alert('Lỗi', 'Không thể khởi tạo yêu cầu xuất file.');
+        }
+    };
+
     // Get items - support both request and ticket structure
     const items = (data as any).inboundOrderItems || [];
     const supplier = (data as any).supplier;
@@ -196,6 +225,27 @@ export default function InboundOrderDetailScreen() {
                     <Text style={styles.typeLabel}>
                         {isRequest ? 'Yêu cầu nhập kho' : 'Phiếu nhập kho'}
                     </Text>
+                </Card>
+
+                {/* Export Card */}
+                <Card style={styles.card}>
+                    <Text style={styles.cardTitle}>Xuất Dữ Liệu</Text>
+                    <View style={styles.exportRow}>
+                        <TouchableOpacity
+                            style={[styles.exportButton, { backgroundColor: '#EBF5FF' }]}
+                            onPress={() => handleExport('csv')}
+                        >
+                            <Feather name="file-text" size={16} color="#007AFF" />
+                            <Text style={[styles.exportButtonText, { color: '#007AFF' }]}>Xuất CSV</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.exportButton, { backgroundColor: '#F0FFF4' }]}
+                            onPress={() => handleExport('excel')}
+                        >
+                            <Feather name="grid" size={16} color="#38A169" />
+                            <Text style={[styles.exportButtonText, { color: '#38A169' }]}>Xuất Excel</Text>
+                        </TouchableOpacity>
+                    </View>
                 </Card>
 
                 {/* Supplier Info */}
@@ -384,6 +434,23 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: COLORS.text,
         marginBottom: 12,
+    },
+    exportRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    exportButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 8,
+        gap: 8,
+    },
+    exportButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     typeLabel: {
         fontSize: 12,

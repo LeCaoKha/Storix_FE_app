@@ -18,7 +18,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 // Status config cho Request (chờ duyệt)
@@ -257,6 +257,27 @@ export default function OutboundOrderDetailScreen() {
                     </Text>
                 </Card>
 
+                {/* Export Card */}
+                <Card style={styles.card}>
+                    <Text style={styles.cardTitle}>Xuất Dữ Liệu</Text>
+                    <View style={styles.exportRow}>
+                        <TouchableOpacity
+                            style={[styles.exportButton, { backgroundColor: '#EBF5FF' }]}
+                            onPress={() => handleExport('csv')}
+                        >
+                            <Feather name="file-text" size={16} color="#007AFF" />
+                            <Text style={[styles.exportButtonText, { color: '#007AFF' }]}>Xuất CSV</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.exportButton, { backgroundColor: '#F0FFF4' }]}
+                            onPress={() => handleExport('excel')}
+                        >
+                            <Feather name="grid" size={16} color="#38A169" />
+                            <Text style={[styles.exportButtonText, { color: '#38A169' }]}>Xuất Excel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Card>
+
                 {/* Destination Info */}
                 <Card style={styles.card}>
                     <Text style={styles.cardTitle}>Thông Tin Xuất Kho</Text>
@@ -460,6 +481,23 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: COLORS.text,
         marginBottom: 12,
+    },
+    exportRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    exportButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 8,
+        gap: 8,
+    },
+    exportButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     typeLabel: {
         fontSize: 12,

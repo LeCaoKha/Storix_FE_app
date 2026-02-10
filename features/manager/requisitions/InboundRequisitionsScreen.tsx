@@ -38,8 +38,12 @@ export default function InboundRequisitionsScreen() {
 
     // Filter INBOUND requisitions only
     const filteredRequisitions = useMemo(() => {
-        // Filter by type first
-        let results = requisitions.filter(req => req.type === 'inbound');
+        // Filter by type and hide processed ones
+        let results = requisitions.filter(req =>
+            req.type === 'inbound' &&
+            req.status !== 'ordered' &&
+            req.status !== 'completed'
+        );
 
         // Apply search
         if (searchQuery.trim()) {

@@ -1,16 +1,16 @@
 import type {
-    CreateOutboundRequestPayload,
-    InventoryAvailability,
-    OutboundOrder,
-    UpdateOutboundItemPayload,
+  CreateOutboundRequestPayload,
+  InventoryAvailability,
+  OutboundOrder,
+  UpdateOutboundItemPayload,
 } from '@/types/outbound-order';
 import { api } from './axios.instance';
 
 // Re-export types để tiện sử dụng
 export type {
-    ConfirmOutboundPayload, CreateOutboundRequestPayload, CreateOutboundTicketPayload, InventoryAvailability, OutboundOrder,
-    OutboundOrderItem,
-    OutboundRequest, UpdateOutboundItemPayload, UpdateOutboundRequestStatusPayload, UpdateOutboundStatusPayload
+  ConfirmOutboundPayload, CreateOutboundRequestPayload, CreateOutboundTicketPayload, InventoryAvailability, OutboundOrder,
+  OutboundOrderItem,
+  OutboundRequest, UpdateOutboundItemPayload, UpdateOutboundRequestStatusPayload, UpdateOutboundStatusPayload
 } from '@/types/outbound-order';
 
 // ============== API Functions ==============
@@ -44,7 +44,7 @@ export const getInventoryAvailability = async (
 export const updateOutboundRequestStatus = async (
   requestId: number,
   approverId: number,
-  status: 'Approved' | 'Rejected'
+  status: string
 ) => {
   const res = await api.put(`/api/InventoryOutbound/update-outbound-request/${requestId}/status`, {
     approverId,
@@ -138,4 +138,12 @@ export const getOutboundRequestById = async (companyId: number, requestId: numbe
 export const getOutboundTicketById = async (companyId: number, ticketId: number) => {
   const res = await api.get(`/api/InventoryOutbound/tickets/${companyId}/${ticketId}`);
   return res.data;
+};
+
+/**
+ * Lấy danh sách phiếu xuất kho được gán cho Staff
+ */
+export const getOutboundOrdersByStaff = async (companyId: number, staffId: number) => {
+  const res = await api.get(`/api/InventoryOutbound/get-outbound-orders-for-staff/${companyId}/${staffId}`);
+  return res.data as OutboundOrder[];
 };

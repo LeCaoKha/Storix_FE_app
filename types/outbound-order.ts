@@ -1,7 +1,7 @@
 // ============== Outbound Order Types (khớp với Backend) ==============
 
 export type OutboundOrderStatus = 'Pending' | 'Picking' | 'Packed' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled';
-export type OutboundRequestStatus = 'Pending' | 'Approved' | 'Rejected';
+export type OutboundRequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Completed';
 
 // Legacy status types for backward compatibility
 export type OutboundStatus = 'open' | 'picking' | 'packing' | 'ready' | 'shipped' | 'completed' | 'delivered' | 'cancelled' | 'on_hold';
@@ -74,7 +74,7 @@ export interface CreateOutboundRequestPayload {
 
 export interface UpdateOutboundRequestStatusPayload {
   approverId: number;
-  status: 'Approved' | 'Rejected';
+  status: string;
 }
 
 export interface UpdateOutboundItemPayload {

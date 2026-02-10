@@ -4,7 +4,7 @@ import { api } from './axios.instance';
 export const getRequisitions = async (companyId: number): Promise<GoodsRequisition[]> => {
     try {
         const res = await api.get(`/api/InventoryInbound/requests/${companyId}`);
-        
+
         if (res.data && Array.isArray(res.data)) {
             return res.data.map((item: any) => ({
                 id: item.id,
@@ -94,7 +94,7 @@ export const createRequisition = async (
 export const getRequisitionById = async (companyId: number, id: number): Promise<GoodsRequisition | null> => {
     try {
         const res = await api.get(`/api/InventoryInbound/requests/${companyId}/${id}`);
-        
+
         if (res.data) {
             const item = res.data;
             return {
@@ -136,7 +136,7 @@ export const getRequisitionById = async (companyId: number, id: number): Promise
 export const getOutboundRequisitions = async (companyId: number): Promise<GoodsRequisition[]> => {
     try {
         const res = await api.get(`/api/InventoryOutbound/requests/${companyId}`);
-        
+
         if (res.data && Array.isArray(res.data)) {
             return res.data.map((item: any) => ({
                 id: item.id,
@@ -219,7 +219,7 @@ export const createOutboundRequisition = async (
 export const getOutboundRequisitionById = async (companyId: number, id: number): Promise<GoodsRequisition | null> => {
     try {
         const res = await api.get(`/api/InventoryOutbound/requests/${companyId}/${id}`);
-        
+
         if (res.data) {
             const item = res.data;
             return {
@@ -254,5 +254,19 @@ export const getOutboundRequisitionById = async (companyId: number, id: number):
         console.error('Error fetching outbound requisition detail:', error);
         return null;
     }
+};
+
+export const updateInboundRequestStatus = async (id: number, approverId: number, status: string) => {
+    return await api.put(`/api/InventoryInbound/update-inbound-request/${id}/status`, {
+        ApproverId: approverId,
+        Status: status
+    });
+};
+
+export const updateOutboundRequestStatus = async (id: number, approverId: number, status: string) => {
+    return await api.put(`/api/InventoryOutbound/update-outbound-request/${id}/status`, {
+        ApproverId: approverId,
+        Status: status
+    });
 };
 

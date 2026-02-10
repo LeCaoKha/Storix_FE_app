@@ -17,7 +17,10 @@ const TICKET_STATUS_CONFIG: Record<TicketStatusKey, { label: string; color: stri
 };
 
 const getTicketStatusConfig = (status?: string) => {
-    return TICKET_STATUS_CONFIG[status as TicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
+    if (!status) return TICKET_STATUS_CONFIG.Pending;
+    // Handle case-insensitive status from backend
+    const normalizedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    return TICKET_STATUS_CONFIG[normalizedStatus as TicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
 };
 
 export default function InboundOrdersScreen() {

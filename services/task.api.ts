@@ -1,74 +1,66 @@
-import { InboundOrder } from '@/types/inbound-order';
 import { Task, TaskPriority, TaskStatus, TaskType } from '@/types/order';
-import { OutboundOrder } from '@/types/outbound-order';
-import { api } from './axios.instance';
+
+import { getInboundOrdersByStaff } from './inbound-order.api';
+import { getOutboundOrdersByStaff } from './outbound-order.api';
 
 /**
  * Lấy tất cả tasks của staff hiện tại
- * Tasks được lấy từ InboundOrders và OutboundOrders được gán cho staff
+ * Sử dụng endpoint mới từ backend để lấy trực tiếp các order được gán cho staff
  */
 export const getTasks = async (staffId: number, companyId: number): Promise<Task[]> => {
     try {
         const tasks: Task[] = [];
 
-        // Fetch inbound tickets
+        // Fetch inbound tasks assigned to this staff
         try {
-            const inboundRes = await api.get<InboundOrder[]>(`/api/InventoryInbound/tickets/${companyId}`);
-            const inboundTickets = inboundRes.data || [];
-            
-            // Filter by staffId and transform to Task
-            const inboundTasks = inboundTickets
-                .filter(ticket => ticket.staffId === staffId)
-                .map(ticket => ({
-                    id: `inbound-${ticket.id}`,
-                    title: `Nhập kho: ${ticket.referenceCode || `INB-${ticket.id}`}`,
-                    description: `Nhận hàng từ ${ticket.supplier?.name || 'nhà cung cấp'} với ${ticket.inboundOrderItems?.length || 0} mặt hàng`,
-                    type: TaskType.INBOUND,
-                    status: mapInboundStatus(ticket.status),
-                    priority: TaskPriority.MEDIUM, // Default priority
-                    assignedTo: String(staffId),
-                    relatedOrderId: String(ticket.id),
-                    location: ticket.warehouse?.name,
-                    createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
-                    updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
-                }));
-            
+            const inboundTickets = await getInboundOrdersByStaff(companyId, staffId);
+
+            const inboundTasks = inboundTickets.map(ticket => ({
+                id: `inbound-${ticket.id}`,
+                title: `Nhập kho: ${ticket.referenceCode || `INB-${ticket.id}`}`,
+                description: `Nhận hàng từ ${ticket.supplier?.name || 'nhà cung cấp'} với ${ticket.inboundOrderItems?.length || 0} mặt hàng`,
+                type: TaskType.INBOUND,
+                status: mapInboundStatus(ticket.status),
+                priority: TaskPriority.MEDIUM,
+                assignedTo: String(staffId),
+                relatedOrderId: String(ticket.id),
+                location: ticket.warehouse?.name,
+                createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+            }));
+
             tasks.push(...inboundTasks);
         } catch (err) {
-            console.warn('[getTasks] Failed to fetch inbound tickets:', err);
+            console.warn('[getTasks] Failed to fetch inbound tasks:', err);
         }
 
-        // Fetch outbound tickets
+        // Fetch outbound tasks assigned to this staff
         try {
-            const outboundRes = await api.get<OutboundOrder[]>(`/api/InventoryOutbound/tickets/${companyId}`);
-            const outboundTickets = outboundRes.data || [];
-            
-            // Filter by staffId and transform to Task
-            const outboundTasks = outboundTickets
-                .filter(ticket => ticket.staffId === staffId)
-                .map(ticket => ({
-                    id: `outbound-${ticket.id}`,
-                    title: `Xuất kho: OUT-${ticket.id}`,
-                    description: `Lấy hàng giao đến ${ticket.destination || 'khách hàng'} với ${ticket.outboundOrderItems?.length || 0} mặt hàng`,
-                    type: TaskType.OUTBOUND,
-                    status: mapOutboundStatus(ticket.status),
-                    priority: TaskPriority.MEDIUM, // Default priority
-                    assignedTo: String(staffId),
-                    relatedOrderId: String(ticket.id),
-                    location: ticket.warehouse?.name,
-                    createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
-                    updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
-                }));
-            
+            const outboundTickets = await getOutboundOrdersByStaff(companyId, staffId);
+
+            const outboundTasks = outboundTickets.map(ticket => ({
+                id: `outbound-${ticket.id}`,
+                title: `Xuất kho: OUT-${ticket.id}`,
+                description: `Lấy hàng giao đến ${ticket.destination || 'khách hàng'} với ${ticket.outboundOrderItems?.length || 0} mặt hàng`,
+                type: TaskType.OUTBOUND,
+                status: mapOutboundStatus(ticket.status),
+                priority: TaskPriority.MEDIUM,
+                assignedTo: String(staffId),
+                relatedOrderId: String(ticket.id),
+                location: ticket.warehouse?.name,
+                createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+            }));
+
             tasks.push(...outboundTasks);
         } catch (err) {
-            console.warn('[getTasks] Failed to fetch outbound tickets:', err);
+            console.warn('[getTasks] Failed to fetch outbound tasks:', err);
         }
 
         // Sort by created date (newest first)
         tasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-        console.log(`[getTasks] Found ${tasks.length} tasks for staff ${staffId}`);
+        console.log(`[getTasks] Found ${tasks.length} tasks for staff ${staffId} from backend`);
         return tasks;
     } catch (error) {
         console.error('[getTasks] Error:', error);

@@ -1,18 +1,19 @@
 import {
-    getOutboundRequestById as apiGetOutboundRequestById,
-    getOutboundTicketById as apiGetOutboundTicketById,
-    confirmOutboundOrder,
-    createOutboundRequest,
-    createOutboundTicket,
-    getAllOutboundRequests,
-    getAllOutboundTickets,
-    getInventoryAvailability,
-    updateOutboundRequestStatus,
-    updateOutboundTicketItems,
-    updateOutboundTicketStatus,
-    type OutboundOrder as ApiOutboundOrder,
-    type CreateOutboundRequestPayload,
-    type UpdateOutboundItemPayload,
+  getOutboundRequestById as apiGetOutboundRequestById,
+  getOutboundTicketById as apiGetOutboundTicketById,
+  confirmOutboundOrder,
+  createOutboundRequest,
+  createOutboundTicket,
+  getAllOutboundRequests,
+  getAllOutboundTickets,
+  getInventoryAvailability,
+  getOutboundOrdersByStaff,
+  updateOutboundRequestStatus,
+  updateOutboundTicketItems,
+  updateOutboundTicketStatus,
+  type OutboundOrder as ApiOutboundOrder,
+  type CreateOutboundRequestPayload,
+  type UpdateOutboundItemPayload
 } from '@/services/outbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { OutboundRequest } from '@/types/outbound-order';
@@ -103,7 +104,7 @@ const getOutboundTicketById = async (companyId: number, id: number): Promise<Api
  */
 export const useOutboundRequests = () => {
   const companyId = useAuthStore((state) => state.user?.companyId);
-  
+
   return useQuery({
     queryKey: [...outboundOrderKeys.requests(), companyId],
     queryFn: () => getOutboundRequests(companyId!),
@@ -130,7 +131,7 @@ export const useOutboundRequest = (id: number | string | undefined) => {
  */
 export const useOutboundTickets = () => {
   const companyId = useAuthStore((state) => state.user?.companyId);
-  
+
   return useQuery({
     queryKey: [...outboundOrderKeys.tickets(), companyId],
     queryFn: () => getOutboundTickets(companyId!),
@@ -158,7 +159,7 @@ export const useOutboundTicket = (id: number | string | undefined) => {
  */
 export const useOutboundOrders = () => {
   const companyId = useAuthStore((state) => state.user?.companyId);
-  
+
   return useQuery({
     queryKey: outboundOrderKeys.lists(),
     queryFn: () => getOutboundTickets(companyId!),
@@ -220,7 +221,7 @@ export const useUpdateOutboundRequestStatus = () => {
     }: {
       requestId: number;
       approverId: number;
-      status: 'Approved' | 'Rejected';
+      status: string;
     }) => updateOutboundRequestStatus(requestId, approverId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.all });
@@ -304,5 +305,16 @@ export const useConfirmOutboundOrder = () => {
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.all });
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.detail(variables.ticketId) });
     },
+  });
+};
+
+/**
+ * Hook lấy danh sách phiếu xuất kho của Staff cụ thể
+ */
+export const useOutboundTasksByStaff = (companyId: number, staffId: number) => {
+  return useQuery({
+    queryKey: [...outboundOrderKeys.tickets(), 'staff', staffId],
+    queryFn: () => getOutboundOrdersByStaff(companyId, staffId),
+    enabled: !!companyId && !!staffId,
   });
 };

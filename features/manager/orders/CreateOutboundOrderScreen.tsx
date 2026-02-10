@@ -1,89 +1,61 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useCreateOutboundOrder, useLinkOrderToRequisition, useRequisition } from '@/hooks';
-import { OutboundOrder } from '@/types/outbound-order';
+import { useCreateOutboundTicket, useOutboundRequest, useUpdateOutboundRequestStatus } from '@/hooks';
+import { useWarehouseStaff } from '@/hooks/user.hooks';
+import { useAuthStore } from '@/stores/auth.store';
+import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateOutboundOrderScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const requisitionId = params.requisitionId as string;
 
-    const { data: requisition, isLoading: isLoadingRequisition } = useRequisition(requisitionId);
-    const { mutateAsync: linkOrder } = useLinkOrderToRequisition();
-    const { mutateAsync: createOutboundOrder } = useCreateOutboundOrder();
+    const { data: requisition, isLoading: isLoadingRequisition } = useOutboundRequest(requisitionId);
+    const { mutateAsync: createOutboundTicket } = useCreateOutboundTicket();
+    const { mutateAsync: updateStatus } = useUpdateOutboundRequestStatus();
+    const { user } = useAuthStore();
 
-    const [customer, setCustomer] = useState('');
-    const [customerContact, setCustomerContact] = useState('');
-    const [destination, setDestination] = useState('');
-    const [salesOrderRef, setSalesOrderRef] = useState('');
-    const [expectedDate, setExpectedDate] = useState(new Date());
+    // Thêm staff list để chọn nhân viên xử lý
+    const { data: staffList = [], isLoading: isLoadingStaff } = useWarehouseStaff(
+        requisition?.warehouseId,
+        user?.companyId
+    );
+
+    const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
+    const [showStaffPicker, setShowStaffPicker] = useState(false);
     const [notes, setNotes] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
     useEffect(() => {
         if (requisition) {
-            // In a real app, customer info might come from the requisition or a separate service
-            // setCustomer(requisition.customer || ''); 
+            setNotes(requisition.destination || '');
         }
     }, [requisition]);
 
     const handleCreate = async () => {
-        if (!customer.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập tên khách hàng');
-            return;
-        }
-        if (!destination.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ giao hàng');
+        if (!selectedStaffId) {
+            Alert.alert('Lỗi', 'Vui lòng chọn nhân viên xử lý');
             return;
         }
 
         setIsCreating(true);
         try {
-            const newOrder: Omit<OutboundOrder, 'id' | 'outboundNumber' | 'createdAt'> = {
-                requisitionId: requisition?.id ? String(requisition.id) : undefined,
-                requisitionNumber: requisition?.requisitionNumber,
-                customer: customer.trim(),
-                customerContact: customerContact.trim() || undefined,
-                destination: destination.trim(),
-                salesOrderRef: salesOrderRef.trim() || undefined,
-                warehouse: requisition?.warehouse || 'Warehouse Central',
-                items: requisition?.items.map(item => ({
-                    id: `out-item-${Date.now()}-${item.id}`,
-                    sku: item.sku,
-                    productName: item.productName,
-                    qtyToPick: item.quantity,
-                    qtyPicked: 0,
-                    unit: item.unit,
-                    pickLocations: [
-                        {
-                            locationId: `loc-${item.sku}`,
-                            locationCode: 'A-01-01', // Default location
-                            quantity: item.quantity,
-                            sequence: 1,
-                        },
-                    ],
-                    batchNumber: item.batchNumber,
-                    lotNumber: item.lotNumber,
-                })) || [],
-                optimizedRoute: ['A-01-01'], // Simplified route
-                status: 'open',
-                expectedShipDate: expectedDate,
-                createdBy: 'mgr-001',
-                createdByName: 'Manager Name',
-                notes: notes.trim() || undefined,
-            };
+            const created = await createOutboundTicket({
+                requestId: parseInt(requisitionId),
+                createdBy: user?.id || 0,
+                staffId: selectedStaffId,
+                note: notes.trim() || undefined
+            });
 
-            const created = await createOutboundOrder(newOrder);
-
-            // Link order to requisition
+            // Cập nhật trạng thái phiếu đề nghị thành 'completed'
             if (requisition) {
-                await linkOrder({
-                    requisitionId: requisition.id,
-                    orderId: created.id,
-                    orderNumber: created.outboundNumber
+                await updateStatus({
+                    requestId: requisition.id,
+                    approverId: user?.id || 0,
+                    status: 'completed'
                 });
             }
 
@@ -100,6 +72,7 @@ export default function CreateOutboundOrderScreen() {
                 },
             ]);
         } catch (error) {
+            console.error('Create ticket error:', error);
             Alert.alert('Lỗi', 'Không thể tạo đơn xuất kho');
         } finally {
             setIsCreating(false);
@@ -135,57 +108,40 @@ export default function CreateOutboundOrderScreen() {
                 {requisition && (
                     <Card style={styles.card}>
                         <Text style={styles.sectionTitle}>Từ Đề Xuất</Text>
-                        <Text style={styles.requisitionNumber}>{requisition.requisitionNumber}</Text>
-                        <Text style={styles.requisitionPurpose}>{requisition.purpose}</Text>
+                        <Text style={styles.requisitionNumber}>#{requisition.id}</Text>
+                        <Text style={styles.requisitionPurpose}>Trạng thái: {requisition.status}</Text>
                     </Card>
                 )}
 
                 <Card style={styles.card}>
-                    <Text style={styles.sectionTitle}>Thông Tin Khách Hàng</Text>
+                    <Text style={styles.sectionTitle}>Thông Tin Xuất Kho</Text>
 
-                    <Text style={styles.label}>Khách hàng *</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={customer}
-                        onChangeText={setCustomer}
-                        placeholder="Nhập tên khách hàng"
-                        placeholderTextColor={COLORS.textMuted}
-                    />
+                    <Text style={styles.label}>Điểm đến</Text>
+                    <View style={[styles.input, styles.readOnlyField]}>
+                        <Text style={styles.readOnlyText}>
+                            {requisition?.destination || 'N/A'}
+                        </Text>
+                        <Feather name="lock" size={16} color={COLORS.textMuted} />
+                    </View>
 
-                    <Text style={styles.label}>Số điện thoại</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={customerContact}
-                        onChangeText={setCustomerContact}
-                        placeholder="Nhập số điện thoại"
-                        keyboardType="phone-pad"
-                        placeholderTextColor={COLORS.textMuted}
-                    />
+                    <Text style={styles.label}>Nhân viên xử lý *</Text>
+                    <TouchableOpacity
+                        style={[styles.input, styles.selectField]}
+                        onPress={() => setShowStaffPicker(true)}
+                        disabled={isLoadingStaff}
+                    >
+                        <Text style={[styles.selectFieldText, !selectedStaffId && styles.placeholder]}>
+                            {isLoadingStaff
+                                ? 'Đang tải...'
+                                : selectedStaffId
+                                    ? staffList.find(s => s.id === selectedStaffId)?.fullName || 'Chọn nhân viên'
+                                    : 'Chọn nhân viên'
+                            }
+                        </Text>
+                        <Feather name="chevron-down" size={20} color={COLORS.textMuted} />
+                    </TouchableOpacity>
 
-                    <Text style={styles.label}>Địa chỉ giao hàng *</Text>
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
-                        value={destination}
-                        onChangeText={setDestination}
-                        placeholder="Nhập địa chỉ giao hàng"
-                        multiline
-                        numberOfLines={3}
-                        textAlignVertical="top"
-                        placeholderTextColor={COLORS.textMuted}
-                    />
-
-                    <Text style={styles.label}>Mã SO</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={salesOrderRef}
-                        onChangeText={setSalesOrderRef}
-                        placeholder="Nhập mã Sales Order"
-                        placeholderTextColor={COLORS.textMuted}
-                    />
-                </Card>
-
-                <Card style={styles.card}>
-                    <Text style={styles.sectionTitle}>Ghi Chú</Text>
+                    <Text style={styles.label}>Ghi chú</Text>
                     <TextInput
                         style={[styles.input, styles.textArea]}
                         value={notes}
@@ -198,22 +154,83 @@ export default function CreateOutboundOrderScreen() {
                     />
                 </Card>
 
-                {requisition && requisition.items.length > 0 && (
+                {requisition && requisition.outboundOrderItems && requisition.outboundOrderItems.length > 0 && (
                     <Card style={styles.card}>
                         <Text style={styles.sectionTitle}>
-                            Sản Phẩm ({requisition.items.length})
+                            Sản Phẩm ({requisition.outboundOrderItems.length})
                         </Text>
-                        {requisition.items.map(item => (
-                            <View key={item.id} style={styles.itemRow}>
-                                <Text style={styles.itemName}>{item.productName}</Text>
-                                <Text style={styles.itemQty}>
-                                    {item.quantity} {item.unit}
-                                </Text>
+                        {requisition.outboundOrderItems.map((item, index) => (
+                            <View key={item.id || index}>
+                                {index > 0 && <View style={styles.itemDivider} />}
+                                <View style={styles.itemRow}>
+                                    <View style={styles.itemInfo}>
+                                        <Text style={styles.itemName}>
+                                            {item.product?.name || `Product #${item.productId}`}
+                                        </Text>
+                                        {item.product?.sku && (
+                                            <Text style={styles.itemSku}>SKU: {item.product.sku}</Text>
+                                        )}
+                                    </View>
+                                    <Text style={styles.itemQty}>
+                                        {item.quantity} pcs
+                                    </Text>
+                                </View>
                             </View>
                         ))}
                     </Card>
                 )}
             </ScrollView>
+
+            <Modal
+                visible={showStaffPicker}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setShowStaffPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Chọn Nhân Viên</Text>
+                            <TouchableOpacity onPress={() => setShowStaffPicker(false)}>
+                                <Feather name="x" size={24} color={COLORS.text} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.modalContent}>
+                            {staffList.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <Text style={styles.emptyText}>Không có nhân viên nào</Text>
+                                </View>
+                            ) : (
+                                staffList.map(staff => (
+                                    <TouchableOpacity
+                                        key={staff.id}
+                                        style={[
+                                            styles.staffItem,
+                                            selectedStaffId === staff.id && styles.staffItemSelected
+                                        ]}
+                                        onPress={() => {
+                                            setSelectedStaffId(staff.id);
+                                            setShowStaffPicker(false);
+                                        }}
+                                    >
+                                        <View style={styles.staffInfo}>
+                                            <Text style={styles.staffName}>
+                                                {staff.fullName}
+                                            </Text>
+                                            <Text style={styles.staffEmail}>
+                                                {staff.email}
+                                            </Text>
+                                        </View>
+                                        {selectedStaffId === staff.id && (
+                                            <Feather name="check" size={20} color={COLORS.primary} />
+                                        )}
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
             <View style={styles.footer}>
                 <TouchableOpacity
@@ -233,26 +250,7 @@ export default function CreateOutboundOrderScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: COLORS.card,
-        paddingTop: 60,
-        paddingHorizontal: 20,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    backButton: {
-        padding: 4,
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: COLORS.text,
+        backgroundColor: COLORS.background || '#f5f5f5',
     },
     content: {
         flex: 1,
@@ -292,7 +290,31 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         fontSize: 14,
         color: COLORS.text,
-        backgroundColor: COLORS.card,
+        backgroundColor: COLORS.card || '#fff',
+    },
+    readOnlyField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#f5f5f5',
+    },
+    readOnlyText: {
+        fontSize: 14,
+        color: COLORS.text,
+        flex: 1,
+    },
+    selectField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    selectFieldText: {
+        fontSize: 14,
+        color: COLORS.text,
+        flex: 1,
+    },
+    placeholder: {
+        color: COLORS.textMuted,
     },
     textArea: {
         minHeight: 80,
@@ -300,23 +322,34 @@ const styles = StyleSheet.create({
     itemRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
         paddingVertical: 8,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-        marginTop: 8,
+    },
+    itemDivider: {
+        height: 1,
+        backgroundColor: COLORS.border,
+        marginVertical: 8,
+    },
+    itemInfo: {
+        flex: 1,
     },
     itemName: {
-        flex: 1,
-        fontSize: 13,
-        color: COLORS.text,
-    },
-    itemQty: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
         color: COLORS.text,
     },
+    itemSku: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        marginTop: 2,
+    },
+    itemQty: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.primary,
+    },
     footer: {
-        backgroundColor: COLORS.card,
+        backgroundColor: COLORS.card || '#fff',
         padding: 20,
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
@@ -333,6 +366,83 @@ const styles = StyleSheet.create({
     createButtonText: {
         fontSize: 16,
         fontWeight: '700',
-        color: COLORS.textLight,
+        color: '#fff',
+    },
+    submitButton: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    submitButtonDisabled: {
+        opacity: 0.6,
+    },
+    submitButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '80%',
+        paddingBottom: 34,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.text,
+    },
+    modalContent: {
+        padding: 20,
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: COLORS.textMuted,
+    },
+    staffItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: '#f5f5f5',
+        marginBottom: 12,
+    },
+    staffItemSelected: {
+        backgroundColor: COLORS.primary + '15',
+        borderWidth: 2,
+        borderColor: COLORS.primary,
+    },
+    staffInfo: {
+        flex: 1,
+    },
+    staffName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    staffEmail: {
+        fontSize: 13,
+        color: COLORS.textMuted,
     },
 });

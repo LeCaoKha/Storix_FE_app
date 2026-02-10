@@ -97,3 +97,29 @@ export const getInboundTicketById = async (companyId: number, ticketId: number) 
   const res = await api.get(`/api/InventoryInbound/tickets/${companyId}/${ticketId}`);
   return res.data;
 };
+
+/**
+ * Lấy danh sách phiếu nhập kho được gán cho Staff
+ */
+export const getInboundOrdersByStaff = async (companyId: number, staffId: number) => {
+  const res = await api.get(`/api/InventoryInbound/get-inbound-orders-for-staff/${companyId}/${staffId}`);
+  return res.data as InboundOrder[];
+};
+
+/**
+ * Xuất file cho Inbound Request
+ */
+export const exportInboundRequest = async (requestId: number, format: 'csv' | 'excel') => {
+  const endpoint = `/api/InventoryInbound/export/inbound-request/${requestId}/${format}`;
+  // Lưu ý: Đối với việc tải file trong React Native, ta có thể cần xử lý khác tùy thuộc vào thư viện file system
+  // Ở đây ta trả về URL hoặc xử lý Blob tùy theo nhu cầu FE
+  return `${api.defaults.baseURL}${endpoint}`;
+};
+
+/**
+ * Xuất file cho Inbound Ticket
+ */
+export const exportInboundTicket = async (orderId: number, format: 'csv' | 'excel') => {
+  const endpoint = `/api/InventoryInbound/export/inbound-ticket/${orderId}/${format}`;
+  return `${api.defaults.baseURL}${endpoint}`;
+};

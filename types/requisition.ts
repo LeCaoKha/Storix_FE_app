@@ -1,5 +1,5 @@
 export type RequisitionType = 'inbound' | 'outbound';
-export type RequisitionStatus = 'pending' | 'approved' | 'rejected' | 'completed';
+export type RequisitionStatus = 'pending' | 'approved' | 'rejected' | 'completed' | 'ordered';
 
 export interface GoodsRequisition {
   id: number;

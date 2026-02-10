@@ -1,6 +1,6 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useCreateInboundTicket, useInboundRequest } from '@/hooks';
+import { useCreateInboundTicket, useInboundRequest, useUpdateInboundRequestStatus } from '@/hooks';
 import { useProducts } from '@/hooks/product.hooks';
 import { useWarehouseStaff } from '@/hooks/user.hooks';
 import { useAuthStore } from '@/stores/auth.store';
@@ -25,6 +25,7 @@ export default function CreateInboundOrderScreen() {
         user?.companyId
     );
     const { mutateAsync: createInboundTicket } = useCreateInboundTicket();
+    const { mutateAsync: updateStatus } = useUpdateInboundRequestStatus();
 
     // Enrich inbound request items with full product data (including productPrices)
     const enrichedRequest = inboundRequest && products.length > 0 ? {
@@ -74,6 +75,14 @@ export default function CreateInboundOrderScreen() {
                 requestId: parseInt(requestId),
                 createdBy: user?.id || 0,
                 staffId: selectedStaffId,
+            });
+
+            // Cập nhật trạng thái yêu cầu nhập kho thành "Approved" hoặc trạng thái tương ứng
+            // Lưu ý: Tên property phải là requestId để khớp với hook mới
+            await updateStatus({
+                requestId: parseInt(requestId),
+                approverId: user?.id || 0,
+                status: 'Approved' // Sử dụng 'Approved' thay vì 'completed' để đồng nhất
             });
 
             Alert.alert('Thành công', 'Đã tạo đơn nhập kho', [

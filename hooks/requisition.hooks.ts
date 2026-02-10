@@ -25,11 +25,11 @@ export const useRequisition = (id: number | string | undefined) => {
         queryKey: ['requisitions', user?.companyId, numericId],
         queryFn: async () => {
             if (!numericId || !user?.companyId) return null;
-            
+
             // Try to fetch from inbound first
             const inbound = await getRequisitionById(user.companyId, numericId).catch(() => null);
             if (inbound) return inbound;
-            
+
             // If not found in inbound, try outbound
             const outbound = await getOutboundRequisitionById(user.companyId, numericId).catch(() => null);
             return outbound;
@@ -47,7 +47,7 @@ export const useCreateRequisition = () => {
             warehouseId: number;
             supplierId: number;
             note?: string;
-            expectedArrivalDate?: string;
+            expectedDate?: string;
             orderDiscount?: number;
             items: {
                 productId: number;
@@ -55,7 +55,16 @@ export const useCreateRequisition = () => {
                 price?: number;
                 lineDiscount?: number;
             }[];
-        }) => createRequisition(data, user?.id || 0),
+        }) => createRequisition({
+            ...data,
+            note: data.note || '',
+            expectedDate: data.expectedDate || new Date().toISOString(),
+            items: data.items.map(item => ({
+                ...item,
+                price: item.price ?? 0,
+                lineDiscount: item.lineDiscount ?? 0
+            }))
+        }, user?.id || 0),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['requisitions'] });
         },
@@ -117,5 +126,9 @@ export const useLinkOrderToRequisition = () => {
         },
     });
 };
+
+// Note: useUpdateInboundRequestStatus is now moved to inbound-orders.hooks.ts 
+// to avoid duplication and ensure consistent invalidation.
+export { useUpdateInboundRequestStatus, useUpdateOutboundRequestStatus } from './inbound-orders.hooks';
 
 
