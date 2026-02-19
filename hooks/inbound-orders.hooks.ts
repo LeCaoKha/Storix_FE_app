@@ -124,24 +124,9 @@ export const useInboundRequest = (id: number | string | undefined) => {
   const companyId = user?.companyId ?? 0;
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
-  console.log('[useInboundRequest] Hook params:', {
-    rawId: id,
-    numericId,
-    companyId,
-    isEnabled: !!numericId && !isNaN(numericId as number) && !!companyId,
-    checks: {
-      hasNumericId: !!numericId,
-      isNotNaN: !isNaN(numericId as number),
-      hasCompanyId: !!companyId
-    }
-  });
-
   return useQuery({
     queryKey: inboundOrderKeys.requestDetail(numericId ?? 0),
-    queryFn: () => {
-      console.log('[useInboundRequest] queryFn executing...');
-      return getInboundRequestById(companyId, numericId!);
-    },
+    queryFn: () => getInboundRequestById(companyId, numericId!),
     enabled: !!numericId && !isNaN(numericId as number) && !!companyId,
   });
 };

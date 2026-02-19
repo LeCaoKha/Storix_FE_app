@@ -1,37 +1,29 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useLogout } from '@/hooks/auth.hooks';
+import { useTasks } from '@/hooks/task.hooks';
+import { useProfile } from '@/hooks/user.hooks';
 import { useAuthStore } from '@/stores/auth.store';
+import { TaskStatus } from '@/types/order';
 
 export default function ProfileScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
     const { mutateAsync: logout } = useLogout();
-
-    // Use user from AuthContext or fallback to mock data
-    const userData = {
-        name: user?.roleId === 3 ? 'Manager' : user?.roleId === 2 ? 'Admin' : 'Staff',
-        email: user?.email || 'No email',
-        roleId: user?.roleId,
-        id: user?.id,
-        companyId: user?.companyId,
-    };
-
+    const { data: profile, isLoading: isFetchingProfile } = useProfile(user?.id);
+    const { data: tasks = [], isLoading: isFetchingTasks } = useTasks();
 
     const handleLogout = () => {
         Alert.alert(
             'Đăng xuất',
             'Bạn có chắc chắn muốn đăng xuất?',
             [
-                {
-                    text: 'Hủy',
-                    style: 'cancel',
-                },
+                { text: 'Hủy', style: 'cancel' },
                 {
                     text: 'Đăng xuất',
                     style: 'destructive',
@@ -49,39 +41,26 @@ export default function ProfileScreen() {
             icon: 'user',
             title: 'Thông tin cá nhân',
             subtitle: 'Cập nhật hồ sơ',
-            onPress: () => { },
+            onPress: () => router.push('/profile/edit' as any),
         },
         {
             icon: 'lock',
             title: 'Đổi mật khẩu',
             subtitle: 'Cập nhật mật khẩu',
-            onPress: () => { },
+            onPress: () => router.push('/profile/change-password' as any),
         },
-        {
-            icon: 'bell',
-            title: 'Thông báo',
-            subtitle: 'Cài đặt thông báo',
-            onPress: () => { },
-        },
-        {
-            icon: 'globe',
-            title: 'Ngôn ngữ',
-            subtitle: 'Tiếng Việt',
-            onPress: () => { },
-        },
-        {
-            icon: 'help-circle',
-            title: 'Trợ giúp & Hỗ trợ',
-            subtitle: 'Câu hỏi thường gặp, Liên hệ',
-            onPress: () => { },
-        },
-        {
-            icon: 'info',
-            title: 'Giới thiệu',
-            subtitle: 'Phiên bản 1.0.0',
-            onPress: () => { },
-        },
+        // Removed non-functional items: Thông báo, Ngôn ngữ, Trợ giúp, Giới thiệu
     ];
+
+    if (isFetchingProfile || isFetchingTasks) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+        );
+    }
+
+    const completedTasksCount = tasks.filter(t => t.status === TaskStatus.COMPLETED).length;
 
     return (
         <View style={styles.container}>
@@ -95,62 +74,85 @@ export default function ProfileScreen() {
                     <Card style={styles.profileCard}>
                         <View style={styles.avatarContainer}>
                             <View style={styles.avatar}>
-                                <Feather name="user" size={40} color={COLORS.primary} />
+                                {profile?.avatar ? (
+                                    <Image source={{ uri: profile.avatar }} style={styles.avatarImage} />
+                                ) : (
+                                    <View style={styles.avatarPlaceholder}>
+                                        <Feather name="user" size={32} color={COLORS.primary} />
+                                    </View>
+                                )}
                             </View>
-                            <TouchableOpacity style={styles.editAvatarButton}>
-                                <Feather name="camera" size={16} color="#fff" />
+                            <TouchableOpacity
+                                style={styles.editAvatarButton}
+                                onPress={() => router.push('/profile/edit' as any)}
+                            >
+                                <Feather name="camera" size={14} color="#fff" />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.userName}>{userData.name}</Text>
-                        <Text style={styles.userRole}>{userData.roleId === 2 ? 'Quản lý kho' : 'Nhân viên kho'}</Text>
+                        <Text style={styles.userName}>{profile?.fullName || (user?.roleId === 4 ? 'Nhân viên' : 'Quản lý')}</Text>
+                        <Text style={styles.userRole}>
+                            {profile?.roleName || (user?.roleId === 4 ? 'Nhân viên kho' : 'Quản lý kho')}
+                        </Text>
 
                         <View style={styles.userStats}>
                             <View style={styles.statItem}>
-                                <Feather name="package" size={20} color={COLORS.primary} />
-                                <Text style={styles.statValue}>127</Text>
+                                <Text style={styles.statValue}>{tasks.length}</Text>
+                                <Text style={styles.statLabel}>Nhiệm vụ</Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>{completedTasksCount}</Text>
                                 <Text style={styles.statLabel}>Hoàn thành</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.statItem}>
-                                <Feather name="clock" size={20} color={COLORS.primary} />
-                                <Text style={styles.statValue}>95%</Text>
-                                <Text style={styles.statLabel}>Hiệu suất</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.statItem}>
-                                <Feather name="award" size={20} color={COLORS.primary} />
-                                <Text style={styles.statValue}>12</Text>
-                                <Text style={styles.statLabel}>Tháng</Text>
                             </View>
                         </View>
                     </Card>
 
                     {/* Employee Information */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Thông tin nhân viên</Text>
-                        <Card>
+                        <Text style={styles.sectionTitle}>Thông tin tài khoản</Text>
+                        <Card style={styles.infoCard}>
                             <View style={styles.infoRow}>
-                                <Feather name="credit-card" size={18} color={COLORS.textMuted} />
+                                <View style={styles.infoIconBox}>
+                                    <Feather name="credit-card" size={18} color={COLORS.textMuted} />
+                                </View>
                                 <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Mã nhân viên</Text>
-                                    <Text style={styles.infoValue}>{userData.id}</Text>
+                                    <Text style={styles.infoLabel}>ID người dùng</Text>
+                                    <Text style={styles.infoValue}>{user?.id}</Text>
                                 </View>
                             </View>
-                            <View style={styles.divider} />
+                            <View style={styles.infoDivider} />
                             <View style={styles.infoRow}>
-                                <Feather name="mail" size={18} color={COLORS.textMuted} />
+                                <View style={styles.infoIconBox}>
+                                    <Feather name="mail" size={18} color={COLORS.textMuted} />
+                                </View>
                                 <View style={styles.infoContent}>
                                     <Text style={styles.infoLabel}>Email</Text>
-                                    <Text style={styles.infoValue}>{userData.email}</Text>
+                                    <Text style={styles.infoValue}>{profile?.email || user?.email}</Text>
                                 </View>
                             </View>
-                            <View style={styles.divider} />
+                            {profile?.phone && (
+                                <>
+                                    <View style={styles.infoDivider} />
+                                    <View style={styles.infoRow}>
+                                        <View style={styles.infoIconBox}>
+                                            <Feather name="phone" size={18} color={COLORS.textMuted} />
+                                        </View>
+                                        <View style={styles.infoContent}>
+                                            <Text style={styles.infoLabel}>Số điện thoại</Text>
+                                            <Text style={styles.infoValue}>{profile.phone}</Text>
+                                        </View>
+                                    </View>
+                                </>
+                            )}
+                            <View style={styles.infoDivider} />
                             <View style={styles.infoRow}>
-                                <Feather name="home" size={18} color={COLORS.textMuted} />
+                                <View style={styles.infoIconBox}>
+                                    <Feather name="home" size={18} color={COLORS.textMuted} />
+                                </View>
                                 <View style={styles.infoContent}>
                                     <Text style={styles.infoLabel}>Mã công ty</Text>
-                                    <Text style={styles.infoValue}>{userData.companyId}</Text>
+                                    <Text style={styles.infoValue}>{user?.companyId || '-'}</Text>
                                 </View>
                             </View>
                         </Card>
@@ -161,7 +163,7 @@ export default function ProfileScreen() {
                         <Text style={styles.sectionTitle}>Cài đặt</Text>
                         <Card style={styles.menuCard}>
                             {menuItems.map((item, index) => (
-                                <React.Fragment key={index}>
+                                <View key={index}>
                                     <TouchableOpacity
                                         style={styles.menuItem}
                                         onPress={item.onPress}
@@ -175,8 +177,8 @@ export default function ProfileScreen() {
                                         </View>
                                         <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
                                     </TouchableOpacity>
-                                    {index < menuItems.length - 1 && <View style={styles.divider} />}
-                                </React.Fragment>
+                                    {index < menuItems.length - 1 && <View style={styles.menuDivider} />}
+                                </View>
                             ))}
                         </Card>
                     </View>
@@ -186,7 +188,7 @@ export default function ProfileScreen() {
                         style={styles.logoutButton}
                         onPress={handleLogout}
                     >
-                        <Feather name="log-out" size={20} color="#EF4444" />
+                        <Feather name="log-out" size={18} color="#EF4444" />
                         <Text style={styles.logoutText}>Đăng xuất</Text>
                     </TouchableOpacity>
                 </View>
@@ -198,14 +200,20 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#f8fafc', // Slightly cleaner background
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
     },
     safeHeader: {
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
         color: COLORS.text,
     },
@@ -213,110 +221,133 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     content: {
-        padding: 20,
+        padding: 16, // Consistent 8pt
     },
     profileCard: {
         alignItems: 'center',
-        paddingVertical: 30,
-        marginBottom: 20,
+        paddingVertical: 16, // Reduced height
+        marginBottom: 16,
     },
     avatarContainer: {
         position: 'relative',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 86, // Shrink avatar ~15%
+        height: 86,
+        borderRadius: 43,
         backgroundColor: '#CCFBF1',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 3,
+        borderWidth: 2,
         borderColor: COLORS.primary,
+        overflow: 'hidden',
+    },
+    avatarPlaceholder: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
     },
     editAvatarButton: {
         position: 'absolute',
         bottom: 0,
         right: 0,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 3,
+        borderWidth: 2,
         borderColor: '#fff',
     },
     userName: {
-        fontSize: 24,
+        fontSize: 20, // Slightly smaller
         fontWeight: 'bold',
         color: COLORS.text,
         marginBottom: 4,
     },
     userRole: {
-        fontSize: 14,
+        fontSize: 13,
         color: COLORS.textMuted,
-        marginBottom: 20,
+        marginBottom: 16,
     },
     userStats: {
         flexDirection: 'row',
         alignItems: 'center',
         width: '100%',
-        paddingTop: 20,
+        paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: COLORS.border,
+        borderTopColor: '#f1f5f9',
     },
     statItem: {
         flex: 1,
         alignItems: 'center',
-        gap: 6,
     },
     statDivider: {
         width: 1,
-        height: 40,
-        backgroundColor: COLORS.border,
+        height: 32,
+        backgroundColor: '#f1f5f9',
     },
     statValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 22, // Increased font size
+        fontWeight: '700',
         color: COLORS.text,
     },
     statLabel: {
-        fontSize: 11,
+        fontSize: 12,
         color: COLORS.textMuted,
-        textAlign: 'center',
+        fontWeight: '500', // Better hierarchy
+        opacity: 0.8,
     },
     section: {
-        marginBottom: 20,
+        marginTop: 24, // 8pt Rhythm
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginBottom: 12,
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.textMuted,
+        textTransform: 'uppercase', // Section labels often look better in caps
+        letterSpacing: 0.5,
+        marginBottom: 12, // 8pt
+        paddingLeft: 4,
+    },
+    infoCard: {
+        padding: 0, // Control padding per row
     },
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        padding: 14,
         gap: 12,
+    },
+    infoIconBox: {
+        width: 32,
+        alignItems: 'center',
     },
     infoContent: {
         flex: 1,
     },
     infoLabel: {
-        fontSize: 12,
+        fontSize: 11, // 2-3px difference
         color: COLORS.textMuted,
-        marginBottom: 4,
+        fontWeight: '500',
+        marginBottom: 2,
     },
     infoValue: {
         fontSize: 14,
         color: COLORS.text,
-        fontWeight: '500',
+        fontWeight: '600',
     },
-    divider: {
+    infoDivider: {
         height: 1,
-        backgroundColor: COLORS.border,
-        marginVertical: 12,
+        backgroundColor: '#f1f5f9',
+        marginLeft: 56, // Inset divider (matches text start)
     },
     menuCard: {
         padding: 0,
@@ -324,14 +355,14 @@ const styles = StyleSheet.create({
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        padding: 12,
         gap: 12,
     },
     menuIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#CCFBF1',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#f1f5f9',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -339,14 +370,19 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     menuTitle: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '600',
         color: COLORS.text,
-        marginBottom: 2,
     },
     menuSubtitle: {
-        fontSize: 12,
+        fontSize: 11,
         color: COLORS.textMuted,
+        marginTop: 1,
+    },
+    menuDivider: {
+        height: 1,
+        backgroundColor: '#f1f5f9',
+        marginLeft: 60, // Inset to match text start
     },
     logoutButton: {
         flexDirection: 'row',
@@ -354,14 +390,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
         backgroundColor: '#fff',
-        padding: 16,
+        paddingVertical: 14,
         borderRadius: 12,
+        marginTop: 32, // Increase spacing
         borderWidth: 1,
-        borderColor: '#FEE2E2',
+        borderColor: '#fee2e2',
+        shadowColor: '#EF4444',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     logoutText: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
         color: '#EF4444',
     },
 });

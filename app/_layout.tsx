@@ -18,15 +18,11 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-
-          {/* Staff tabs */}
-          <Stack.Screen name="(staff-tabs)" options={{ headerShown: false }} />
-
-          {/* Manager tabs */}
-          <Stack.Screen name="(manager-tabs)" options={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="(staff-tabs)" />
+          <Stack.Screen name="(manager-tabs)" />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

@@ -1,26 +1,43 @@
-import { getUserById, getUsersByWarehouse } from '@/services/user.api';
-import { useQuery } from '@tanstack/react-query';
+import { getUserProfile, getUsersByWarehouse, updateProfile } from '@/services/user.api';
+import { useAuthStore } from '@/stores/auth.store';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-export const useUserById = (userId: number | null | undefined, enabled: boolean = true) => {
+export const userKeys = {
+    all: ['users'] as const,
+    profiles: () => [...userKeys.all, 'profile'] as const,
+    profile: (id: number) => [...userKeys.profiles(), id] as const,
+    byWarehouse: (warehouseId: number) => [...userKeys.all, 'warehouse', warehouseId] as const,
+};
+
+export const useProfile = (userId?: number) => {
+    const { user } = useAuthStore();
+    const id = userId || user?.id;
+
     return useQuery({
-        queryKey: ['user', userId],
-        queryFn: () => getUserById(userId!),
-        enabled: enabled && !!userId,
+        queryKey: userKeys.profile(id || 0),
+        queryFn: () => getUserProfile(id!),
+        enabled: !!id,
     });
 };
 
-export const useWarehouseStaff = (warehouseId: number | null | undefined, companyId?: number) => {
+export const useWarehouseStaff = (warehouseId?: number, companyId?: number) => {
     return useQuery({
-        queryKey: ['warehouse-staff', warehouseId, companyId],
-        queryFn: async () => {
-            if (!warehouseId) return [];
-            const users = await getUsersByWarehouse(warehouseId);
-            // Filter only Staff (roleId = 4) from the same company
-            return users.filter(u =>
-                u.roleId === 4 &&
-                (!companyId || u.companyId === companyId)
-            );
-        },
+        queryKey: userKeys.byWarehouse(warehouseId || 0),
+        queryFn: () => getUsersByWarehouse(warehouseId!),
         enabled: !!warehouseId,
+    });
+};
+
+export const useUpdateProfile = () => {
+    const queryClient = useQueryClient();
+    const { user } = useAuthStore();
+
+    return useMutation({
+        mutationFn: ({ userId, formData }: { userId: number; formData: FormData }) =>
+            updateProfile(userId, formData),
+        onSuccess: (updatedUser) => {
+            queryClient.invalidateQueries({ queryKey: userKeys.profile(updatedUser.id) });
+            // Optionally update auth store if you want to keep it in sync
+        },
     });
 };
