@@ -82,7 +82,7 @@ export default function InboundRequisitionsScreen() {
     };
 
     const handleRequisitionPress = (id: number | string) => {
-        router.push(`/(manager-tabs)/requisitions/${id}` as any);
+        router.push(`/(manager-tabs)/requisitions/${id}?type=inbound` as any);
     };
 
     return (

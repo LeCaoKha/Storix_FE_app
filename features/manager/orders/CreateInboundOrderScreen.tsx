@@ -1,10 +1,11 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useCreateInboundTicket, useInboundRequest, useUpdateInboundRequestStatus } from '@/hooks';
+import { useCreateInboundTicket, useInboundRequest } from '@/hooks';
 import { useProducts } from '@/hooks/product.hooks';
 import { useWarehouseStaff } from '@/hooks/user.hooks';
 import { useAuthStore } from '@/stores/auth.store';
 import { getLatestPrice } from '@/types/product';
+import { formatVND } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -25,7 +26,6 @@ export default function CreateInboundOrderScreen() {
         user?.companyId
     );
     const { mutateAsync: createInboundTicket } = useCreateInboundTicket();
-    const { mutateAsync: updateStatus } = useUpdateInboundRequestStatus();
 
     // Enrich inbound request items with full product data (including productPrices)
     const enrichedRequest = inboundRequest && products.length > 0 ? {
@@ -51,17 +51,7 @@ export default function CreateInboundOrderScreen() {
     const [notes, setNotes] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    // Comprehensive debug logging
-    useEffect(() => {
-        console.log('=== Debug Info ===');
-        console.log('1. InboundRequest:', JSON.stringify(enrichedRequest, null, 2));
-        console.log('2. WarehouseId from request:', enrichedRequest?.warehouseId);
-        console.log('3. User companyId:', user?.companyId);
-        console.log('4. Staff List Length:', staffList?.length);
-        console.log('5. Staff List:', JSON.stringify(staffList, null, 2));
-        console.log('6. Is Loading Staff:', isLoadingStaff);
-        console.log('=================');
-    }, [enrichedRequest, staffList, isLoadingStaff, user]);
+
 
     const handleCreate = async () => {
         if (!selectedStaffId) {
@@ -71,18 +61,11 @@ export default function CreateInboundOrderScreen() {
 
         setIsCreating(true);
         try {
+            // Backend tự động chuyển trạng thái request sang 'Transported' khi tạo ticket
             const created = await createInboundTicket({
                 requestId: parseInt(requestId),
                 createdBy: user?.id || 0,
                 staffId: selectedStaffId,
-            });
-
-            // Cập nhật trạng thái yêu cầu nhập kho thành "Approved" hoặc trạng thái tương ứng
-            // Lưu ý: Tên property phải là requestId để khớp với hook mới
-            await updateStatus({
-                requestId: parseInt(requestId),
-                approverId: user?.id || 0,
-                status: 'Approved' // Sử dụng 'Approved' thay vì 'completed' để đồng nhất
             });
 
             Alert.alert('Thành công', 'Đã tạo đơn nhập kho', [
@@ -191,35 +174,32 @@ export default function CreateInboundOrderScreen() {
                             return (
                                 <View key={item.id || index}>
                                     {index > 0 && <View style={styles.itemDivider} />}
-                                    <View style={styles.itemRow}>
-                                        <View style={styles.itemInfo}>
-                                            <Text style={styles.itemName}>
-                                                {item.name || item.product?.name || `Product #${item.productId}`}
-                                            </Text>
-                                            {(item.sku || item.product?.sku) && (
-                                                <Text style={styles.itemSku}>SKU: {item.sku || item.product?.sku}</Text>
-                                            )}
-                                            {(item.product as any)?.productPrices && (item.product as any).productPrices.length > 0 && (
-                                                <View style={styles.priceContainer}>
-                                                    <View style={styles.priceRow}>
-                                                        <Feather name="tag" size={12} color="#6B7280" />
-                                                        <Text style={styles.priceUnit}>
-                                                            {latestPrice.toLocaleString('vi-VN')} ₫/đơn vị
-                                                        </Text>
-                                                    </View>
-                                                    <View style={styles.totalPriceRow}>
-                                                        <Feather name="dollar-sign" size={14} color="#22C55E" />
-                                                        <Text style={styles.totalPriceLabel}>Tổng:</Text>
-                                                        <Text style={styles.totalPriceValue}>
-                                                            {totalPrice.toLocaleString('vi-VN')} ₫
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            )}
+                                    <View style={styles.itemCardContent}>
+                                        <View style={styles.itemMainInfo}>
+                                            <View style={styles.itemHeader}>
+                                                <Text style={styles.itemName} numberOfLines={1}>
+                                                    {item.name || item.product?.name || `Product #${item.productId}`}
+                                                </Text>
+                                                {(item.sku || item.product?.sku) && (
+                                                    <Text style={styles.itemSku}>SKU: {item.sku || item.product?.sku}</Text>
+                                                )}
+                                            </View>
                                         </View>
-                                        <Text style={styles.itemQty}>
-                                            {item.expectedQuantity} pcs
-                                        </Text>
+
+                                        <View style={styles.itemFooter}>
+                                            <View style={styles.priceSection}>
+                                                <Text style={styles.unitPriceText}>
+                                                    {formatVND(latestPrice)}/đv
+                                                </Text>
+                                                <View style={styles.totalSection}>
+                                                    <Text style={styles.totalLabel}>THÀNH TIỀN</Text>
+                                                    <Text style={styles.totalValue}>{formatVND(totalPrice)}</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={styles.itemQty}>
+                                                {item.expectedQuantity} pcs
+                                            </Text>
+                                        </View>
                                     </View>
                                 </View>
                             );
@@ -378,62 +358,71 @@ const styles = StyleSheet.create({
         minHeight: 100,
     },
     itemRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 8,
+        paddingVertical: 12,
     },
-    itemDivider: {
-        height: 1,
-        backgroundColor: COLORS.border,
-        marginVertical: 8,
+    itemCardContent: {
+        paddingVertical: 12,
     },
-    itemInfo: {
+    itemMainInfo: {
+        marginBottom: 10,
+    },
+    itemHeader: {
         flex: 1,
-        marginRight: 12,
     },
     itemName: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
         color: COLORS.text,
         marginBottom: 4,
     },
     itemSku: {
         fontSize: 12,
         color: COLORS.textMuted,
+        fontWeight: '500',
     },
-    priceContainer: {
-        marginTop: 6,
-        gap: 2,
-    },
-    priceRow: {
+    itemFooter: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
     },
-    priceUnit: {
+    priceSection: {
+        flex: 1,
+    },
+    unitPriceText: {
         fontSize: 12,
-        color: '#6B7280',
+        color: COLORS.textMuted,
+        marginBottom: 4,
     },
-    totalPriceRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    totalSection: {
         gap: 2,
     },
-    totalPriceLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: COLORS.text,
-    },
-    totalPriceValue: {
-        fontSize: 13,
+    totalLabel: {
+        fontSize: 10,
         fontWeight: '700',
-        color: '#22C55E',
+        color: COLORS.textMuted,
+        letterSpacing: 0.5,
+    },
+    totalValue: {
+        fontSize: 17,
+        fontWeight: '800',
+        color: '#10B981',
     },
     itemQty: {
         fontSize: 14,
         fontWeight: '700',
         color: COLORS.primary,
+        backgroundColor: COLORS.primary + '10',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    itemDivider: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+    },
+    itemInfo: {
+        flex: 1,
     },
     footer: {
         backgroundColor: '#fff',

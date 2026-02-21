@@ -1,7 +1,7 @@
 // ============== Inbound Order Types (khớp với Backend) ==============
 
 export type InboundOrderStatus = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
-export type InboundRequestStatus = 'Pending' | 'Approved' | 'Rejected';
+export type InboundRequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Transported';
 
 // Legacy status types for backward compatibility
 export type InboundStatus = 'scheduled' | 'arrived' | 'receiving' | 'putaway' | 'completed' | 'cancelled' | 'pending' | 'received' | 'in_transit';

@@ -9,8 +9,8 @@ import { useRequisition } from '@/hooks';
 
 export default function RequisitionDetailScreen() {
     const router = useRouter();
-    const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: requisition, isLoading } = useRequisition(id!);
+    const { id, type } = useLocalSearchParams<{ id: string; type: 'inbound' | 'outbound' }>();
+    const { data: requisition, isLoading } = useRequisition(id!, type);
 
     if (isLoading) {
         return (
@@ -88,7 +88,7 @@ export default function RequisitionDetailScreen() {
                                 <Text style={styles.requisitionNumber}>{requisition.requisitionNumber}</Text>
                             </View>
                         </View>
-                        <StatusBadge status={requisition.status} size="large" />
+                        <StatusBadge status={requisition.status} />
                     </View>
                 </Card>
 
@@ -159,18 +159,18 @@ export default function RequisitionDetailScreen() {
                             <Text style={styles.detailValue}>{requisition.warehouse}</Text>
                         </View>
                     </View>
-                    
+
                     {/* Show supplier for inbound or destination for outbound */}
-                    {(requisition.type === 'inbound' && requisition.supplier) || 
-                     (requisition.type === 'outbound' && requisition.notes) ? (
+                    {(requisition.type === 'inbound' && requisition.supplier) ||
+                        (requisition.type === 'outbound' && requisition.notes) ? (
                         <>
                             <View style={styles.detailDivider} />
                             <View style={styles.detailRow}>
                                 <View style={styles.detailIcon}>
-                                    <Feather 
-                                        name={requisition.type === 'inbound' ? 'truck' : 'send'} 
-                                        size={16} 
-                                        color={COLORS.textMuted} 
+                                    <Feather
+                                        name={requisition.type === 'inbound' ? 'truck' : 'send'}
+                                        size={16}
+                                        color={COLORS.textMuted}
                                     />
                                 </View>
                                 <View style={styles.detailContent}>

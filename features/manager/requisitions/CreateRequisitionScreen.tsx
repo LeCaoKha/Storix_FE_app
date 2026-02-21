@@ -1,12 +1,13 @@
 import { Calendar, Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useCreateOutboundRequisition, useCreateRequisition, useUserById } from '@/hooks';
+import { useCreateOutboundRequisition, useCreateRequisition, useProfile } from '@/hooks';
 import { useProducts } from '@/hooks/product.hooks';
 import { useSuppliers } from '@/hooks/suppliers.hooks';
 import { api } from '@/services/axios.instance';
 import { useAuthStore } from '@/stores/auth.store';
 import { getLatestPrice } from '@/types/product';
 import type { RequisitionItem, RequisitionType } from '@/types/requisition';
+import { formatVND } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -35,9 +36,11 @@ export default function CreateRequisitionScreen() {
     const companyId = user?.companyId;
 
     // Fetch fresh user data to get warehouse information
-    const { data: freshUserData } = useUserById(user?.id);
-    const currentWarehouseName = freshUserData?.warehouseName || user?.warehouseName;
-    const currentWarehouseId = freshUserData?.warehouseId || user?.warehouseId;
+    const { data: freshUserData } = useProfile(user?.id);
+
+    // Support both camelCase and PascalCase from backend
+    const currentWarehouseName = freshUserData?.warehouseName || (freshUserData as any)?.WarehouseName || user?.warehouseName;
+    const currentWarehouseId = freshUserData?.warehouseId || (freshUserData as any)?.WarehouseId || user?.warehouseId;
 
     const [type, setType] = useState<RequisitionType>('inbound');
     const [warehouseId, setWarehouseId] = useState<number | null>(null);
@@ -60,11 +63,11 @@ export default function CreateRequisitionScreen() {
 
         const loadWarehouses = async () => {
             // Ưu tiên: Nếu user đã có warehouse assignment, auto-select luôn và không cho đổi
-            const userWarehouseId = freshUserData?.warehouseId || user?.warehouseId;
-            const userWarehouseName = freshUserData?.warehouseName || user?.warehouseName;
+            // Support both camelCase and PascalCase
+            const userWarehouseId = freshUserData?.warehouseId || (freshUserData as any)?.WarehouseId || user?.warehouseId;
+            const userWarehouseName = freshUserData?.warehouseName || (freshUserData as any)?.WarehouseName || user?.warehouseName;
 
-            if (userWarehouseId && !warehouseId) {
-                console.log('Auto-selecting warehouse from user profile:', userWarehouseId);
+            if (userWarehouseId && (!warehouseId || warehouseId === 0)) {
                 setWarehouseId(userWarehouseId);
 
                 // Tạo mock warehouse entry để hiển thị tên
@@ -80,24 +83,26 @@ export default function CreateRequisitionScreen() {
             }
 
             if (!companyId) {
-                console.log('No companyId available');
                 return;
             }
 
             if (!token) {
-                console.log('No token available, please login again');
                 Alert.alert('Lỗi', 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
                 return;
             }
 
+            // Only Role 2 (Company Admin) can access the warehouse assignments list API.
+            // Managers (Role 3) and Staff (Role 4) must rely on their profile assignment.
+            if (user?.roleId !== 2) {
+                setLoadingWarehouses(false);
+                return;
+            }
+
             setLoadingWarehouses(true);
-            console.log('Loading warehouses for companyId:', companyId);
 
             try {
                 const res = await api.get(`/api/company-warehouses/${companyId}/assignments`);
                 if (!mounted) return;
-
-                console.log('Warehouses loaded successfully:', res.data?.length || 0);
                 setWarehouses(res.data || []);
 
                 // Auto-select first warehouse if available (chỉ khi chưa có từ user profile)
@@ -135,19 +140,9 @@ export default function CreateRequisitionScreen() {
     // Auto-select first supplier
     useEffect(() => {
         if (suppliers.length > 0 && !supplierId) {
-            console.log('Auto-selecting first supplier:', suppliers[0]);
             setSupplierId(suppliers[0].supplierId || suppliers[0].id || null);
         }
     }, [suppliers, supplierId]);
-
-    // Debug: Log when supplierId changes
-    useEffect(() => {
-        if (supplierId) {
-            const selected = suppliers.find(s => (s.supplierId || s.id) === supplierId);
-            console.log('Selected supplier ID:', supplierId);
-            console.log('Selected supplier data:', selected);
-        }
-    }, [supplierId, suppliers]);
 
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
@@ -247,7 +242,6 @@ export default function CreateRequisitionScreen() {
                         lineDiscount: 0
                     }))
                 };
-                console.log('Creating inbound requisition with data:', requestData);
                 await createRequisition(requestData);
                 Alert.alert('Thành công', 'Phiếu đề nghị nhập kho đã được tạo', [
                     { text: 'OK', onPress: () => router.back() },
@@ -266,11 +260,6 @@ export default function CreateRequisitionScreen() {
                 ]);
             }
         } catch (error: any) {
-            console.error('Create requisition error:', error);
-            console.error('Error response:', error.response?.data);
-            console.error('Error status:', error.response?.status);
-            console.error('Error message:', error.message);
-
             let errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Không thể tạo phiếu đề nghị';
 
             // Improve stock error message for outbound
@@ -529,35 +518,39 @@ export default function CreateRequisitionScreen() {
                                 const totalPrice = latestPrice * item.quantity;
                                 return (
                                     <View key={item.id}>
-                                        <View style={styles.itemRow}>
-                                            <View style={styles.itemInfo}>
-                                                <Text style={styles.itemName}>{item.productName}</Text>
-                                                <Text style={styles.itemSku}>SKU: {item.sku}</Text>
-                                                {item.product?.productPrices && item.product.productPrices.length > 0 && (
-                                                    <View style={styles.priceContainer}>
-                                                        <View style={styles.priceRow}>
-                                                            <Feather name="tag" size={12} color="#6B7280" />
-                                                            <Text style={styles.priceUnit}>
-                                                                {latestPrice.toLocaleString('vi-VN')} ₫/đơn vị
-                                                            </Text>
-                                                        </View>
-                                                        <View style={styles.totalPriceRow}>
-                                                            <Feather name="dollar-sign" size={14} color="#22C55E" />
-                                                            <Text style={styles.totalPriceLabel}>Tổng:</Text>
-                                                            <Text style={styles.totalPriceValue}>
-                                                                {totalPrice.toLocaleString('vi-VN')} ₫
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                )}
+                                        <View style={styles.itemCardContent}>
+                                            {/* Top Row: Name and Remove */}
+                                            <View style={styles.itemMainInfo}>
+                                                <View style={styles.itemHeader}>
+                                                    <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
+                                                    <Text style={styles.itemSku}>SKU: {item.sku}</Text>
+                                                </View>
+                                                <TouchableOpacity
+                                                    style={styles.deleteButton}
+                                                    onPress={() => handleRemoveItem(item.id)}
+                                                >
+                                                    <Feather name="trash-2" size={18} color="#EF4444" />
+                                                </TouchableOpacity>
                                             </View>
-                                            <View style={styles.itemActions}>
+
+                                            {/* Bottom Row: Price and Quantity */}
+                                            <View style={styles.itemFooter}>
+                                                <View style={styles.priceSection}>
+                                                    <Text style={styles.unitPriceText}>
+                                                        {formatVND(latestPrice)}/đv
+                                                    </Text>
+                                                    <View style={styles.totalSection}>
+                                                        <Text style={styles.totalLabel}>THÀNH TIỀN</Text>
+                                                        <Text style={styles.totalValue}>{formatVND(totalPrice)}</Text>
+                                                    </View>
+                                                </View>
+
                                                 <View style={styles.quantityInput}>
                                                     <TouchableOpacity
                                                         onPress={() => handleUpdateQuantity(item.id, String(Math.max(1, item.quantity - 1)))}
                                                         style={styles.quantityButton}
                                                     >
-                                                        <Feather name="minus" size={16} color={COLORS.primary} />
+                                                        <Feather name="minus" size={14} color={COLORS.primary} />
                                                     </TouchableOpacity>
                                                     <TextInput
                                                         style={styles.quantityInputField}
@@ -569,16 +562,9 @@ export default function CreateRequisitionScreen() {
                                                         onPress={() => handleUpdateQuantity(item.id, String(item.quantity + 1))}
                                                         style={styles.quantityButton}
                                                     >
-                                                        <Feather name="plus" size={16} color={COLORS.primary} />
+                                                        <Feather name="plus" size={14} color={COLORS.primary} />
                                                     </TouchableOpacity>
-                                                    <Text style={styles.quantityUnit}>{item.unit}</Text>
                                                 </View>
-                                                <TouchableOpacity
-                                                    style={styles.removeButton}
-                                                    onPress={() => handleRemoveItem(item.id)}
-                                                >
-                                                    <Feather name="x" size={18} color="#EF4444" />
-                                                </TouchableOpacity>
                                             </View>
                                         </View>
                                         {index < items.length - 1 && <View style={styles.itemDivider} />}
@@ -653,7 +639,7 @@ export default function CreateRequisitionScreen() {
                                                 <View style={styles.priceRowModal}>
                                                     <Feather name="tag" size={12} color="#22C55E" />
                                                     <Text style={styles.productPriceText}>
-                                                        {latestPrice.toLocaleString('vi-VN')} ₫
+                                                        {formatVND(latestPrice)}
                                                     </Text>
                                                 </View>
                                             )}
@@ -974,91 +960,97 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     itemsCard: {
+        padding: 0,
+        overflow: 'hidden',
+    },
+    itemCardContent: {
         padding: 16,
     },
-    itemRow: {
+    itemMainInfo: {
         flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 12,
     },
-    itemInfo: {
+    itemHeader: {
         flex: 1,
+        marginRight: 12,
     },
     itemName: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
         color: COLORS.text,
         marginBottom: 4,
     },
     itemSku: {
         fontSize: 12,
         color: COLORS.textMuted,
+        fontWeight: '500',
     },
-    priceContainer: {
-        marginTop: 6,
-        gap: 2,
+    deleteButton: {
+        padding: 4,
     },
-    priceRow: {
+    itemFooter: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
     },
-    priceUnit: {
+    priceSection: {
+        flex: 1,
+    },
+    unitPriceText: {
         fontSize: 12,
-        color: '#6B7280',
+        color: COLORS.textMuted,
+        marginBottom: 4,
     },
-    totalPriceRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    totalSection: {
         gap: 2,
     },
-    totalPriceLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: COLORS.text,
-    },
-    totalPriceValue: {
-        fontSize: 14,
+    totalLabel: {
+        fontSize: 10,
         fontWeight: '700',
-        color: '#22C55E',
+        color: COLORS.textMuted,
+        letterSpacing: 0.5,
     },
-    itemActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
+    totalValue: {
+        fontSize: 17,
+        fontWeight: '800',
+        color: '#10B981', // Emerald 500
     },
     quantityInput: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#F8FAFC',
         borderRadius: 8,
-        paddingHorizontal: 12,
-        gap: 6,
+        padding: 4,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     quantityButton: {
-        padding: 4,
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
     },
     quantityInputField: {
-        width: 50,
-        paddingVertical: 8,
+        width: 40,
+        textAlign: 'center',
         fontSize: 14,
         fontWeight: '700',
         color: COLORS.text,
-        textAlign: 'center',
-    },
-    quantityUnit: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-    },
-    removeButton: {
-        padding: 4,
+        padding: 0,
     },
     itemDivider: {
         height: 1,
-        backgroundColor: COLORS.border,
-        marginVertical: 8,
+        backgroundColor: '#F1F5F9',
+        marginHorizontal: 16,
     },
     modalContainer: {
         flex: 1,

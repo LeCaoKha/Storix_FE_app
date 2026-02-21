@@ -17,21 +17,29 @@ export const useRequisitions = (companyId: number | undefined) => {
     });
 };
 
-export const useRequisition = (id: number | string | undefined) => {
+export const useRequisition = (id: number | string | undefined, type?: 'inbound' | 'outbound') => {
     const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
     const { user } = useAuthStore();
 
     return useQuery({
-        queryKey: ['requisitions', user?.companyId, numericId],
+        queryKey: ['requisitions', user?.companyId, numericId, type],
         queryFn: async () => {
             if (!numericId || !user?.companyId) return null;
 
-            // Try to fetch from inbound first
-            const inbound = await getRequisitionById(user.companyId, numericId).catch(() => null);
+            // If type is known, fetch directly
+            if (type === 'inbound') {
+                return getRequisitionById(user.companyId, numericId);
+            }
+            if (type === 'outbound') {
+                return getOutboundRequisitionById(user.companyId, numericId);
+            }
+
+            // Fallback: Try to fetch from inbound first (suppress error if 404)
+            const inbound = await getRequisitionById(user.companyId, numericId, true);
             if (inbound) return inbound;
 
             // If not found in inbound, try outbound
-            const outbound = await getOutboundRequisitionById(user.companyId, numericId).catch(() => null);
+            const outbound = await getOutboundRequisitionById(user.companyId, numericId);
             return outbound;
         },
         enabled: !!numericId && !!user?.companyId,

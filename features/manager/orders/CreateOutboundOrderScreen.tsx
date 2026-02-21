@@ -1,6 +1,6 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useCreateOutboundTicket, useOutboundRequest, useUpdateOutboundRequestStatus } from '@/hooks';
+import { useCreateOutboundTicket, useOutboundRequest } from '@/hooks';
 import { useWarehouseStaff } from '@/hooks/user.hooks';
 import { useAuthStore } from '@/stores/auth.store';
 import { Feather } from '@expo/vector-icons';
@@ -15,7 +15,7 @@ export default function CreateOutboundOrderScreen() {
 
     const { data: requisition, isLoading: isLoadingRequisition } = useOutboundRequest(requisitionId);
     const { mutateAsync: createOutboundTicket } = useCreateOutboundTicket();
-    const { mutateAsync: updateStatus } = useUpdateOutboundRequestStatus();
+
     const { user } = useAuthStore();
 
     // Thêm staff list để chọn nhân viên xử lý
@@ -50,14 +50,6 @@ export default function CreateOutboundOrderScreen() {
                 note: notes.trim() || undefined
             });
 
-            // Cập nhật trạng thái phiếu đề nghị thành 'completed'
-            if (requisition) {
-                await updateStatus({
-                    requestId: requisition.id,
-                    approverId: user?.id || 0,
-                    status: 'completed'
-                });
-            }
 
             Alert.alert('Thành công', 'Đã tạo đơn xuất kho', [
                 {

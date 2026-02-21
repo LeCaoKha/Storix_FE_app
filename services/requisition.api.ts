@@ -24,11 +24,11 @@ export const getRequisitions = async (companyId: number): Promise<GoodsRequisiti
                 updatedAt: item.createdAt || new Date().toISOString(),
                 reviewedByName: item.approvedByUser?.fullName,
                 reviewedAt: item.approvedAt,
-                items: (item.inboundOrderItems || []).map((orderItem: any) => ({
+                items: (item.inboundOrderItems || item.items || item.InboundOrderItems || (item as any).Items || []).map((orderItem: any) => ({
                     id: orderItem.id,
-                    sku: orderItem.sku || '',
-                    productName: orderItem.name || '',
-                    quantity: orderItem.expectedQuantity || 0,
+                    sku: orderItem.sku || orderItem.Sku || '',
+                    productName: orderItem.name || orderItem.ProductName || orderItem.Name || '',
+                    quantity: orderItem.expectedQuantity || orderItem.ExpectedQuantity || orderItem.quantity || orderItem.Quantity || 0,
                     unit: 'Cái',
                 })),
             }));
@@ -91,7 +91,7 @@ export const createRequisition = async (
     };
 };
 
-export const getRequisitionById = async (companyId: number, id: number): Promise<GoodsRequisition | null> => {
+export const getRequisitionById = async (companyId: number, id: number, suppressError = false): Promise<GoodsRequisition | null> => {
     try {
         const res = await api.get(`/api/InventoryInbound/requests/${companyId}/${id}`);
 
@@ -115,18 +115,21 @@ export const getRequisitionById = async (companyId: number, id: number): Promise
                 updatedAt: item.createdAt || new Date().toISOString(),
                 reviewedByName: item.approvedByUser?.fullName,
                 reviewedAt: item.approvedAt,
-                items: (item.inboundOrderItems || []).map((orderItem: any) => ({
+                items: (item.inboundOrderItems || item.items || item.InboundOrderItems || (item as any).Items || []).map((orderItem: any) => ({
                     id: orderItem.id,
-                    sku: orderItem.sku || '',
-                    productName: orderItem.name || '',
-                    quantity: orderItem.expectedQuantity || 0,
+                    sku: orderItem.sku || orderItem.Sku || '',
+                    productName: orderItem.name || orderItem.ProductName || orderItem.Name || '',
+                    quantity: orderItem.expectedQuantity || orderItem.ExpectedQuantity || orderItem.quantity || orderItem.Quantity || 0,
                     unit: 'Cái',
+                    product: orderItem.product || (orderItem as any).Product,
                 })),
             };
         }
         return null;
-    } catch (error) {
-        console.error('Error fetching requisition detail:', error);
+    } catch (error: any) {
+        if (!suppressError || error.response?.status !== 404) {
+            console.error('Error fetching requisition detail:', error);
+        }
         return null;
     }
 };
@@ -156,11 +159,11 @@ export const getOutboundRequisitions = async (companyId: number): Promise<GoodsR
                 updatedAt: item.createdAt || new Date().toISOString(),
                 reviewedByName: item.approvedByUser?.fullName,
                 reviewedAt: item.approvedAt,
-                items: (item.items || []).map((orderItem: any) => ({
+                items: (item.items || item.inboundOrderItems || item.Items || (item as any).InboundOrderItems || []).map((orderItem: any) => ({
                     id: orderItem.id,
-                    sku: orderItem.productId?.toString() || '',
-                    productName: orderItem.productName || '',
-                    quantity: orderItem.quantity || 0,
+                    sku: orderItem.sku || orderItem.Sku || orderItem.productId?.toString() || '',
+                    productName: orderItem.productName || orderItem.ProductName || orderItem.name || orderItem.Name || '',
+                    quantity: orderItem.quantity || orderItem.Quantity || orderItem.expectedQuantity || orderItem.ExpectedQuantity || 0,
                     unit: 'Cái',
                 })),
             }));
@@ -216,7 +219,7 @@ export const createOutboundRequisition = async (
     };
 };
 
-export const getOutboundRequisitionById = async (companyId: number, id: number): Promise<GoodsRequisition | null> => {
+export const getOutboundRequisitionById = async (companyId: number, id: number, suppressError = false): Promise<GoodsRequisition | null> => {
     try {
         const res = await api.get(`/api/InventoryOutbound/requests/${companyId}/${id}`);
 
@@ -240,18 +243,21 @@ export const getOutboundRequisitionById = async (companyId: number, id: number):
                 updatedAt: item.createdAt || new Date().toISOString(),
                 reviewedByName: item.approvedByUser?.fullName,
                 reviewedAt: item.approvedAt,
-                items: (item.items || []).map((orderItem: any) => ({
+                items: (item.items || item.inboundOrderItems || item.Items || (item as any).InboundOrderItems || []).map((orderItem: any) => ({
                     id: orderItem.id,
-                    sku: orderItem.productId?.toString() || '',
-                    productName: orderItem.productName || '',
-                    quantity: orderItem.quantity || 0,
+                    sku: orderItem.sku || orderItem.Sku || orderItem.productId?.toString() || '',
+                    productName: orderItem.productName || orderItem.ProductName || orderItem.name || orderItem.Name || '',
+                    quantity: orderItem.quantity || orderItem.Quantity || orderItem.expectedQuantity || orderItem.ExpectedQuantity || 0,
                     unit: 'Cái',
+                    product: orderItem.product || (orderItem as any).Product,
                 })),
             };
         }
         return null;
-    } catch (error) {
-        console.error('Error fetching outbound requisition detail:', error);
+    } catch (error: any) {
+        if (!suppressError || error.response?.status !== 404) {
+            console.error('Error fetching outbound requisition detail:', error);
+        }
         return null;
     }
 };

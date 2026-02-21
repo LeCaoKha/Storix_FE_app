@@ -11,11 +11,28 @@ import { useProfile } from '@/hooks/user.hooks';
 import { useAuthStore } from '@/stores/auth.store';
 import { TaskStatus } from '@/types/order';
 
+// Map backend English role names to Vietnamese display names
+const ROLE_DISPLAY_NAMES: Record<string, string> = {
+    'Manager': 'Quản lý',
+    'Staff': 'Nhân viên',
+    'Company Administrator': 'Quản trị viên',
+    'Super Admin': 'Quản trị hệ thống',
+};
+
+const getRoleDisplayName = (roleName?: string, roleId?: number): string => {
+    if (roleName && ROLE_DISPLAY_NAMES[roleName]) return ROLE_DISPLAY_NAMES[roleName];
+    if (roleId === 4) return 'Nhân viên';
+    if (roleId === 3) return 'Quản lý';
+    if (roleId === 2) return 'Quản trị viên';
+    return roleName || 'Người dùng';
+};
+
 export default function ProfileScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
     const { mutateAsync: logout } = useLogout();
     const { data: profile, isLoading: isFetchingProfile } = useProfile(user?.id);
+    const isStaff = user?.roleId === 4;
     const { data: tasks = [], isLoading: isFetchingTasks } = useTasks();
 
     const handleLogout = () => {
@@ -52,7 +69,7 @@ export default function ProfileScreen() {
         // Removed non-functional items: Thông báo, Ngôn ngữ, Trợ giúp, Giới thiệu
     ];
 
-    if (isFetchingProfile || isFetchingTasks) {
+    if (isFetchingProfile || (isStaff && isFetchingTasks)) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
@@ -60,7 +77,7 @@ export default function ProfileScreen() {
         );
     }
 
-    const completedTasksCount = tasks.filter(t => t.status === TaskStatus.COMPLETED).length;
+    const completedTasksCount = isStaff ? tasks.filter(t => t.status === TaskStatus.COMPLETED).length : 0;
 
     return (
         <View style={styles.container}>
@@ -90,22 +107,24 @@ export default function ProfileScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.userName}>{profile?.fullName || (user?.roleId === 4 ? 'Nhân viên' : 'Quản lý')}</Text>
+                        <Text style={styles.userName}>{profile?.fullName || getRoleDisplayName(undefined, user?.roleId)}</Text>
                         <Text style={styles.userRole}>
-                            {profile?.roleName || (user?.roleId === 4 ? 'Nhân viên kho' : 'Quản lý kho')}
+                            {getRoleDisplayName(profile?.roleName, user?.roleId)}
                         </Text>
 
-                        <View style={styles.userStats}>
-                            <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{tasks.length}</Text>
-                                <Text style={styles.statLabel}>Nhiệm vụ</Text>
+                        {isStaff && (
+                            <View style={styles.userStats}>
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statValue}>{tasks.length}</Text>
+                                    <Text style={styles.statLabel}>Nhiệm vụ</Text>
+                                </View>
+                                <View style={styles.statDivider} />
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statValue}>{completedTasksCount}</Text>
+                                    <Text style={styles.statLabel}>Hoàn thành</Text>
+                                </View>
                             </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.statItem}>
-                                <Text style={styles.statValue}>{completedTasksCount}</Text>
-                                <Text style={styles.statLabel}>Hoàn thành</Text>
-                            </View>
-                        </View>
+                        )}
                     </Card>
 
                     {/* Employee Information */}
@@ -213,7 +232,7 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.border,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 28,
         fontWeight: 'bold',
         color: COLORS.text,
     },

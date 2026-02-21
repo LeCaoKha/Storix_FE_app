@@ -3,7 +3,6 @@ import { COLORS } from '@/constants/color';
 import { useOutboundRequest, useOutboundTicket } from '@/hooks';
 import {
     useConfirmOutboundOrder,
-    useCreateOutboundTicket,
     useUpdateOutboundRequestStatus,
 } from '@/hooks/outbound-orders.hooks';
 import { useAuthStore } from '@/stores/auth.store';
@@ -55,6 +54,11 @@ export default function OutboundOrderDetailScreen() {
     const { user } = useAuthStore();
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // Export handler
+    const handleExport = (format: 'csv' | 'excel') => {
+        Alert.alert('Xuất dữ liệu', `Tính năng xuất ${format.toUpperCase()} đang được phát triển.`);
+    };
+
     // Fetch data based on type
     const { data: request, isLoading: requestLoading, error: requestError } = useOutboundRequest(
         type === 'request' ? id : undefined
@@ -65,7 +69,6 @@ export default function OutboundOrderDetailScreen() {
 
     // Mutations
     const updateRequestStatus = useUpdateOutboundRequestStatus();
-    const createTicket = useCreateOutboundTicket();
     const confirmOrder = useConfirmOutboundOrder();
 
     const isLoading = requestLoading || ticketLoading;
@@ -100,7 +103,9 @@ export default function OutboundOrderDetailScreen() {
 
     const isRequest = type === 'request';
     const statusConfig = isRequest ? getRequestStatusConfig(data.status) : getTicketStatusConfig(data.status);
-    const canApproveReject = isRequest && data.status === 'Pending';
+    // Only Admin (roleId=2) can approve/reject outbound requests
+    const isAdmin = user?.roleId === 2;
+    const canApproveReject = isRequest && data.status === 'Pending' && isAdmin;
     const canCreateTicket = isRequest && data.status === 'Approved';
     const canConfirmComplete = !isRequest && data.status === 'Ready';
 
@@ -168,35 +173,12 @@ export default function OutboundOrderDetailScreen() {
         );
     };
 
-    // Handle create ticket from approved request
+    // Handle create ticket - navigate to create screen for staff selection
     const handleCreateTicket = () => {
-        Alert.alert(
-            'Tạo phiếu xuất kho',
-            'Tạo phiếu xuất kho từ yêu cầu đã duyệt?',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Tạo phiếu',
-                    style: 'default',
-                    onPress: async () => {
-                        try {
-                            setIsProcessing(true);
-                            await createTicket.mutateAsync({
-                                requestId: data.id,
-                                createdBy: user?.id ?? 0,
-                            });
-                            Alert.alert('Thành công', 'Đã tạo phiếu xuất kho', [
-                                { text: 'OK', onPress: () => router.back() },
-                            ]);
-                        } catch {
-                            Alert.alert('Lỗi', 'Không thể tạo phiếu xuất kho. Vui lòng thử lại.');
-                        } finally {
-                            setIsProcessing(false);
-                        }
-                    },
-                },
-            ]
-        );
+        router.push({
+            pathname: '/(manager-tabs)/(orders-outbound)/create',
+            params: { requisitionId: data.id }
+        } as any);
     };
 
     // Handle confirm complete
@@ -370,6 +352,18 @@ export default function OutboundOrderDetailScreen() {
 
                 <View style={{ height: 120 }} />
             </ScrollView>
+
+            {/* Info for Manager: waiting for Admin approval */}
+            {isRequest && data.status === 'Pending' && !isAdmin && (
+                <View style={styles.actionBar}>
+                    <View style={[styles.actionButton, { backgroundColor: '#FFF9E6', borderWidth: 1, borderColor: '#F6C90E40' }]}>
+                        <Feather name="clock" size={16} color="#B8860B" />
+                        <Text style={{ color: '#B8860B', fontWeight: '600', fontSize: 14 }}>
+                            Đang chờ Admin duyệt yêu cầu này
+                        </Text>
+                    </View>
+                </View>
+            )}
 
             {/* Action Buttons */}
             {(canApproveReject || canCreateTicket || canConfirmComplete) && (

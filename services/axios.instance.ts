@@ -14,12 +14,6 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().token;
-    console.log('API Request - Token check:', {
-      hasToken: !!token,
-      tokenLength: token?.length,
-      url: config.url
-    });
-
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -33,19 +27,6 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
-    const isInboundRequest = response.config.url?.includes('/InventoryInbound/requests/');
-
-    if (isInboundRequest) {
-      console.log(`[AXIOS SUCCESS - FULL DATA] ${response.config.url}`);
-      console.log('Full Response:', JSON.stringify(response.data, null, 2));
-    } else {
-      console.log(`[AXIOS SUCCESS] ${response.config.url}`, {
-        status: response.status,
-        dataType: typeof response.data,
-        dataKeys: response.data ? Object.keys(response.data).slice(0, 10) : [],
-        data: JSON.stringify(response.data).substring(0, 200) + '...'
-      });
-    }
     return response;
   },
   (error) => {
@@ -60,7 +41,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const url = error.config?.url || '';
       const isAuthEndpoint = url.includes('/Login') || url.includes('/auth/') || url.includes('/token');
-      
+
       // Only auto-logout for auth endpoints, not regular API calls
       // Regular 401s might be due to expired tokens that can be refreshed
       if (isAuthEndpoint) {

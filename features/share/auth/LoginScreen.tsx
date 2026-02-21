@@ -1,9 +1,10 @@
 import { Feather } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Button, Input } from '@/components';
 import { COLORS } from '@/constants/color';
@@ -107,11 +108,13 @@ export default function LoginScreen() {
                     style={styles.headerBackground}
                 >
                     <View style={styles.headerContent}>
-                        <Image
-                            source={require('@/assets/images/Logo.png')}
-                            style={{ width: 150, height: 150, marginBottom: 16 }}
-                            resizeMode="contain"
-                        />
+                        <View style={styles.logoContainer}>
+                            <ExpoImage
+                                source={require('@/assets/images/logoStorix.png')}
+                                style={{ width: 110, height: 110 }}
+                                contentFit="contain"
+                            />
+                        </View>
                         <Text style={styles.appTagline}>Hệ thống Quản lý Kho hàng</Text>
                     </View>
                 </LinearGradient>
@@ -194,19 +197,19 @@ const styles = StyleSheet.create({
     headerContent: {
         alignItems: 'center',
     },
-    logoBox: {
-        width: 64,
-        height: 64,
-        backgroundColor: '#fff',
-        borderRadius: 16,
+    logoContainer: {
+        width: 140,
+        height: 140,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 15,
+        elevation: 8,
     },
     appName: {
         fontSize: 28,

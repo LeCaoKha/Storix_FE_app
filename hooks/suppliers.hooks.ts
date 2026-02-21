@@ -1,9 +1,9 @@
 import {
-    createSupplier,
-    deleteSupplier,
-    getSupplierById,
-    getSuppliers,
-    updateSupplier,
+  createSupplier,
+  deleteSupplier,
+  getSupplierById,
+  getSuppliers,
+  updateSupplier,
 } from '@/services/supplier.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { CreateSupplierPayload, UpdateSupplierPayload } from '@/types/supplier';
@@ -22,12 +22,12 @@ export const supplierKeys = {
  * Hook to fetch all suppliers
  */
 export const useSuppliers = () => {
-  const userId = useAuthStore((state) => state.user?.id);
-  
+  const companyId = useAuthStore((state) => state.user?.companyId);
+
   return useQuery({
-    queryKey: [...supplierKeys.lists(), userId],
-    queryFn: () => getSuppliers(userId!),
-    enabled: !!userId,
+    queryKey: [...supplierKeys.lists(), companyId],
+    queryFn: () => getSuppliers(companyId!),
+    enabled: !!companyId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -37,7 +37,7 @@ export const useSuppliers = () => {
  */
 export const useSupplier = (supplierId: number) => {
   const userId = useAuthStore((state) => state.user?.id);
-  
+
   return useQuery({
     queryKey: supplierKeys.detail(supplierId),
     queryFn: () => getSupplierById(userId!, supplierId),

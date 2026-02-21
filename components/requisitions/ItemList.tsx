@@ -1,8 +1,9 @@
 import { getLatestPrice } from '@/types/product';
 import { RequisitionItem } from '@/types/requisition';
+import { formatVND } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 interface RequisitionItemListProps {
   items: RequisitionItem[];
@@ -10,129 +11,149 @@ interface RequisitionItemListProps {
 }
 
 export const RequisitionItemList: React.FC<RequisitionItemListProps> = ({ items, showNotes }) => {
-  const renderItem = ({ item }: { item: RequisitionItem }) => {
+  const renderItem = ({ item, index }: { item: RequisitionItem; index: number }) => {
     const latestPrice = item.product ? getLatestPrice(item.product) : 0;
     const totalPrice = latestPrice * item.quantity;
 
     return (
-      <View style={styles.item}>
-        <View style={styles.itemHeader}>
-          <View style={styles.itemInfo}>
-            <Text style={styles.productName}>{item.productName}</Text>
+      <View key={item.id}>
+        <View style={styles.itemContent}>
+          {/* Top Row: Name and SKU */}
+          <View style={styles.itemMainInfo}>
+            <View style={styles.itemHeader}>
+              <Text style={styles.productName} numberOfLines={1}>{item.productName}</Text>
+              <Text style={styles.itemSku}>SKU: {item.sku}</Text>
+            </View>
             <View style={styles.qtyBadge}>
-              <Text style={styles.quantity}>{item.quantity} {item.unit}</Text>
+              <Text style={styles.quantityText}>{item.quantity} {item.unit}</Text>
+            </View>
+          </View>
+
+          {/* Bottom Row: Prices */}
+          <View style={styles.itemFooter}>
+            <View style={styles.priceSection}>
+              <Text style={styles.unitPriceText}>
+                {formatVND(latestPrice)}/đv
+              </Text>
+              <View style={styles.totalSection}>
+                <Text style={styles.totalLabel}>THÀNH TIỀN</Text>
+                <Text style={styles.totalValue}>{formatVND(totalPrice)}</Text>
+              </View>
             </View>
           </View>
         </View>
-        {latestPrice !== undefined && (
-          <View style={styles.priceContainer}>
-            <View style={styles.priceRow}>
-              <Feather name="tag" size={12} color="#6B7280" />
-              <Text style={styles.priceUnit}>
-                {latestPrice.toLocaleString('vi-VN')} ₫/đơn vị
-              </Text>
-            </View>
-            <View style={styles.totalPriceRow}>
-              <Feather name="dollar-sign" size={14} color="#22C55E" />
-              <Text style={styles.totalPriceLabel}>Tổng:</Text>
-              <Text style={styles.totalPriceValue}>
-                {totalPrice.toLocaleString('vi-VN')} ₫
-              </Text>
-            </View>
-          </View>
-        )}
         {showNotes && item.notes && (
-          <Text style={styles.description}>{item.notes}</Text>
+          <View style={styles.notesContainer}>
+            <Feather name="file-text" size={12} color="#94A3B8" />
+            <Text style={styles.notesText}>{item.notes}</Text>
+          </View>
         )}
       </View>
     );
   };
 
   return (
-    <FlatList
-      data={items}
-      keyExtractor={(item) => String(item.id)}
-      renderItem={renderItem}
-      style={styles.list}
-      scrollEnabled={false}
-    />
+    <View style={styles.list}>
+      {items.map((item, index) => (
+        <View key={item.id}>
+          {renderItem({ item, index })}
+          {index < items.length - 1 && <View style={styles.divider} />}
+        </View>
+      ))}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   list: {
-    flex: 1,
-  },
-  item: {
     backgroundColor: '#fff',
-    padding: 16,
-    marginBottom: 8,
-    borderRadius: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E1E5E9',
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  productName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#11181C',
-    marginBottom: 4,
+  itemContent: {
+    padding: 16,
   },
-  quantity: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  qtyBadge: {
-    backgroundColor: '#EEF2F6',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  itemHeader: {
-    marginBottom: 8,
-  },
-  itemInfo: {
+  itemMainInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  priceContainer: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    gap: 4,
+  itemHeader: {
+    flex: 1,
+    marginRight: 12,
   },
-  priceRow: {
+  productName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  itemSku: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  qtyBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  quantityText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  itemFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  priceSection: {
+    flex: 1,
+  },
+  unitPriceText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  totalSection: {
+    gap: 2,
+  },
+  totalLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+  },
+  totalValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  notesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  priceUnit: {
+  notesText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#64748B',
+    fontStyle: 'italic',
   },
-  totalPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  totalPriceLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#11181C',
-  },
-  totalPriceValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#22C55E',
-  },
-  description: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 8,
+  divider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginHorizontal: 16,
   },
 });

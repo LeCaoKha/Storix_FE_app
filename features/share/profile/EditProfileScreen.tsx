@@ -73,6 +73,10 @@ export default function EditProfileScreen() {
             formData.append('FullName', fullName);
             formData.append('Phone', phone);
             formData.append('Email', email);
+            // CRITICAL: must send CompanyId or backend will set it to null
+            if (user?.companyId) {
+                formData.append('CompanyId', String(user.companyId));
+            }
 
             if (selectedImage) {
                 const uri = selectedImage.uri;
