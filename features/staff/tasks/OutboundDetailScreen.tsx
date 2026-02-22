@@ -32,9 +32,10 @@ export default function OutboundDetailScreen() {
 
     // Initialize state when order data is loaded
     useEffect(() => {
-        if (order?.outboundOrderItems) {
+        const orderItems = order?.items || order?.outboundOrderItems;
+        if (orderItems) {
             const initialQty: Record<number, number> = {};
-            order.outboundOrderItems.forEach((item: OutboundOrderItem) => {
+            orderItems.forEach((item: OutboundOrderItem) => {
                 initialQty[item.id] = 0; // Số lượng đã lấy ban đầu = 0
             });
             setLocalQuantities(initialQty);
@@ -43,10 +44,11 @@ export default function OutboundDetailScreen() {
 
     // Sort items by product name for easier picking
     const sortedItems = React.useMemo(() => {
-        if (!order?.outboundOrderItems) return [];
-        return [...order.outboundOrderItems].sort((a, b) => {
-            const nameA = a.product?.name || '';
-            const nameB = b.product?.name || '';
+        const orderItems = order?.items || order?.outboundOrderItems;
+        if (!orderItems) return [];
+        return [...orderItems].sort((a, b) => {
+            const nameA = a.name || a.product?.name || '';
+            const nameB = b.name || b.product?.name || '';
             return nameA.localeCompare(nameB);
         });
     }, [order]);
@@ -77,7 +79,8 @@ export default function OutboundDetailScreen() {
     const handleUpdateQty = (itemId: number, increment: boolean) => {
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
-            const item = order?.outboundOrderItems.find((i: OutboundOrderItem) => i.id === itemId);
+            const orderItems = order?.items || order?.outboundOrderItems || [];
+            const item = orderItems.find((i: OutboundOrderItem) => i.id === itemId);
             const maxQty = item?.quantity || 9999;
             const newValue = increment
                 ? Math.min(current + 1, maxQty)
@@ -91,7 +94,8 @@ export default function OutboundDetailScreen() {
         setIsSaving(true);
         try {
             // Update items with picked quantities
-            const updatedItems = order.outboundOrderItems.map((item: OutboundOrderItem) => ({
+            const orderItems = order.items || order.outboundOrderItems || [];
+            const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
                 id: item.id,
                 productId: item.productId || 0,
                 quantity: localQuantities[item.id] || item.quantity || 0,
@@ -111,9 +115,13 @@ export default function OutboundDetailScreen() {
     };
 
     // Check if all items are picked
-    const allItemsPicked = order?.outboundOrderItems?.every(
-        (item: OutboundOrderItem) => (localQuantities[item.id] || 0) >= (item.quantity || 0)
-    ) ?? false;
+    const allItemsPicked = React.useMemo(() => {
+        const orderItems = order?.items || order?.outboundOrderItems;
+        if (!orderItems || orderItems.length === 0) return false;
+        return orderItems.every(
+            (item: OutboundOrderItem) => (localQuantities[item.id] || 0) >= (item.quantity || 0)
+        );
+    }, [order, localQuantities]);
 
     const handleConfirmComplete = async () => {
         if (!order || !user) return;
@@ -130,7 +138,8 @@ export default function OutboundDetailScreen() {
                         setIsConfirming(true);
                         try {
                             // Update items with final quantities
-                            const updatedItems = order.outboundOrderItems.map((item: OutboundOrderItem) => ({
+                            const orderItems = order.items || order.outboundOrderItems || [];
+                            const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
                                 id: item.id,
                                 productId: item.productId || 0,
                                 quantity: localQuantities[item.id] || item.quantity || 0,
@@ -184,17 +193,17 @@ export default function OutboundDetailScreen() {
 
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{order.outboundOrderItems?.length ?? 0} mặt hàng</Text>
+                    <Text style={styles.sectionSubtitle}>{(order.items || order.outboundOrderItems)?.length ?? 0} mặt hàng</Text>
                 </View>
 
                 {sortedItems.map((item: OutboundOrderItem) => (
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                <Text style={styles.productName}>{item.name || item.product?.name || `Sản phẩm #${item.productId}`}</Text>
                                 <View style={styles.skuRow}>
                                     <View style={styles.skuBadge}>
-                                        <Text style={styles.skuText}>{item.product?.sku || 'N/A'}</Text>
+                                        <Text style={styles.skuText}>{item.sku || item.product?.sku || 'N/A'}</Text>
                                     </View>
                                 </View>
                             </View>
@@ -241,9 +250,9 @@ export default function OutboundDetailScreen() {
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.reportBtn}>
+                <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
+                    <Text style={styles.reportBtnText}>Báo lỗi (Sắp có)</Text>
                 </TouchableOpacity>
 
                 {!allItemsPicked ? (

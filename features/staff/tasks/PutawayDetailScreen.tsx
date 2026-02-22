@@ -61,6 +61,11 @@ export default function PutawayDetailScreen() {
             />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+                <View style={styles.placeholderNotice}>
+                    <Feather name="info" size={16} color="#854d0e" />
+                    <Text style={styles.placeholderNoticeText}>Tính năng này đang trong quá trình phát triển (Chưa có Backend hỗ trợ).</Text>
+                </View>
+
                 <Card style={styles.infoCard}>
                     <View style={styles.locationRow}>
                         <View style={styles.locationBox}>
@@ -254,5 +259,21 @@ const styles = StyleSheet.create({
     },
     disabledBtn: {
         opacity: 0.6,
+    },
+    placeholderNotice: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#fefce8',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#fef08a',
+    },
+    placeholderNoticeText: {
+        fontSize: 13,
+        color: '#854d0e',
+        flex: 1,
     },
 });

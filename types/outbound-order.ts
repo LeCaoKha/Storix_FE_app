@@ -15,6 +15,9 @@ export interface OutboundOrderItem {
   productId?: number;
   quantity?: number;
   price?: number;
+  // Flat fields from BE DTO (MapOutboundOrderItem returns p?.Name, p?.Sku)
+  name?: string;
+  sku?: string;
   product?: {
     id: number;
     name: string;
@@ -33,7 +36,8 @@ export interface OutboundOrder {
   status?: string;
   note?: string;
   createdAt?: string;
-  outboundOrderItems: OutboundOrderItem[];
+  outboundOrderItems?: OutboundOrderItem[]; // Legacy field
+  items?: OutboundOrderItem[]; // Backend DTO field
   warehouse?: {
     id: number;
     name: string;
@@ -57,7 +61,8 @@ export interface OutboundRequest {
   createdAt?: string;
   approvedAt?: string;
   approverId?: number;
-  outboundOrderItems: OutboundOrderItem[];
+  outboundOrderItems?: OutboundOrderItem[]; // Legacy field
+  items?: OutboundOrderItem[]; // Backend DTO field
   warehouse?: {
     id: number;
     name: string;

@@ -176,8 +176,8 @@ export default function InboundDetailScreen() {
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
-                                <Text style={styles.skuText}>SKU: {item.product?.sku || 'N/A'}</Text>
+                                <Text style={styles.productName}>{item.name || item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                <Text style={styles.skuText}>SKU: {item.sku || item.product?.sku || 'N/A'}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
                                 backgroundColor: (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? COLORS.success + '20' : COLORS.warning + '20'
@@ -228,9 +228,9 @@ export default function InboundDetailScreen() {
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.reportBtn}>
+                <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
+                    <Text style={styles.reportBtnText}>Báo lỗi (Sắp có)</Text>
                 </TouchableOpacity>
 
                 {!allItemsReceived ? (

@@ -1,39 +1,31 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
+import { useStockCountTicket, useUpdateStockCountItem } from '@/hooks/stock-count.hooks';
+import { StockCountItem } from '@/services/stock-count.api';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-const mockTask = {
-    id: '1',
-    taskNumber: 'CNT-2024-001',
-    type: 'Cycle Count',
-    status: 'In Progress',
-    warehouse: 'Main Warehouse',
-    location: 'Zone A - Rack 04',
-    itemCount: 3,
-    date: '2024-05-20',
-    items: [
-        { id: '101', productName: 'iPhone 15 Pro Case', sku: 'SKU-7721', systemQty: 24 },
-        { id: '102', productName: 'Samsung S24 Ultra Screen Protector', sku: 'SKU-8832', systemQty: 50 },
-        { id: '103', productName: 'USB-C Charging Cable 2m', sku: 'SKU-1123', systemQty: 100 },
-    ],
-};
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function InventoryCountDetailScreen() {
     const router = useRouter();
-    const [counts, setCounts] = useState<Record<string, string>>({});
-    const [revealedItems, setRevealedItems] = useState<Record<string, boolean>>({});
+    const { id } = useLocalSearchParams<{ id: string }>();
+    const ticketId = parseInt(id || '0');
+
+    const { data: ticket, isLoading, error } = useStockCountTicket(ticketId);
+    const updateItem = useUpdateStockCountItem();
+
+    const [counts, setCounts] = useState<Record<number, string>>({});
+    const [revealedItems, setRevealedItems] = useState<Record<number, boolean>>({});
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const handleCountChange = (itemId: string, value: string) => {
+    const handleCountChange = (itemId: number, value: string) => {
         // Only allow numbers
         const cleanValue = value.replace(/[^0-9]/g, '');
         setCounts(prev => ({ ...prev, [itemId]: cleanValue }));
     };
 
-    const handleConfirmItem = (item: typeof mockTask.items[0]) => {
+    const handleConfirmItem = async (item: StockCountItem) => {
         const countStr = counts[item.id] || '';
         if (countStr === '') {
             Alert.alert('Lưu ý', 'Vui lòng nhập số lượng trước khi xác nhận');
@@ -41,50 +33,84 @@ export default function InventoryCountDetailScreen() {
         }
 
         const count = parseInt(countStr);
-        const diff = Math.abs(count - item.systemQty);
+        setIsProcessing(true);
 
-        setRevealedItems(prev => ({ ...prev, [item.id]: true }));
+        try {
+            await updateItem.mutateAsync({
+                itemId: item.id,
+                payload: {
+                    countedQuantity: count,
+                    status: 'Counted'
+                }
+            });
 
-        if (diff > item.systemQty * 0.2) {
-            Alert.alert(
-                'Cảnh báo sai lệch lớn',
-                `Số lượng đếm (${count}) lệch quá 20% so với hệ thống (${item.systemQty}). Vui lòng kiểm tra lại.`
-            );
+            setRevealedItems(prev => ({ ...prev, [item.id]: true }));
+
+            const diff = Math.abs(count - item.systemQuantity);
+            if (diff > item.systemQuantity * 0.2) {
+                Alert.alert(
+                    'Cảnh báo sai lệch lớn',
+                    `Số lượng đếm (${count}) lệch quá 20% so với hệ thống (${item.systemQuantity}). Vui lòng kiểm tra lại.`
+                );
+            }
+        } catch (error) {
+            console.error('Failed to update count:', error);
+            Alert.alert('Lỗi', 'Không thể cập nhật số lượng. Vui lòng thử lại.');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const handleComplete = () => {
-        const allConfirmed = mockTask.items.every(item => revealedItems[item.id]);
+        if (!ticket) return;
+        const allConfirmed = ticket.items.every(item => revealedItems[item.id] || item.countedQuantity !== null);
         if (!allConfirmed) {
             Alert.alert('Lưu ý', 'Vui lòng xác nhận số lượng cho tất cả các mặt hàng');
             return;
         }
 
-        setIsProcessing(true);
-        // Simulate API call
-        setTimeout(() => {
-            setIsProcessing(false);
-            Alert.alert('Thành công', 'Đã lưu kết quả kiểm kê');
-            router.back();
-        }, 1000);
+        Alert.alert('Thành công', 'Đã lưu kết quả kiểm kê', [
+            { text: 'OK', onPress: () => router.back() }
+        ]);
     };
+
+    if (isLoading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loadingText}>Đang tải chi tiết phiếu kiểm kê...</Text>
+            </View>
+        );
+    }
+
+    if (error || !ticket) {
+        return (
+            <View style={styles.errorContainer}>
+                <Feather name="alert-circle" size={48} color={COLORS.danger} />
+                <Text style={styles.errorText}>Không thể tải thông tin phiếu kiểm kê</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={() => router.back()}>
+                    <Text style={styles.retryBtnText}>Quay lại</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
             <ScreenHeader
                 title="Kiểm kê (Physical Count)"
-                subtitle={mockTask.taskNumber}
+                subtitle={ticket.name || `CNT-${ticket.id}`}
             />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <View style={styles.infoIconContainer}>
-                            <Feather name="map-pin" size={16} color={COLORS.primary} />
+                            <Feather name="info" size={16} color={COLORS.primary} />
                         </View>
                         <View>
-                            <Text style={styles.infoLabel}>Vị trí đếm</Text>
-                            <Text style={styles.infoValue}>{mockTask.location}</Text>
+                            <Text style={styles.infoLabel}>Loại kiểm kê</Text>
+                            <Text style={styles.infoValue}>{ticket.type || 'N/A'}</Text>
                         </View>
                     </View>
                     <View style={styles.divider} />
@@ -93,8 +119,10 @@ export default function InventoryCountDetailScreen() {
                             <Feather name="calendar" size={16} color={COLORS.primary} />
                         </View>
                         <View>
-                            <Text style={styles.infoLabel}>Ngày thực hiện</Text>
-                            <Text style={styles.infoValue}>{mockTask.date}</Text>
+                            <Text style={styles.infoLabel}>Ngày tạo</Text>
+                            <Text style={styles.infoValue}>
+                                {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+                            </Text>
                         </View>
                     </View>
 
@@ -108,21 +136,21 @@ export default function InventoryCountDetailScreen() {
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Sản phẩm cần đếm ({mockTask.itemCount})</Text>
+                    <Text style={styles.sectionTitle}>Sản phẩm cần đếm ({ticket.items.length})</Text>
                 </View>
 
-                {mockTask.items.map(item => {
-                    const isRevealed = revealedItems[item.id];
-                    const count = parseInt(counts[item.id] || '0');
-                    const diff = count - item.systemQty;
+                {ticket.items.map(item => {
+                    const isRevealed = revealedItems[item.id] || item.countedQuantity !== null;
+                    const count = isRevealed ? (item.countedQuantity ?? parseInt(counts[item.id] || '0')) : parseInt(counts[item.id] || '0');
+                    const diff = count - item.systemQuantity;
 
                     return (
                         <Card key={item.id} style={[styles.itemCard, isRevealed && styles.itemCardRevealed]}>
                             <View style={styles.itemHeader}>
                                 <View style={styles.itemInfo}>
-                                    <Text style={styles.productName}>{item.productName}</Text>
+                                    <Text style={styles.productName}>{item.name || `Sản phẩm #${item.productId}`}</Text>
                                     <View style={styles.skuBadge}>
-                                        <Text style={styles.skuText}>{item.sku}</Text>
+                                        <Text style={styles.skuText}>{item.sku || 'N/A'}</Text>
                                     </View>
                                 </View>
                                 {isRevealed && (
@@ -148,7 +176,7 @@ export default function InventoryCountDetailScreen() {
                                     <Text style={styles.countLabel}>Số hệ thống</Text>
                                     <View style={[styles.qtyBox, isRevealed && styles.qtyBoxRevealed]}>
                                         <Text style={isRevealed ? styles.systemQtyValue : styles.hiddenQtyValue}>
-                                            {isRevealed ? item.systemQty : '??'}
+                                            {isRevealed ? item.systemQuantity : '??'}
                                         </Text>
                                         {!isRevealed && <Feather name="lock" size={14} color={COLORS.textMuted} />}
                                     </View>
@@ -161,7 +189,7 @@ export default function InventoryCountDetailScreen() {
                                             style={[styles.countInput, isRevealed && styles.revealedInput]}
                                             keyboardType="numeric"
                                             placeholder="0"
-                                            value={counts[item.id] || ''}
+                                            value={isRevealed ? (item.countedQuantity?.toString() || counts[item.id] || '') : (counts[item.id] || '')}
                                             onChangeText={(v) => handleCountChange(item.id, v)}
                                             editable={!isRevealed}
                                         />
@@ -171,11 +199,18 @@ export default function InventoryCountDetailScreen() {
 
                             {!isRevealed ? (
                                 <TouchableOpacity
-                                    style={styles.confirmItemBtn}
+                                    style={[styles.confirmItemBtn, isProcessing && { opacity: 0.7 }]}
                                     onPress={() => handleConfirmItem(item)}
+                                    disabled={isProcessing}
                                 >
-                                    <Feather name="check" size={18} color="#fff" />
-                                    <Text style={styles.confirmItemBtnText}>Xác nhận kết quả đếm</Text>
+                                    {isProcessing ? (
+                                        <ActivityIndicator size="small" color="#fff" />
+                                    ) : (
+                                        <Feather name="check" size={18} color="#fff" />
+                                    )}
+                                    <Text style={styles.confirmItemBtnText}>
+                                        {isProcessing ? 'Đang lưu...' : 'Xác nhận kết quả đếm'}
+                                    </Text>
                                 </TouchableOpacity>
                             ) : (
                                 <View style={styles.revealedFooter}>
@@ -193,9 +228,9 @@ export default function InventoryCountDetailScreen() {
 
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[styles.completeBtn, (isProcessing || !mockTask.items.every(i => revealedItems[i.id])) && styles.disabledBtn]}
+                    style={[styles.completeBtn, (isProcessing || !ticket.items.every(item => revealedItems[item.id] || item.countedQuantity !== null)) && styles.disabledBtn]}
                     onPress={handleComplete}
-                    disabled={isProcessing || !mockTask.items.every(i => revealedItems[i.id])}
+                    disabled={isProcessing || !ticket.items.every(item => revealedItems[item.id] || item.countedQuantity !== null)}
                 >
                     <Text style={styles.completeBtnText}>
                         {isProcessing ? 'Đang lưu...' : 'Hoàn thành đợt kiểm kê'}
@@ -207,6 +242,42 @@ export default function InventoryCountDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: COLORS.textMuted,
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+        backgroundColor: '#F9FAFB',
+    },
+    errorText: {
+        marginTop: 16,
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.text,
+        textAlign: 'center',
+    },
+    retryBtn: {
+        marginTop: 24,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        backgroundColor: COLORS.primary,
+        borderRadius: 8,
+    },
+    retryBtnText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
     container: {
         flex: 1,
         backgroundColor: '#F9FAFB',

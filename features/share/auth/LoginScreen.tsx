@@ -18,6 +18,20 @@ export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const authStore = useAuthStore();
+
+    // Tự động đăng nhập nếu đã có token
+    React.useEffect(() => {
+        const { token, user } = useAuthStore.getState();
+        if (token && user) {
+            console.log('[Auth] Found existing session, redirecting...', { roleId: user.roleId });
+            if (user.roleId === 2 || user.roleId === 3) {
+                router.replace('/(manager-tabs)/requisitions' as any);
+            } else {
+                router.replace('/(staff-tabs)' as any);
+            }
+        }
+    }, []);
 
     const handleLogin = async () => {
         try {
