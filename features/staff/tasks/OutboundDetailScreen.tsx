@@ -1,12 +1,13 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useConfirmOutboundOrder, useOutboundTasksByStaff, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function OutboundDetailScreen() {
     const router = useRouter();
@@ -115,9 +116,9 @@ export default function OutboundDetailScreen() {
                 items: updatedItems,
             });
 
-            Alert.alert('Thành công', 'Đã cập nhật số lượng lấy hàng');
+            AlertService.success('Thành công', 'Đã cập nhật số lượng lấy hàng');
         } catch {
-            Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
+            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
             setIsSaving(false);
         }
@@ -126,49 +127,46 @@ export default function OutboundDetailScreen() {
     const handleConfirmComplete = async () => {
         if (!order || !user) return;
 
-        Alert.alert(
+        AlertService.confirm(
             'Xác nhận hoàn tất xuất kho',
             'Bạn có chắc chắn đã lấy đủ và kiểm tra tất cả hàng hóa? Sau khi xác nhận, phiếu xuất sẽ được đánh dấu hoàn thành.',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Xác nhận',
-                    style: 'default',
-                    onPress: async () => {
-                        setIsConfirming(true);
-                        try {
-                            // Update items with final quantities
-                            const orderItems = order.items || order.outboundOrderItems || [];
-                            const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
-                                id: item.id,
-                                productId: item.productId || 0,
-                                quantity: localQuantities[item.id] || item.quantity || 0,
-                            }));
+            async () => {
+                setIsConfirming(true);
+                try {
+                    // Update items with final quantities
+                    const orderItems = order.items || order.outboundOrderItems || [];
+                    const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
+                        id: item.id,
+                        productId: item.productId || 0,
+                        quantity: localQuantities[item.id] || item.quantity || 0,
+                    }));
 
-                            await updateItems.mutateAsync({
-                                ticketId: order.id,
-                                items: updatedItems,
-                            });
+                    await updateItems.mutateAsync({
+                        ticketId: order.id,
+                        items: updatedItems,
+                    });
 
-                            // Then confirm the order
-                            await confirmOrder.mutateAsync({
-                                ticketId: order.id,
-                                performedBy: user.id,
-                            });
+                    // Update ticket status to Completed
+                    await updateStatus.mutateAsync({
+                        ticketId: order.id,
+                        performedBy: user.id || 0,
+                        status: 'Completed',
+                    });
 
-                            Alert.alert(
-                                'Hoàn tất!',
-                                'Phiếu xuất kho đã được xác nhận hoàn thành.',
-                                [{ text: 'OK', onPress: () => router.back() }]
-                            );
-                        } catch {
-                            Alert.alert('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
-                        } finally {
-                            setIsConfirming(false);
-                        }
-                    }
+                    // Confirm the flow
+                    await confirmOrder.mutateAsync({
+                        ticketId: order.id,
+                        performedBy: user.id || 0,
+                    });
+
+                    AlertService.success('Hoàn thành', 'Đơn hàng đã được xuất kho thành công');
+                    router.back();
+                } catch {
+                    AlertService.error('Lỗi', 'Không thể hoàn tất đơn hàng');
+                } finally {
+                    setIsConfirming(false);
                 }
-            ]
+            }
         );
     };
 

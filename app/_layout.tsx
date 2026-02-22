@@ -9,6 +9,7 @@ import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from 'react-native';
 import "react-native-reanimated";
 
+import AlertContainer from "@/components/ui/Alert";
 import { queryClient } from '@/services/queryClient';
 import { QueryClientProvider } from '@tanstack/react-query';
 
@@ -25,6 +26,7 @@ export default function RootLayout() {
           <Stack.Screen name="(manager-tabs)" />
         </Stack>
         <StatusBar style="auto" />
+        <AlertContainer />
       </ThemeProvider>
     </QueryClientProvider>
   );
