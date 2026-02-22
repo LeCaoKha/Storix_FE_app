@@ -21,6 +21,7 @@ export interface InboundOrderItem {
   description?: string;
   typeId?: number;
   price?: number;
+  discount?: number;
   lineDiscount?: number;
   // Nested product object for backward compatibility
   product?: {

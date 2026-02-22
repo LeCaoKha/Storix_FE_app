@@ -14,6 +14,7 @@ export interface OutboundOrderItem {
   outboundOrderId?: number;
   productId?: number;
   quantity?: number;
+  price?: number;
   product?: {
     id: number;
     name: string;

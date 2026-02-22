@@ -1,6 +1,6 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useConfirmOutboundOrder, useOutboundOrder, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
+import { useConfirmOutboundOrder, useOutboundTasksByStaff, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
 import { useAuthStore } from '@/stores/auth.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
@@ -11,14 +11,22 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 export default function OutboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: order, isLoading, error } = useOutboundOrder(id);
+    const user = useAuthStore((state) => state.user);
+    const companyId = user?.companyId ?? 0;
+    const staffId = user?.id ?? 0;
+
+    // Lấy data từ staff task list (tránh 404 do filter companyId không nhất quán ở BE)
+    const { data: staffTasks, isLoading } = useOutboundTasksByStaff(companyId, staffId);
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const order = staffTasks?.find(t => t.id === numericId) ?? null;
+    const error = !isLoading && !order;
+
+
     const updateItems = useUpdateOutboundTicketItems();
     const updateStatus = useUpdateOutboundTicketStatus();
     const confirmOrder = useConfirmOutboundOrder();
-    const user = useAuthStore((state) => state.user);
 
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
-    const [verifiedItems, setVerifiedItems] = useState<Record<number, boolean>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
 
@@ -66,21 +74,7 @@ export default function OutboundDetailScreen() {
         );
     }
 
-    const handleVerifyItem = (itemId: number) => {
-        setIsSaving(true);
-        // Simulate scanning delay
-        setTimeout(() => {
-            setIsSaving(false);
-            setVerifiedItems(prev => ({ ...prev, [itemId]: true }));
-            Alert.alert('Thành công', 'Đã xác nhận đúng sản phẩm');
-        }, 600);
-    };
-
     const handleUpdateQty = (itemId: number, increment: boolean) => {
-        if (!verifiedItems[itemId]) {
-            Alert.alert('Lưu ý', 'Vui lòng quét mã sản phẩm để xác minh trước khi lấy hàng');
-            return;
-        }
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
             const item = order?.outboundOrderItems.find((i: OutboundOrderItem) => i.id === itemId);
@@ -121,19 +115,8 @@ export default function OutboundDetailScreen() {
         (item: OutboundOrderItem) => (localQuantities[item.id] || 0) >= (item.quantity || 0)
     ) ?? false;
 
-    // Check if all items are verified (scanned)
-    const allItemsVerified = order?.outboundOrderItems?.every(
-        (item: OutboundOrderItem) => verifiedItems[item.id]
-    ) ?? false;
-
     const handleConfirmComplete = async () => {
         if (!order || !user) return;
-
-        // Check if all items are verified first
-        if (!allItemsVerified) {
-            Alert.alert('Chưa hoàn tất', 'Vui lòng quét xác minh tất cả sản phẩm trước khi xác nhận hoàn tất.');
-            return;
-        }
 
         Alert.alert(
             'Xác nhận hoàn tất xuất kho',
@@ -146,7 +129,7 @@ export default function OutboundDetailScreen() {
                     onPress: async () => {
                         setIsConfirming(true);
                         try {
-                            // First update items with final quantities
+                            // Update items with final quantities
                             const updatedItems = order.outboundOrderItems.map((item: OutboundOrderItem) => ({
                                 id: item.id,
                                 productId: item.productId || 0,
@@ -166,7 +149,7 @@ export default function OutboundDetailScreen() {
 
                             Alert.alert(
                                 'Hoàn tất!',
-                                'Phiếu xuất kho đã được xác nhận hoàn thành. Hàng hóa đã được ghi giảm khỏi tồn kho.',
+                                'Phiếu xuất kho đã được xác nhận hoàn thành.',
                                 [{ text: 'OK', onPress: () => router.back() }]
                             );
                         } catch {
@@ -201,11 +184,11 @@ export default function OutboundDetailScreen() {
 
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{order.outboundOrderItems.length} mặt hàng</Text>
+                    <Text style={styles.sectionSubtitle}>{order.outboundOrderItems?.length ?? 0} mặt hàng</Text>
                 </View>
 
                 {sortedItems.map((item: OutboundOrderItem) => (
-                    <Card key={item.id} style={[styles.itemCard, verifiedItems[item.id] ? styles.itemCardVerified : null]}>
+                    <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
                                 <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
@@ -227,46 +210,32 @@ export default function OutboundDetailScreen() {
                         </View>
 
                         <View style={styles.counterRow}>
-                            <View style={styles.qtyLabelContainer}>
-                                <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
-                                {!verifiedItems[item.id] && (
-                                    <Text style={styles.verificationPrompt}>Quét để xác minh</Text>
-                                )}
-                            </View>
-                            <View style={[styles.counter, !verifiedItems[item.id] && styles.disabledCounter]}>
+                            <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
+                            <View style={styles.counter}>
                                 <TouchableOpacity
                                     style={styles.counterBtn}
                                     onPress={() => handleUpdateQty(item.id, false)}
-                                    disabled={!verifiedItems[item.id]}
                                 >
-                                    <Feather name="minus" size={20} color={verifiedItems[item.id] ? COLORS.primary : COLORS.border} />
+                                    <Feather name="minus" size={20} color={COLORS.primary} />
                                 </TouchableOpacity>
                                 <View style={styles.qtyDisplay}>
-                                    <Text style={[styles.qtyValue, !verifiedItems[item.id] && { color: COLORS.border }]}>
-                                        {localQuantities[item.id] || 0}
-                                    </Text>
+                                    <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
                                     <Text style={styles.qtyTotal}>/ {item.quantity || 0}</Text>
                                 </View>
                                 <TouchableOpacity
                                     style={styles.counterBtn}
                                     onPress={() => handleUpdateQty(item.id, true)}
-                                    disabled={!verifiedItems[item.id]}
                                 >
-                                    <Feather name="plus" size={20} color={verifiedItems[item.id] ? COLORS.primary : COLORS.border} />
+                                    <Feather name="plus" size={20} color={COLORS.primary} />
                                 </TouchableOpacity>
                             </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={[styles.scanItemBtn, verifiedItems[item.id] && styles.scanItemBtnSuccess]}
-                            onPress={() => handleVerifyItem(item.id)}
-                            disabled={verifiedItems[item.id] || isSaving}
-                        >
-                            <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? COLORS.success : COLORS.primary} />
-                            <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: COLORS.success }]}>
-                                {verifiedItems[item.id] ? 'Đã xác minh sản phẩm' : 'Verify Scan (Quét mã xác nhận)'}
-                            </Text>
-                        </TouchableOpacity>
+                        {item.price != null && (
+                            <View style={styles.priceRow}>
+                                <Text style={styles.priceText}>Đơn giá: <Text style={styles.boldText}>{item.price.toLocaleString('vi-VN')} ₫</Text></Text>
+                            </View>
+                        )}
                     </Card>
                 ))}
             </ScrollView>
@@ -276,8 +245,8 @@ export default function OutboundDetailScreen() {
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
                     <Text style={styles.reportBtnText}>Báo lỗi</Text>
                 </TouchableOpacity>
-                
-                {!(allItemsPicked && allItemsVerified) ? (
+
+                {!allItemsPicked ? (
                     <TouchableOpacity
                         style={[styles.saveBtn, isSaving && styles.disabledBtn]}
                         onPress={handleSave}
@@ -589,5 +558,16 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#fff',
         fontWeight: 'bold',
+    },
+    priceRow: {
+        flexDirection: 'row',
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+    },
+    priceText: {
+        fontSize: 13,
+        color: COLORS.textMuted,
     },
 });

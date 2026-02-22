@@ -1,36 +1,39 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundOrder, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundTasksByStaff, useUpdateInboundTicketItems } from '@/hooks';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function InboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: order, isLoading, error } = useInboundOrder(id);
-    const updateItems = useUpdateInboundTicketItems();
     const user = useAuthStore((state) => state.user);
+    const companyId = user?.companyId ?? 0;
+    const staffId = user?.id ?? 0;
+
+    // Lấy data từ staff task list (dùng Warehouse.CompanyId - đúng filter)
+    // thay vì gọi lại GET /tickets/{companyId}/{id} (dùng CreatedByNavigation.CompanyId - sai)
+    const { data: staffTasks, isLoading } = useInboundTasksByStaff(companyId, staffId);
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const order = staffTasks?.find(t => t.id === numericId) ?? null;
+    const error = !isLoading && !order;
+
+    const updateItems = useUpdateInboundTicketItems();
 
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
-    const [localItemData, setLocalItemData] = useState<Record<number, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
 
-    // Initialize state when order data is loaded
+    // Initialize receivedQuantity from existing data
     useEffect(() => {
         if (order?.inboundOrderItems) {
             setLocalQuantities(
                 order.inboundOrderItems.reduce((acc: Record<number, number>, item: InboundOrderItem) => ({ ...acc, [item.id]: item.receivedQuantity || 0 }), {})
             );
-            const initialData: Record<number, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }> = {};
-            order.inboundOrderItems.forEach((item: InboundOrderItem) => {
-                initialData[item.id] = { batch: '', expiry: '', qc: 'good' };
-            });
-            setLocalItemData(initialData);
         }
     }, [order]);
 
@@ -68,12 +71,7 @@ export default function InboundDetailScreen() {
         });
     };
 
-    const handleUpdateItemData = (itemId: number, field: string, value: string) => {
-        setLocalItemData(prev => ({
-            ...prev,
-            [itemId]: { ...prev[itemId], [field]: value }
-        }));
-    };
+
 
     const handleSave = async () => {
         if (!order) return;
@@ -214,50 +212,17 @@ export default function InboundDetailScreen() {
                             </View>
                         </View>
 
-                        {/* Business Logic: Batch & Expiry & QC */}
-                        <View style={styles.businessLogicSection}>
-                            <View style={styles.dataGrid}>
-                                <View style={styles.dataField}>
-                                    <Text style={styles.dataLabel}>Số lô (Batch)</Text>
-                                    <TextInput
-                                        style={styles.dataInput}
-                                        placeholder="Nhập số lô"
-                                        value={localItemData[item.id]?.batch}
-                                        onChangeText={(v) => handleUpdateItemData(item.id, 'batch', v)}
-                                    />
-                                </View>
-                                <View style={styles.dataField}>
-                                    <Text style={styles.dataLabel}>Hạn dùng (Exp)</Text>
-                                    <TextInput
-                                        style={styles.dataInput}
-                                        placeholder="DD/MM/YYYY"
-                                        value={localItemData[item.id]?.expiry}
-                                        onChangeText={(v) => handleUpdateItemData(item.id, 'expiry', v)}
-                                    />
-                                </View>
+                        {/* Giá & Chiết khấu — từ InboundOrderItem.Price / Discount */}
+                        {(item.price != null || item.discount != null) && (
+                            <View style={styles.priceRow}>
+                                {item.price != null && (
+                                    <Text style={styles.priceText}>Đơn giá: <Text style={styles.boldText}>{item.price.toLocaleString('vi-VN')} ₫</Text></Text>
+                                )}
+                                {item.discount != null && item.discount > 0 && (
+                                    <Text style={styles.discountText}>CK: {item.discount}%</Text>
+                                )}
                             </View>
-
-                            <Text style={styles.dataLabel}>Tình trạng QC</Text>
-                            <View style={styles.qcOptions}>
-                                <TouchableOpacity
-                                    style={[styles.qcOption, localItemData[item.id]?.qc === 'good' && styles.qcOptionActive]}
-                                    onPress={() => handleUpdateItemData(item.id, 'qc', 'good')}
-                                >
-                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'good' && styles.qcOptionTextActive]}>Hàng tốt</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.qcOption, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionActiveDanger]}
-                                    onPress={() => handleUpdateItemData(item.id, 'qc', 'damaged')}
-                                >
-                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActiveDanger]}>Lỗi/Hỏng</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        <TouchableOpacity style={styles.scanItemBtn}>
-                            <Feather name="maximize" size={16} color={COLORS.primary} />
-                            <Text style={styles.scanItemBtnText}>Scan mã vạch sản phẩm này</Text>
-                        </TouchableOpacity>
+                        )}
                     </Card>
                 ))}
             </ScrollView>
@@ -601,5 +566,23 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#fff',
         fontWeight: 'bold',
+    },
+    priceRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+    },
+    priceText: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+    },
+    discountText: {
+        fontSize: 13,
+        color: COLORS.success,
+        fontWeight: '600',
     },
 });
