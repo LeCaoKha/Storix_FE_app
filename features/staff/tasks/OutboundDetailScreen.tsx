@@ -47,11 +47,20 @@ export default function OutboundDetailScreen() {
         const orderItems = order?.items || order?.outboundOrderItems;
         if (!orderItems) return [];
         return [...orderItems].sort((a, b) => {
-            const nameA = a.name || a.product?.name || '';
-            const nameB = b.name || b.product?.name || '';
+            const nameA = a.productName || a.name || a.product?.name || '';
+            const nameB = b.productName || b.name || b.product?.name || '';
             return nameA.localeCompare(nameB);
         });
     }, [order]);
+
+    // Check if all items are picked
+    const allItemsPicked = React.useMemo(() => {
+        const orderItems = order?.items || order?.outboundOrderItems;
+        if (!orderItems || orderItems.length === 0) return false;
+        return orderItems.every(
+            (item: OutboundOrderItem) => (localQuantities[item.id] || 0) >= (item.quantity || 0)
+        );
+    }, [order, localQuantities]);
 
     if (isLoading) {
         return (
@@ -114,15 +123,6 @@ export default function OutboundDetailScreen() {
         }
     };
 
-    // Check if all items are picked
-    const allItemsPicked = React.useMemo(() => {
-        const orderItems = order?.items || order?.outboundOrderItems;
-        if (!orderItems || orderItems.length === 0) return false;
-        return orderItems.every(
-            (item: OutboundOrderItem) => (localQuantities[item.id] || 0) >= (item.quantity || 0)
-        );
-    }, [order, localQuantities]);
-
     const handleConfirmComplete = async () => {
         if (!order || !user) return;
 
@@ -183,7 +183,7 @@ export default function OutboundDetailScreen() {
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="user" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Người tạo: <Text style={styles.boldText}>{order.createdByNavigation?.email || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>Người tạo: <Text style={styles.boldText}>{order.createdByUser?.fullName || order.createdByUser?.email || order.createdByNavigation?.email || 'N/A'}</Text></Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Feather name="map-pin" size={16} color={COLORS.textMuted} />
@@ -200,7 +200,7 @@ export default function OutboundDetailScreen() {
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.name || item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                <Text style={styles.productName}>{item.productName || item.name || item.product?.name || `Sản phẩm #${item.productId}`}</Text>
                                 <View style={styles.skuRow}>
                                     <View style={styles.skuBadge}>
                                         <Text style={styles.skuText}>{item.sku || item.product?.sku || 'N/A'}</Text>
@@ -252,7 +252,7 @@ export default function OutboundDetailScreen() {
             <View style={styles.footer}>
                 <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi (Sắp có)</Text>
+                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
                 </TouchableOpacity>
 
                 {!allItemsPicked ? (

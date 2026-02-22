@@ -2,7 +2,6 @@ import { Task, TaskPriority, TaskStatus, TaskType } from '@/types/order';
 
 import { getInboundOrdersByStaff } from './inbound-order.api';
 import { getOutboundOrdersByStaff } from './outbound-order.api';
-import { getStockCountTickets } from './stock-count.api';
 
 /**
  * Lấy tất cả tasks của staff hiện tại
@@ -61,27 +60,7 @@ export const getTasks = async (staffId: number, companyId: number): Promise<Task
             console.warn('[getTasks] Failed to fetch outbound tasks:', err);
         }
 
-        // Fetch stock count tasks
-        try {
-            const countTickets = await getStockCountTickets(companyId);
 
-            const countTasks = countTickets.map(ticket => ({
-                id: `count-${ticket.id}`,
-                title: `Kiểm kê: ${ticket.name || `CNT-${ticket.id}`}`,
-                description: `Kiểm kê ${ticket.itemCount} mặt hàng tại kho`,
-                type: TaskType.COUNT,
-                status: mapCountStatus(ticket.status),
-                priority: TaskPriority.MEDIUM,
-                assignedTo: String(staffId),
-                relatedOrderId: String(ticket.id),
-                createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
-                updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
-            }));
-
-            tasks.push(...countTasks);
-        } catch (err) {
-            console.warn('[getTasks] Failed to fetch stock count tasks:', err);
-        }
 
         // Sort by created date (newest first)
         tasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -115,9 +94,12 @@ function mapOutboundStatus(status?: string): TaskStatus {
         case 'pending':
             return TaskStatus.PENDING;
         case 'picking':
+        case 'qualitycheck':
         case 'packing':
         case 'packed':
         case 'ready':
+        case 'loadhandover':
+        case 'issuereported':
             return TaskStatus.IN_PROGRESS;
         case 'shipped':
         case 'completed':
@@ -129,22 +111,4 @@ function mapOutboundStatus(status?: string): TaskStatus {
     }
 }
 
-function mapCountStatus(status?: string): TaskStatus {
-    switch (status?.toLowerCase()) {
-        case 'pending':
-        case 'created':
-            return TaskStatus.PENDING;
-        case 'processing':
-        case 'in progress':
-        case 'in_progress':
-            return TaskStatus.IN_PROGRESS;
-        case 'completed':
-        case 'approved':
-        case 'finished':
-            return TaskStatus.COMPLETED;
-        case 'cancelled':
-            return TaskStatus.CANCELLED;
-        default:
-            return TaskStatus.PENDING;
-    }
-}
+

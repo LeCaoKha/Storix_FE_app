@@ -230,7 +230,7 @@ export default function InboundDetailScreen() {
             <View style={styles.footer}>
                 <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi (Sắp có)</Text>
+                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
                 </TouchableOpacity>
 
                 {!allItemsReceived ? (

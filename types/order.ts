@@ -19,7 +19,6 @@ export enum TaskType {
   OUTBOUND = 'outbound',
   PUTAWAY = 'putaway',
   PICKING = 'picking',
-  COUNT = 'count',
   TRANSFER = 'transfer',
 }
 

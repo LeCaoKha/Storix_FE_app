@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRootNavigationState, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth.store';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const rootNavigationState = useRootNavigationState();
     const { mutateAsync: login, isPending: isLoading } = useLogin();
     const loginStore = useAuthStore((state) => state.login);
     const [email, setEmail] = useState('');
@@ -22,16 +23,23 @@ export default function LoginScreen() {
 
     // Tự động đăng nhập nếu đã có token
     React.useEffect(() => {
+        // Chỉ điều hướng khi root layout đã mount (tránh lỗi Render Error)
+        if (!rootNavigationState?.key) return;
+
         const { token, user } = useAuthStore.getState();
         if (token && user) {
-            console.log('[Auth] Found existing session, redirecting...', { roleId: user.roleId });
-            if (user.roleId === 2 || user.roleId === 3) {
-                router.replace('/(manager-tabs)/requisitions' as any);
-            } else {
-                router.replace('/(staff-tabs)' as any);
-            }
+            // Thêm một chút delay để đảm bảo Navigator đã hoàn toàn sẵn sàng nhận lệnh
+            const timeout = setTimeout(() => {
+                console.log('[Auth] Found existing session, redirecting...', { roleId: user.roleId });
+                if (user.roleId === 2 || user.roleId === 3) {
+                    router.replace('/(manager-tabs)/requisitions' as any);
+                } else {
+                    router.replace('/(staff-tabs)' as any);
+                }
+            }, 1);
+            return () => clearTimeout(timeout);
         }
-    }, []);
+    }, [rootNavigationState?.key]);
 
     const handleLogin = async () => {
         try {
@@ -48,14 +56,19 @@ export default function LoginScreen() {
             // Fetch complete user profile to get warehouse assignment
             try {
                 const { getUserProfile } = await import('@/services/user.api');
-                const userProfile = await getUserProfile(data.userId);
+                const userProfile = await getUserProfile(data.userId) as any;
 
-                console.log('User profile fetched:', {
-                    warehouseId: userProfile.warehouseId,
-                    warehouseName: userProfile.warehouseName
+                // Backend trả về User entity thô, bóc tách assignment mới nhất
+                const latestAssignment = userProfile.warehouseAssignments?.sort((a: any, b: any) =>
+                    new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime()
+                )[0];
+
+                console.log('User profile fetched (raw):', {
+                    hasAssignments: !!userProfile.warehouseAssignments?.length,
+                    warehouseId: latestAssignment?.warehouseId
                 });
 
-                // Save to store with complete profile data
+                // Save to store with extracted profile data
                 loginStore(data.accessToken, {
                     id: data.userId,
                     roleId: data.roleId,
@@ -63,9 +76,9 @@ export default function LoginScreen() {
                     email: email,
                     fullName: userProfile.fullName,
                     phone: userProfile.phone,
-                    warehouseId: userProfile.warehouseId,
-                    warehouseName: userProfile.warehouseName,
-                    roleName: userProfile.roleName,
+                    warehouseId: latestAssignment?.warehouseId,
+                    warehouseName: latestAssignment?.warehouse?.name,
+                    roleName: userProfile.role?.name,
                     status: userProfile.status,
                 });
             } catch (profileError) {
