@@ -62,6 +62,12 @@ export const AlertService = {
     error: (title: string, message: string, onDismiss?: () => void) => {
         useAlertStore.getState().showAlert({ title, message, type: 'error', onDismiss });
     },
+    warning: (title: string, message: string, onDismiss?: () => void) => {
+        useAlertStore.getState().showAlert({ title, message, type: 'warning', onDismiss });
+    },
+    info: (title: string, message: string, onDismiss?: () => void) => {
+        useAlertStore.getState().showAlert({ title, message, type: 'info', onDismiss });
+    },
     confirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) => {
         useAlertStore.getState().showAlert({
             title,

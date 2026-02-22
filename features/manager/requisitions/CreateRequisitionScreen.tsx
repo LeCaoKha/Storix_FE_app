@@ -4,6 +4,7 @@ import { useCreateOutboundRequisition, useCreateRequisition, useProfile } from '
 import { useProducts } from '@/hooks/product.hooks';
 import { useSuppliers } from '@/hooks/suppliers.hooks';
 import { api } from '@/services/axios.instance';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { getLatestPrice } from '@/types/product';
 import type { RequisitionItem, RequisitionType } from '@/types/requisition';
@@ -21,7 +22,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 export default function CreateRequisitionScreen() {
@@ -87,7 +88,7 @@ export default function CreateRequisitionScreen() {
             }
 
             if (!token) {
-                Alert.alert('Lỗi', 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                AlertService.error('Lỗi', 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
                 return;
             }
 
@@ -119,7 +120,7 @@ export default function CreateRequisitionScreen() {
                     console.log('Warehouses endpoint not available - user can enter warehouse ID manually');
                     setWarehouses([]);
                 } else if (error.response?.status === 401) {
-                    Alert.alert('Lỗi', 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                    AlertService.error('Lỗi', 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
                 } else {
                     console.error('Error loading warehouses:', error.message);
                 }
@@ -152,7 +153,7 @@ export default function CreateRequisitionScreen() {
     const handleAddProduct = (product: any) => {
         // Check if already added
         if (items.some(item => item.id === product.id)) {
-            Alert.alert('Thông báo', 'Sản phẩm đã có trong danh sách');
+            AlertService.info('Thông báo', 'Sản phẩm đã có trong danh sách');
             return;
         }
 
@@ -183,39 +184,39 @@ export default function CreateRequisitionScreen() {
 
     const handleSubmit = async () => {
         if (!companyId) {
-            Alert.alert('Lỗi', 'Không tìm thấy thông tin công ty. Vui lòng đăng nhập lại.');
+            AlertService.error('Lỗi', 'Không tìm thấy thông tin công ty. Vui lòng đăng nhập lại.');
             return;
         }
 
         if (!warehouseId) {
-            Alert.alert('Lỗi', 'Vui lòng chọn kho');
+            AlertService.error('Lỗi', 'Vui lòng chọn kho');
             return;
         }
 
         // Validate based on type
         if (type === 'inbound') {
             if (!supplierId) {
-                Alert.alert('Lỗi', 'Vui lòng chọn nhà cung cấp');
+                AlertService.error('Lỗi', 'Vui lòng chọn nhà cung cấp');
                 return;
             }
             if (!note || note.trim() === '') {
-                Alert.alert('Lỗi', 'Vui lòng nhập ghi chú');
+                AlertService.error('Lỗi', 'Vui lòng nhập ghi chú');
                 return;
             }
         } else if (type === 'outbound') {
             if (!destination || destination.trim() === '') {
-                Alert.alert('Lỗi', 'Vui lòng nhập địa điểm xuất kho');
+                AlertService.error('Lỗi', 'Vui lòng nhập địa điểm xuất kho');
                 return;
             }
         }
 
         if (items.length === 0) {
-            Alert.alert('Lỗi', 'Vui lòng thêm ít nhất một sản phẩm');
+            AlertService.error('Lỗi', 'Vui lòng thêm ít nhất một sản phẩm');
             return;
         }
 
         if (items.some(item => item.quantity <= 0)) {
-            Alert.alert('Lỗi', 'Số lượng phải lớn hơn 0');
+            AlertService.error('Lỗi', 'Số lượng phải lớn hơn 0');
             return;
         }
 
@@ -224,7 +225,7 @@ export default function CreateRequisitionScreen() {
 
     const submitRequisition = async () => {
         if (!user) {
-            Alert.alert('Lỗi', 'Không tìm thấy thông tin người dùng');
+            AlertService.error('Lỗi', 'Không tìm thấy thông tin người dùng');
             return;
         }
 
@@ -243,9 +244,9 @@ export default function CreateRequisitionScreen() {
                     }))
                 };
                 await createRequisition(requestData);
-                Alert.alert('Thành công', 'Phiếu đề nghị nhập kho đã được tạo', [
-                    { text: 'OK', onPress: () => router.back() },
-                ]);
+                AlertService.success('Thành công', 'Phiếu đề nghị nhập kho đã được tạo', () => {
+                    router.back();
+                });
             } else {
                 await createOutboundRequisition({
                     warehouseId: warehouseId!,
@@ -255,9 +256,9 @@ export default function CreateRequisitionScreen() {
                         quantity: i.quantity
                     })),
                 });
-                Alert.alert('Thành công', 'Phiếu đề nghị xuất kho đã được tạo', [
-                    { text: 'OK', onPress: () => router.back() },
-                ]);
+                AlertService.success('Thành công', 'Phiếu đề nghị xuất kho đã được tạo', () => {
+                    router.back();
+                });
             }
         } catch (error: any) {
             let errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Không thể tạo phiếu đề nghị';
@@ -274,7 +275,7 @@ export default function CreateRequisitionScreen() {
                 }
             }
 
-            Alert.alert('Lỗi', errorMessage);
+            AlertService.error('Lỗi', errorMessage);
         }
     };
 
@@ -360,38 +361,38 @@ export default function CreateRequisitionScreen() {
                                 style={styles.selectField}
                                 onPress={() => {
                                     if (warehouses.length === 0 && !loadingWarehouses) {
-                                        Alert.alert(
+                                        AlertService.confirm(
                                             'Không có kho',
                                             'Không tìm thấy kho nào. Bạn có muốn nhập ID kho thủ công không?',
-                                            [
-                                                { text: 'Hủy', style: 'cancel' },
-                                                {
-                                                    text: 'Nhập thủ công',
-                                                    onPress: () => {
-                                                        Alert.prompt(
-                                                            'Nhập ID Kho',
-                                                            'Vui lòng nhập ID kho (số nguyên)',
-                                                            [
-                                                                { text: 'Hủy', style: 'cancel' },
-                                                                {
-                                                                    text: 'OK',
-                                                                    onPress: (value?: string) => {
-                                                                        const id = parseInt(value || '0');
-                                                                        if (id > 0) {
-                                                                            setWarehouseId(id);
-                                                                        } else {
-                                                                            Alert.alert('Lỗi', 'ID kho không hợp lệ');
-                                                                        }
-                                                                    }
+                                            () => {
+                                                // AlertService does not currently support prompt, but we can simulate or just use the existing logic if we keep Alert for prompt?
+                                                // Wait, React Native Alert.prompt is iOS only. This project seems to use standard Alert.alert mostly.
+                                                // The original code used Alert.prompt which is a bit problematic for cross-platform.
+                                                // For now, I'll keep the prompt logic but use AlertService for the result.
+                                                // Actually, AlertService.show can take custom buttons.
+                                                // I will replace with a confirm and then keep the prompt for now as it's a specific feature.
+                                                Alert.prompt(
+                                                    'Nhập ID Kho',
+                                                    'Vui lòng nhập ID kho (số nguyên)',
+                                                    [
+                                                        { text: 'Hủy', style: 'cancel' },
+                                                        {
+                                                            text: 'OK',
+                                                            onPress: (value?: string) => {
+                                                                const id = parseInt(value || '0');
+                                                                if (id > 0) {
+                                                                    setWarehouseId(id);
+                                                                } else {
+                                                                    AlertService.error('Lỗi', 'ID kho không hợp lệ');
                                                                 }
-                                                            ],
-                                                            'plain-text',
-                                                            '',
-                                                            'number-pad'
-                                                        );
-                                                    }
-                                                }
-                                            ]
+                                                            }
+                                                        }
+                                                    ],
+                                                    'plain-text',
+                                                    '',
+                                                    'number-pad'
+                                                );
+                                            }
                                         );
                                     } else {
                                         setShowWarehousePicker(true);

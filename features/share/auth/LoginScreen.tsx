@@ -9,6 +9,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Touchable
 import { Button, Input } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useLogin } from '@/hooks/auth.hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function LoginScreen() {
@@ -112,6 +113,7 @@ export default function LoginScreen() {
             }
         } catch (error) {
             console.error('Login failed:', error);
+            AlertService.error('Đăng nhập thất bại', 'Email hoặc mật khẩu không chính xác. Vui lòng thử lại.');
         }
     };
 

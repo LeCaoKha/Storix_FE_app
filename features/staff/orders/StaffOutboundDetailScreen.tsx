@@ -1,11 +1,12 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useOutboundOrder, useUpdateOutboundTicketItems } from '@/hooks';
+import { AlertService } from '@/stores/alert.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function StaffOutboundDetailScreen() {
     const router = useRouter();
@@ -67,13 +68,13 @@ export default function StaffOutboundDetailScreen() {
         setTimeout(() => {
             setIsSaving(false);
             setVerifiedItems(prev => ({ ...prev, [itemId]: true }));
-            Alert.alert('Thành công', 'Đã xác nhận đúng sản phẩm');
+            AlertService.success('Thành công', 'Đã xác nhận đúng sản phẩm');
         }, 600);
     };
 
     const handleUpdateQty = (itemId: number, increment: boolean) => {
         if (!verifiedItems[itemId]) {
-            Alert.alert('Lưu ý', 'Vui lòng quét mã sản phẩm để xác minh trước khi lấy hàng');
+            AlertService.warning('Lưu ý', 'Vui lòng quét mã sản phẩm để xác minh trước khi lấy hàng');
             return;
         }
         setLocalQuantities(prev => {
@@ -108,10 +109,11 @@ export default function StaffOutboundDetailScreen() {
                 items: updatedItems,
             });
 
-            Alert.alert('Thành công', allPicked ? 'Đã hoàn tất lấy hàng' : 'Đã cập nhật số lượng lấy hàng');
-            router.back();
+            AlertService.success('Thành công', allPicked ? 'Đã hoàn tất lấy hàng' : 'Đã cập nhật số lượng lấy hàng', () => {
+                router.back();
+            });
         } catch {
-            Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
+            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
             setIsSaving(false);
         }
@@ -142,74 +144,74 @@ export default function StaffOutboundDetailScreen() {
                 </View>
 
                 {sortedItems.map((item: OutboundOrderItem) => {
-                    const cardStyle = verifiedItems[item.id] 
+                    const cardStyle = verifiedItems[item.id]
                         ? StyleSheet.flatten([styles.itemCard, styles.itemCardVerified])
                         : styles.itemCard;
-                    
+
                     return (
-                    <Card key={item.id} style={cardStyle}>
-                        <View style={styles.itemHeader}>
-                            <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
-                                <View style={styles.skuRow}>
-                                    <View style={styles.skuBadge}>
-                                        <Text style={styles.skuText}>{item.product?.sku || 'N/A'}</Text>
+                        <Card key={item.id} style={cardStyle}>
+                            <View style={styles.itemHeader}>
+                                <View style={styles.itemInfo}>
+                                    <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                    <View style={styles.skuRow}>
+                                        <View style={styles.skuBadge}>
+                                            <Text style={styles.skuText}>{item.product?.sku || 'N/A'}</Text>
+                                        </View>
                                     </View>
                                 </View>
-                            </View>
-                            <View style={[styles.statusBadge, {
-                                backgroundColor: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? '#D1FAE5' : '#FEF3C7'
-                            }]}>
-                                <Text style={[styles.statusBadgeText, {
-                                    color: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? '#059669' : '#D97706'
+                                <View style={[styles.statusBadge, {
+                                    backgroundColor: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? '#D1FAE5' : '#FEF3C7'
                                 }]}>
-                                    {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? 'Xong' : 'Chờ'}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.counterRow}>
-                            <View style={styles.qtyLabelContainer}>
-                                <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
-                                {!verifiedItems[item.id] && (
-                                    <Text style={styles.verificationPrompt}>Quét để xác minh</Text>
-                                )}
-                            </View>
-                            <View style={[styles.counter, !verifiedItems[item.id] && styles.disabledCounter]}>
-                                <TouchableOpacity
-                                    style={styles.counterBtn}
-                                    onPress={() => handleUpdateQty(item.id, false)}
-                                    disabled={!verifiedItems[item.id]}
-                                >
-                                    <Feather name="minus" size={20} color={verifiedItems[item.id] ? COLORS.primary : COLORS.border} />
-                                </TouchableOpacity>
-                                <View style={styles.qtyDisplay}>
-                                    <Text style={[styles.qtyValue, !verifiedItems[item.id] && { color: COLORS.border }]}>
-                                        {localQuantities[item.id] || 0}
+                                    <Text style={[styles.statusBadgeText, {
+                                        color: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? '#059669' : '#D97706'
+                                    }]}>
+                                        {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? 'Xong' : 'Chờ'}
                                     </Text>
-                                    <Text style={styles.qtyTotal}>/ {item.quantity || 0}</Text>
                                 </View>
-                                <TouchableOpacity
-                                    style={styles.counterBtn}
-                                    onPress={() => handleUpdateQty(item.id, true)}
-                                    disabled={!verifiedItems[item.id]}
-                                >
-                                    <Feather name="plus" size={20} color={verifiedItems[item.id] ? COLORS.primary : COLORS.border} />
-                                </TouchableOpacity>
                             </View>
-                        </View>
 
-                        <TouchableOpacity
-                            style={[styles.scanItemBtn, verifiedItems[item.id] && styles.scanItemBtnSuccess]}
-                            onPress={() => handleVerifyItem(item.id)}
-                            disabled={verifiedItems[item.id] || isSaving}
-                        >
-                            <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? "#059669" : COLORS.primary} />
-                            <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: '#059669' }]}>
-                                {verifiedItems[item.id] ? 'Đã xác minh sản phẩm' : 'Verify Scan (Quét mã xác nhận)'}
-                            </Text>
-                        </TouchableOpacity>
-                    </Card>
+                            <View style={styles.counterRow}>
+                                <View style={styles.qtyLabelContainer}>
+                                    <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
+                                    {!verifiedItems[item.id] && (
+                                        <Text style={styles.verificationPrompt}>Quét để xác minh</Text>
+                                    )}
+                                </View>
+                                <View style={[styles.counter, !verifiedItems[item.id] && styles.disabledCounter]}>
+                                    <TouchableOpacity
+                                        style={styles.counterBtn}
+                                        onPress={() => handleUpdateQty(item.id, false)}
+                                        disabled={!verifiedItems[item.id]}
+                                    >
+                                        <Feather name="minus" size={20} color={verifiedItems[item.id] ? COLORS.primary : COLORS.border} />
+                                    </TouchableOpacity>
+                                    <View style={styles.qtyDisplay}>
+                                        <Text style={[styles.qtyValue, !verifiedItems[item.id] && { color: COLORS.border }]}>
+                                            {localQuantities[item.id] || 0}
+                                        </Text>
+                                        <Text style={styles.qtyTotal}>/ {item.quantity || 0}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.counterBtn}
+                                        onPress={() => handleUpdateQty(item.id, true)}
+                                        disabled={!verifiedItems[item.id]}
+                                    >
+                                        <Feather name="plus" size={20} color={verifiedItems[item.id] ? COLORS.primary : COLORS.border} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[styles.scanItemBtn, verifiedItems[item.id] && styles.scanItemBtnSuccess]}
+                                onPress={() => handleVerifyItem(item.id)}
+                                disabled={verifiedItems[item.id] || isSaving}
+                            >
+                                <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? "#059669" : COLORS.primary} />
+                                <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: '#059669' }]}>
+                                    {verifiedItems[item.id] ? 'Đã xác minh sản phẩm' : 'Verify Scan (Quét mã xác nhận)'}
+                                </Text>
+                            </TouchableOpacity>
+                        </Card>
                     );
                 })}
             </ScrollView>

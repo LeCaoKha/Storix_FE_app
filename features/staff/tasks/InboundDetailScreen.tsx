@@ -1,12 +1,13 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundTasksByStaff, useUpdateInboundTicketItems } from '@/hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function InboundDetailScreen() {
     const router = useRouter();
@@ -90,9 +91,9 @@ export default function InboundDetailScreen() {
                 items: updatedItems,
             });
 
-            Alert.alert('Thành công', 'Đã lưu thông tin nhận hàng');
+            AlertService.success('Thành công', 'Đã lưu thông tin nhận hàng');
         } catch {
-            Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
+            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
             setIsSaving(false);
         }
@@ -106,43 +107,37 @@ export default function InboundDetailScreen() {
     const handleConfirmComplete = async () => {
         if (!order || !user) return;
 
-        Alert.alert(
-            'Xác nhận hoàn tất',
+        AlertService.confirm(
+            'Xác nhận hoàn tất nhập kho',
             'Bạn có chắc chắn đã nhận đủ và kiểm tra tất cả hàng hóa? Sau khi xác nhận, phiếu nhập sẽ được đánh dấu hoàn thành.',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Xác nhận',
-                    style: 'default',
-                    onPress: async () => {
-                        setIsConfirming(true);
-                        try {
-                            // Update items with final quantities
-                            const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => ({
-                                id: item.id,
-                                productId: item.productId || 0,
-                                expectedQuantity: item.expectedQuantity,
-                                receivedQuantity: localQuantities[item.id] || item.receivedQuantity || 0,
-                            }));
+            async () => {
+                setIsConfirming(true);
+                try {
+                    // Update items with final quantities
+                    const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => ({
+                        id: item.id,
+                        productId: item.productId || 0,
+                        expectedQuantity: item.expectedQuantity,
+                        receivedQuantity: localQuantities[item.id] || item.receivedQuantity || 0,
+                    }));
 
-                            await updateItems.mutateAsync({
-                                ticketId: order.id,
-                                items: updatedItems,
-                            });
+                    await updateItems.mutateAsync({
+                        ticketId: order.id,
+                        items: updatedItems,
+                    });
 
-                            Alert.alert(
-                                'Hoàn tất!',
-                                'Phiếu nhập kho đã được xác nhận hoàn thành. Hàng hóa đã được ghi nhận vào tồn kho.',
-                                [{ text: 'OK', onPress: () => router.back() }]
-                            );
-                        } catch {
-                            Alert.alert('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
-                        } finally {
-                            setIsConfirming(false);
-                        }
-                    }
+                    // Update ticket status to Completed (assuming Backend supports this)
+                    // ... call status update API if available
+
+                    AlertService.success('Hoàn thành', 'Phiếu nhập kho đã được xác nhận hoàn tất. Hàng hóa đã được ghi nhận vào tồn kho.', () => {
+                        router.back();
+                    });
+                } catch {
+                    AlertService.error('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
+                } finally {
+                    setIsConfirming(false);
                 }
-            ]
+            }
         );
     };
 

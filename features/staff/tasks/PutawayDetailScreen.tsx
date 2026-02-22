@@ -1,9 +1,10 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
+import { AlertService } from '@/stores/alert.store';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PutawayDetailScreen() {
     const router = useRouter();
@@ -27,29 +28,42 @@ export default function PutawayDetailScreen() {
     };
 
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isLocationScanned, setIsLocationScanned] = useState(false);
+    const [scannedLocation, setScannedLocation] = useState('');
+    const [isVerified, setIsVerified] = useState(false);
+    const [isPicking, setIsPicking] = useState(false); // New state for the final completion process
 
     const handleScanLocation = () => {
         setIsProcessing(true);
         // Simulate scanning delay
         setTimeout(() => {
             setIsProcessing(false);
-            setIsLocationScanned(true);
-            Alert.alert('Thành công', 'Đã xác nhận đúng vị trí ' + mockTask.targetLocation);
+            setScannedLocation(mockTask.targetLocation); // Simulate a successful scan
+            AlertService.success('Thành công', 'Đã quét mã vị trí ' + mockTask.targetLocation);
         }, 800);
     };
 
+    const handleConfirm = () => {
+        if (scannedLocation === mockTask.targetLocation) {
+            setIsVerified(true);
+            AlertService.success('Thành công', 'Đã xác nhận đúng vị trí ' + mockTask.targetLocation);
+        } else {
+            AlertService.warning('Lưu ý', 'Vị trí quét không khớp. Vui lòng thử lại.');
+            setIsVerified(false);
+        }
+    };
+
     const handleComplete = () => {
-        if (!isLocationScanned) {
-            Alert.alert('Lưu ý', 'Vui lòng quét mã vị trí trước khi xác nhận');
+        if (!isVerified) {
+            AlertService.warning('Lưu ý', 'Vui lòng xác nhận đúng vị trí trước khi hoàn thành');
             return;
         }
-        setIsProcessing(true);
+        setIsPicking(true);
         // Simulate API call
         setTimeout(() => {
-            setIsProcessing(false);
-            Alert.alert('Thành công', 'Đã hoàn thành xếp hàng vào vị trí ' + mockTask.targetLocation);
-            router.back();
+            setIsPicking(false);
+            AlertService.success('Thành công', 'Đã hoàn thành xếp hàng vào vị trí ' + mockTask.targetLocation, () => {
+                router.back();
+            });
         }, 1000);
     };
 
@@ -75,7 +89,7 @@ export default function PutawayDetailScreen() {
                         <Feather name="arrow-right" size={20} color={COLORS.textMuted} />
                         <View style={styles.locationBox}>
                             <Text style={styles.locationLabel}>Đến vị trí</Text>
-                            <Text style={[styles.locationValue, isLocationScanned && { color: '#059669' }]}>{mockTask.targetLocation}</Text>
+                            <Text style={[styles.locationValue, isVerified && { color: '#059669' }]}>{mockTask.targetLocation}</Text>
                         </View>
                     </View>
                 </Card>
@@ -98,28 +112,37 @@ export default function PutawayDetailScreen() {
                 ))}
 
                 <TouchableOpacity
-                    style={[styles.scanLocationBtn, isLocationScanned && styles.scanLocationBtnSuccess]}
+                    style={[styles.scanLocationBtn, isVerified && styles.scanLocationBtnSuccess]}
                     onPress={handleScanLocation}
-                    disabled={isLocationScanned || isProcessing}
+                    disabled={isVerified || isProcessing}
                 >
-                    <Feather name={isLocationScanned ? "check-circle" : "maximize"} size={20} color={isLocationScanned ? "#059669" : COLORS.primary} />
-                    <Text style={[styles.scanLocationText, isLocationScanned && { color: '#059669' }]}>
-                        {isLocationScanned ? "Đã quét vị trí khớp" : "Quét mã vị trí đích (Rack/Bin)"}
+                    <Feather name={isVerified ? "check-circle" : "maximize"} size={20} color={isVerified ? "#059669" : COLORS.primary} />
+                    <Text style={[styles.scanLocationText, isVerified && { color: '#059669' }]}>
+                        {isVerified ? "Đã quét vị trí khớp" : "Quét mã vị trí đích (Rack/Bin)"}
                     </Text>
                 </TouchableOpacity>
+
+                {!isVerified && scannedLocation !== '' && (
+                    <TouchableOpacity
+                        style={[styles.completeBtn, { marginTop: 12, backgroundColor: COLORS.warning }]}
+                        onPress={handleConfirm}
+                    >
+                        <Text style={styles.completeBtnText}>Xác nhận vị trí này</Text>
+                    </TouchableOpacity>
+                )}
             </ScrollView>
 
             <View style={styles.footer}>
                 <TouchableOpacity
                     style={[
                         styles.completeBtn,
-                        (isProcessing || !isLocationScanned) && styles.disabledBtn
+                        (isPicking || !isVerified) && styles.disabledBtn
                     ]}
                     onPress={handleComplete}
-                    disabled={isProcessing || !isLocationScanned}
+                    disabled={isPicking || !isVerified}
                 >
                     <Text style={styles.completeBtnText}>
-                        {isProcessing ? 'Đang xử lý...' : 'Xác nhận đã xếp hàng'}
+                        {isPicking ? 'Đang xử lý...' : 'Xác nhận đã xếp hàng'}
                     </Text>
                 </TouchableOpacity>
             </View>

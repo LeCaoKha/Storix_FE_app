@@ -5,6 +5,7 @@ import {
     useConfirmOutboundOrder,
     useUpdateOutboundRequestStatus,
 } from '@/hooks/outbound-orders.hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
@@ -12,12 +13,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 
 // Status config cho Request (chờ duyệt)
@@ -56,7 +56,7 @@ export default function OutboundOrderDetailScreen() {
 
     // Export handler
     const handleExport = (format: 'csv' | 'excel') => {
-        Alert.alert('Xuất dữ liệu', `Tính năng xuất ${format.toUpperCase()} đang được phát triển.`);
+        AlertService.info('Xuất dữ liệu', `Tính năng xuất ${format.toUpperCase()} đang được phát triển.`);
     };
 
     // Fetch data based on type
@@ -111,65 +111,51 @@ export default function OutboundOrderDetailScreen() {
 
     // Handle approve request
     const handleApprove = () => {
-        Alert.alert(
+        AlertService.confirm(
             'Duyệt yêu cầu',
             'Bạn có chắc chắn muốn duyệt yêu cầu xuất kho này?',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Duyệt',
-                    style: 'default',
-                    onPress: async () => {
-                        try {
-                            setIsProcessing(true);
-                            await updateRequestStatus.mutateAsync({
-                                requestId: data.id,
-                                approverId: user?.id ?? 0,
-                                status: 'Approved',
-                            });
-                            Alert.alert('Thành công', 'Yêu cầu đã được duyệt', [
-                                { text: 'OK', onPress: () => router.back() },
-                            ]);
-                        } catch {
-                            Alert.alert('Lỗi', 'Không thể duyệt yêu cầu. Vui lòng thử lại.');
-                        } finally {
-                            setIsProcessing(false);
-                        }
-                    },
-                },
-            ]
+            async () => {
+                try {
+                    setIsProcessing(true);
+                    await updateRequestStatus.mutateAsync({
+                        requestId: data.id,
+                        approverId: user?.id ?? 0,
+                        status: 'Approved',
+                    });
+                    AlertService.success('Thành công', 'Yêu cầu đã được duyệt', () => {
+                        router.back();
+                    });
+                } catch {
+                    AlertService.error('Lỗi', 'Không thể duyệt yêu cầu. Vui lòng thử lại.');
+                } finally {
+                    setIsProcessing(false);
+                }
+            }
         );
     };
 
     // Handle reject request
     const handleReject = () => {
-        Alert.alert(
+        AlertService.confirm(
             'Từ chối yêu cầu',
             'Bạn có chắc chắn muốn từ chối yêu cầu xuất kho này?',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Từ chối',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            setIsProcessing(true);
-                            await updateRequestStatus.mutateAsync({
-                                requestId: data.id,
-                                approverId: user?.id ?? 0,
-                                status: 'Rejected',
-                            });
-                            Alert.alert('Thành công', 'Yêu cầu đã bị từ chối', [
-                                { text: 'OK', onPress: () => router.back() },
-                            ]);
-                        } catch {
-                            Alert.alert('Lỗi', 'Không thể từ chối yêu cầu. Vui lòng thử lại.');
-                        } finally {
-                            setIsProcessing(false);
-                        }
-                    },
-                },
-            ]
+            async () => {
+                try {
+                    setIsProcessing(true);
+                    await updateRequestStatus.mutateAsync({
+                        requestId: data.id,
+                        approverId: user?.id ?? 0,
+                        status: 'Rejected',
+                    });
+                    AlertService.success('Thành công', 'Yêu cầu đã bị từ chối', () => {
+                        router.back();
+                    });
+                } catch {
+                    AlertService.error('Lỗi', 'Không thể từ chối yêu cầu. Vui lòng thử lại.');
+                } finally {
+                    setIsProcessing(false);
+                }
+            }
         );
     };
 
@@ -183,32 +169,25 @@ export default function OutboundOrderDetailScreen() {
 
     // Handle confirm complete
     const handleConfirmComplete = () => {
-        Alert.alert(
+        AlertService.confirm(
             'Xác nhận hoàn tất',
             'Xác nhận đơn xuất kho đã hoàn tất?',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Xác nhận',
-                    style: 'default',
-                    onPress: async () => {
-                        try {
-                            setIsProcessing(true);
-                            await confirmOrder.mutateAsync({
-                                ticketId: data.id,
-                                performedBy: user?.id ?? 0,
-                            });
-                            Alert.alert('Thành công', 'Đơn xuất kho đã hoàn tất', [
-                                { text: 'OK', onPress: () => router.back() },
-                            ]);
-                        } catch {
-                            Alert.alert('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
-                        } finally {
-                            setIsProcessing(false);
-                        }
-                    },
-                },
-            ]
+            async () => {
+                try {
+                    setIsProcessing(true);
+                    await confirmOrder.mutateAsync({
+                        ticketId: data.id,
+                        performedBy: user?.id ?? 0,
+                    });
+                    AlertService.success('Thành công', 'Đơn xuất kho đã hoàn tất', () => {
+                        router.back();
+                    });
+                } catch {
+                    AlertService.error('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
+                } finally {
+                    setIsProcessing(false);
+                }
+            }
         );
     };
 

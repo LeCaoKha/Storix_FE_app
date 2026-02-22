@@ -2,10 +2,11 @@ import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useStockCountTicket, useUpdateStockCountItem } from '@/hooks/stock-count.hooks';
 import { StockCountItem } from '@/services/stock-count.api';
+import { AlertService } from '@/stores/alert.store';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function InventoryCountDetailScreen() {
     const router = useRouter();
@@ -28,7 +29,7 @@ export default function InventoryCountDetailScreen() {
     const handleConfirmItem = async (item: StockCountItem) => {
         const countStr = counts[item.id] || '';
         if (countStr === '') {
-            Alert.alert('Lưu ý', 'Vui lòng nhập số lượng trước khi xác nhận');
+            AlertService.warning('Lưu ý', 'Vui lòng nhập số lượng trước khi xác nhận');
             return;
         }
 
@@ -48,14 +49,14 @@ export default function InventoryCountDetailScreen() {
 
             const diff = Math.abs(count - item.systemQuantity);
             if (diff > item.systemQuantity * 0.2) {
-                Alert.alert(
+                AlertService.warning(
                     'Cảnh báo sai lệch lớn',
                     `Số lượng đếm (${count}) lệch quá 20% so với hệ thống (${item.systemQuantity}). Vui lòng kiểm tra lại.`
                 );
             }
         } catch (error) {
             console.error('Failed to update count:', error);
-            Alert.alert('Lỗi', 'Không thể cập nhật số lượng. Vui lòng thử lại.');
+            AlertService.error('Lỗi', 'Không thể cập nhật số lượng. Vui lòng thử lại.');
         } finally {
             setIsProcessing(false);
         }
@@ -65,13 +66,13 @@ export default function InventoryCountDetailScreen() {
         if (!ticket) return;
         const allConfirmed = ticket.items.every(item => revealedItems[item.id] || item.countedQuantity !== null);
         if (!allConfirmed) {
-            Alert.alert('Lưu ý', 'Vui lòng xác nhận số lượng cho tất cả các mặt hàng');
+            AlertService.warning('Lưu ý', 'Vui lòng xác nhận số lượng cho tất cả các mặt hàng');
             return;
         }
 
-        Alert.alert('Thành công', 'Đã lưu kết quả kiểm kê', [
-            { text: 'OK', onPress: () => router.back() }
-        ]);
+        AlertService.success('Thành công', 'Đã lưu kết quả kiểm kê', () => {
+            router.back();
+        });
     };
 
     if (isLoading) {

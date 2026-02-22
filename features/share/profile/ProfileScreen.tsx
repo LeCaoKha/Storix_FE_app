@@ -1,13 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Card, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useLogout } from '@/hooks/auth.hooks';
 import { useTasks } from '@/hooks/task.hooks';
 import { useProfile } from '@/hooks/user.hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { TaskStatus } from '@/types/order';
 
@@ -36,20 +37,13 @@ export default function ProfileScreen() {
     const { data: tasks = [], isLoading: isFetchingTasks } = useTasks();
 
     const handleLogout = () => {
-        Alert.alert(
+        AlertService.confirm(
             'Đăng xuất',
-            'Bạn có chắc chắn muốn đăng xuất?',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Đăng xuất',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await logout();
-                        router.replace('/login' as any);
-                    },
-                },
-            ]
+            'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng?',
+            () => {
+                logout();
+                router.replace('/login');
+            }
         );
     };
 

@@ -3,13 +3,14 @@ import { COLORS } from '@/constants/color';
 import { useCreateInboundTicket, useInboundRequest } from '@/hooks';
 import { useProducts } from '@/hooks/product.hooks';
 import { useWarehouseStaff } from '@/hooks/user.hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { getLatestPrice } from '@/types/product';
 import { formatVND } from '@/utils/format';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CreateInboundOrderScreen() {
     const router = useRouter();
@@ -55,7 +56,7 @@ export default function CreateInboundOrderScreen() {
 
     const handleCreate = async () => {
         if (!selectedStaffId) {
-            Alert.alert('Lỗi', 'Vui lòng chọn nhân viên nhập kho');
+            AlertService.error('Lỗi', 'Vui lòng chọn nhân viên nhập kho');
             return;
         }
 
@@ -68,22 +69,17 @@ export default function CreateInboundOrderScreen() {
                 staffId: selectedStaffId,
             });
 
-            Alert.alert('Thành công', 'Đã tạo đơn nhập kho', [
-                {
-                    text: 'OK',
-                    onPress: () => {
-                        router.back();
-                        router.push({
-                            pathname: `/(manager-tabs)/(orders-inbound)/${created.id}`,
-                            params: { type: 'ticket' }
-                        } as any);
-                    },
-                },
-            ]);
+            AlertService.success('Thành công', 'Đã tạo đơn nhập kho', () => {
+                router.back();
+                router.push({
+                    pathname: `/(manager-tabs)/(orders-inbound)/${created.id}`,
+                    params: { type: 'ticket' }
+                } as any);
+            });
         } catch (error: any) {
             console.error('Create ticket error:', error);
             const errorMessage = error.response?.data?.message || error.message || 'Không thể tạo đơn nhập kho';
-            Alert.alert('Lỗi', errorMessage);
+            AlertService.error('Lỗi', errorMessage);
         } finally {
             setIsCreating(false);
         }

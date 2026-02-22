@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -17,6 +16,7 @@ import {
 import { SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useUpdateProfile } from '@/hooks/user.hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function ChangePasswordScreen() {
@@ -30,17 +30,17 @@ export default function ChangePasswordScreen() {
 
     const handleSave = async () => {
         if (!password) {
-            Alert.alert('Lỗi', 'Vui lòng nhập mật khẩu mới.');
+            AlertService.warning('Lỗi', 'Vui lòng nhập mật khẩu mới.');
             return;
         }
 
         if (password.length < 6) {
-            Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự.');
+            AlertService.warning('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự.');
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp.');
+            AlertService.warning('Lỗi', 'Mật khẩu xác nhận không khớp.');
             return;
         }
 
@@ -53,11 +53,12 @@ export default function ChangePasswordScreen() {
                 formData,
             });
 
-            Alert.alert('Thành công', 'Mật khẩu đã được thay đổi.');
-            router.back();
+            AlertService.success('Thành công', 'Mật khẩu đã được thay đổi.', () => {
+                router.back();
+            });
         } catch (error: any) {
             console.error('[ChangePassword] Error:', error);
-            Alert.alert('Lỗi', 'Không thể đổi mật khẩu. Vui lòng thử lại.');
+            AlertService.error('Lỗi', 'Không thể đổi mật khẩu. Vui lòng thử lại.');
         }
     };
 

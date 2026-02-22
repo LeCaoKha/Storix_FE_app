@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Image,
     KeyboardAvoidingView,
     Platform,
@@ -19,6 +18,7 @@ import {
 import { SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useProfile, useUpdateProfile } from '@/hooks/user.hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function EditProfileScreen() {
@@ -45,7 +45,7 @@ export default function EditProfileScreen() {
     const handlePickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Quyền truy cập', 'Vui lòng cho phép truy cập thư viện ảnh để đổi ảnh đại diện.');
+            AlertService.warning('Quyền truy cập', 'Vui lòng cho phép truy cập thư viện ảnh để đổi ảnh đại diện.');
             return;
         }
 
@@ -64,7 +64,7 @@ export default function EditProfileScreen() {
 
     const handleSave = async () => {
         if (!fullName.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập họ tên.');
+            AlertService.warning('Lỗi', 'Vui lòng nhập họ tên.');
             return;
         }
 
@@ -97,11 +97,12 @@ export default function EditProfileScreen() {
                 formData,
             });
 
-            Alert.alert('Thành công', 'Thông tin cá nhân đã được cập nhật.');
-            router.back();
+            AlertService.success('Thành công', 'Thông tin cá nhân đã được cập nhật.', () => {
+                router.back();
+            });
         } catch (error: any) {
             console.error('[EditProfile] Save error:', error);
-            Alert.alert('Lỗi', 'Không thể cập nhật thông tin. Vui lòng thử lại.');
+            AlertService.error('Lỗi', 'Không thể cập nhật thông tin. Vui lòng thử lại.');
         }
     };
 

@@ -1,11 +1,12 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
+import { AlertService } from '@/stores/alert.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function StaffInboundDetailScreen() {
     const router = useRouter();
@@ -93,10 +94,11 @@ export default function StaffInboundDetailScreen() {
                 items: updatedItems,
             });
 
-            Alert.alert('Thành công', allReceived ? 'Đã hoàn tất nhận hàng' : 'Đã lưu thông tin nhận hàng');
-            router.back();
+            AlertService.success('Thành công', allReceived ? 'Đã hoàn tất nhận hàng' : 'Đã lưu thông tin nhận hàng', () => {
+                router.back();
+            });
         } catch {
-            Alert.alert('Lỗi', 'Không thể cập nhật số lượng');
+            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
             setIsSaving(false);
         }

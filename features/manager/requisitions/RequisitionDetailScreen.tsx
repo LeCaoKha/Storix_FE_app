@@ -2,10 +2,11 @@ import { Card, RequisitionItemList, ScreenHeader, StatusBadge } from '@/componen
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { COLORS } from '@/constants/color';
 import { useRequisition } from '@/hooks';
+import { AlertService } from '@/stores/alert.store';
 
 export default function RequisitionDetailScreen() {
     const router = useRouter();
@@ -46,7 +47,7 @@ export default function RequisitionDetailScreen() {
 
     const handleEdit = () => {
         // TODO: Navigate to edit screen
-        Alert.alert('Chức năng đang phát triển', 'Tính năng chỉnh sửa sẽ sớm được cập nhật');
+        AlertService.info('Chức năng đang phát triển', 'Tính năng chỉnh sửa sẽ sớm được cập nhật');
     };
 
     const handleCreateOrder = () => {
@@ -58,7 +59,7 @@ export default function RequisitionDetailScreen() {
 
     const handleViewOrder = () => {
         // TODO: Navigate to order detail
-        Alert.alert('Xem đơn hàng', `Đơn hàng: ${requisition.linkedOrderNumber}`);
+        AlertService.info('Xem đơn hàng', `Đơn hàng: ${requisition.linkedOrderNumber}`);
     };
 
     return (

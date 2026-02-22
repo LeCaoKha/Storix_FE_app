@@ -2,11 +2,12 @@ import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useCreateOutboundTicket, useOutboundRequest } from '@/hooks';
 import { useWarehouseStaff } from '@/hooks/user.hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateOutboundOrderScreen() {
     const router = useRouter();
@@ -37,7 +38,7 @@ export default function CreateOutboundOrderScreen() {
 
     const handleCreate = async () => {
         if (!selectedStaffId) {
-            Alert.alert('Lỗi', 'Vui lòng chọn nhân viên xử lý');
+            AlertService.error('Lỗi', 'Vui lòng chọn nhân viên xử lý');
             return;
         }
 
@@ -51,21 +52,16 @@ export default function CreateOutboundOrderScreen() {
             });
 
 
-            Alert.alert('Thành công', 'Đã tạo đơn xuất kho', [
-                {
-                    text: 'OK',
-                    onPress: () => {
-                        router.back();
-                        router.push({
-                            pathname: `/(manager-tabs)/(orders-outbound)/${created.id}`,
-                            params: { type: 'ticket' }
-                        } as any);
-                    },
-                },
-            ]);
+            AlertService.success('Thành công', 'Đã tạo đơn xuất kho', () => {
+                router.back();
+                router.push({
+                    pathname: `/(manager-tabs)/(orders-outbound)/${created.id}`,
+                    params: { type: 'ticket' }
+                } as any);
+            });
         } catch (error) {
             console.error('Create ticket error:', error);
-            Alert.alert('Lỗi', 'Không thể tạo đơn xuất kho');
+            AlertService.error('Lỗi', 'Không thể tạo đơn xuất kho');
         } finally {
             setIsCreating(false);
         }
