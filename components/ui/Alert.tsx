@@ -65,7 +65,7 @@ export default function AlertContainer() {
                 </Animated.View>
 
                 <Animated.View
-                    entering={FadeInUp.springify().damping(15)}
+                    entering={FadeInUp.duration(300)}
                     exiting={FadeOutDown.duration(150)}
                     style={styles.alertBox}
                 >

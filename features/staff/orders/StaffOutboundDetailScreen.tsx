@@ -18,26 +18,35 @@ export default function StaffOutboundDetailScreen() {
     const [verifiedItems, setVerifiedItems] = useState<Record<number, boolean>>({});
     const [isSaving, setIsSaving] = useState(false);
 
+    // Normalize items list (handle both items and outboundOrderItems)
+    const orderItems = React.useMemo(() => {
+        return order?.items || order?.outboundOrderItems || [];
+    }, [order]);
+
     // Initialize state when order data is loaded
     useEffect(() => {
-        if (order?.outboundOrderItems) {
-            const initialQty: Record<number, number> = {};
-            order.outboundOrderItems.forEach((item: OutboundOrderItem) => {
-                initialQty[item.id] = 0;
+        if (orderItems.length > 0) {
+            setLocalQuantities(prev => {
+                // If already initialized for this order, don't reset
+                if (Object.keys(prev).length > 0) return prev;
+
+                const initialQty: Record<number, number> = {};
+                orderItems.forEach((item: OutboundOrderItem) => {
+                    initialQty[item.id] = 0;
+                });
+                return initialQty;
             });
-            setLocalQuantities(initialQty);
         }
-    }, [order]);
+    }, [orderItems]);
 
     // Sort items by product name
     const sortedItems = React.useMemo(() => {
-        if (!order?.outboundOrderItems) return [];
-        return [...order.outboundOrderItems].sort((a, b) => {
-            const nameA = a.product?.name || '';
-            const nameB = b.product?.name || '';
+        return [...orderItems].sort((a, b) => {
+            const nameA = a.product?.name || a.productName || '';
+            const nameB = b.product?.name || b.productName || '';
             return nameA.localeCompare(nameB);
         });
-    }, [order]);
+    }, [orderItems]);
 
     if (isLoading) {
         return (
@@ -79,7 +88,7 @@ export default function StaffOutboundDetailScreen() {
         }
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
-            const item = order?.outboundOrderItems.find((i: OutboundOrderItem) => i.id === itemId);
+            const item = orderItems.find((i: OutboundOrderItem) => i.id === itemId);
             const maxQty = item?.quantity || 9999;
             const newValue = increment
                 ? Math.min(current + 1, maxQty)
@@ -93,14 +102,14 @@ export default function StaffOutboundDetailScreen() {
         setIsSaving(true);
         try {
             // Update items with picked quantities
-            const updatedItems = order.outboundOrderItems.map((item: OutboundOrderItem) => ({
+            const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
                 id: item.id,
                 productId: item.productId || 0,
-                quantity: localQuantities[item.id] || item.quantity || 0,
+                quantity: localQuantities[item.id] ?? item.quantity ?? 0,
             }));
 
             // Check if all items picked
-            const allPicked = order.outboundOrderItems.every((item: OutboundOrderItem) =>
+            const allPicked = orderItems.every((item: OutboundOrderItem) =>
                 (localQuantities[item.id] || 0) >= (item.quantity || 0)
             );
 
@@ -140,7 +149,7 @@ export default function StaffOutboundDetailScreen() {
 
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{order.outboundOrderItems.length} mặt hàng</Text>
+                    <Text style={styles.sectionSubtitle}>{orderItems.length} mặt hàng</Text>
                 </View>
 
                 {sortedItems.map((item: OutboundOrderItem) => {

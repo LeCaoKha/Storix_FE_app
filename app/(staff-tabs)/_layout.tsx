@@ -34,6 +34,7 @@ export default function StaffTabLayout() {
                 name="orders/[id]"
                 options={{
                     href: null,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             <Tabs.Screen
@@ -48,24 +49,28 @@ export default function StaffTabLayout() {
                 name="tasks/count/[id]"
                 options={{
                     href: null,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             <Tabs.Screen
                 name="tasks/inbound/[id]"
                 options={{
                     href: null,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             <Tabs.Screen
                 name="tasks/outbound/[id]"
                 options={{
                     href: null,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             <Tabs.Screen
                 name="tasks/putaway/[id]"
                 options={{
                     href: null,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
         </Tabs>
