@@ -1,9 +1,9 @@
 import {
-  createSupplier,
-  deleteSupplier,
-  getSupplierById,
-  getSuppliers,
-  updateSupplier,
+    createSupplier,
+    deleteSupplier,
+    getSupplierById,
+    getSuppliers,
+    updateSupplier,
 } from '@/services/supplier.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { CreateSupplierPayload, UpdateSupplierPayload } from '@/types/supplier';
@@ -80,9 +80,10 @@ export const useUpdateSupplier = () => {
  */
 export const useDeleteSupplier = () => {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useMutation({
-    mutationFn: (supplierId: number) => deleteSupplier(supplierId),
+    mutationFn: (supplierId: number) => deleteSupplier(userId!, supplierId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: supplierKeys.lists() });
     },

@@ -38,11 +38,11 @@ export default function InboundRequisitionsScreen() {
 
     // Filter INBOUND requisitions only
     const filteredRequisitions = useMemo(() => {
-        // Filter by type and hide processed ones
+        // Filter by type - chỉ hiển thị Pending, Approved, Rejected
+        // Khi status = 'transported' -> đã chuyển sang màn Đơn nhập kho
         let results = requisitions.filter(req =>
             req.type === 'inbound' &&
-            req.status !== 'ordered' &&
-            req.status !== 'completed'
+            req.status !== 'transported'
         );
 
         // Apply search

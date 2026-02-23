@@ -1,16 +1,15 @@
 import {
-  getInboundRequestById as apiGetInboundRequestById,
-  getInboundTicketById as apiGetInboundTicketById,
-  createInboundRequest,
-  createInboundTicket,
-  getAllInboundRequests,
-  getAllInboundTickets,
-  getInboundOrdersByStaff,
-  updateInboundRequestStatus,
-  updateInboundTicketItems,
-  type InboundOrder as ApiInboundOrder,
-  type CreateInboundRequestPayload,
-  type UpdateInboundItemPayload
+    getInboundRequestById as apiGetInboundRequestById,
+    getInboundTicketById as apiGetInboundTicketById,
+    createInboundRequest,
+    createInboundTicket,
+    getAllInboundRequests,
+    getAllInboundTickets,
+    updateInboundRequestStatus,
+    updateInboundTicketItems,
+    type InboundOrder as ApiInboundOrder,
+    type CreateInboundRequestPayload,
+    type UpdateInboundItemPayload,
 } from '@/services/inbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { InboundRequest } from '@/types/inbound-order';
@@ -124,9 +123,24 @@ export const useInboundRequest = (id: number | string | undefined) => {
   const companyId = user?.companyId ?? 0;
   const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
+  console.log('[useInboundRequest] Hook params:', {
+    rawId: id,
+    numericId,
+    companyId,
+    isEnabled: !!numericId && !isNaN(numericId as number) && !!companyId,
+    checks: {
+      hasNumericId: !!numericId,
+      isNotNaN: !isNaN(numericId as number),
+      hasCompanyId: !!companyId
+    }
+  });
+
   return useQuery({
     queryKey: inboundOrderKeys.requestDetail(numericId ?? 0),
-    queryFn: () => getInboundRequestById(companyId, numericId!),
+    queryFn: () => {
+      console.log('[useInboundRequest] queryFn executing...');
+      return getInboundRequestById(companyId, numericId!);
+    },
     enabled: !!numericId && !isNaN(numericId as number) && !!companyId,
   });
 };
@@ -206,7 +220,7 @@ export const useCreateInboundRequest = () => {
 };
 
 /**
- * Hook cập nhật trạng thái yêu cầu nhập kho (approve/reject/complete)
+ * Hook cập nhật trạng thái yêu cầu nhập kho (approve/reject)
  */
 export const useUpdateInboundRequestStatus = () => {
   const queryClient = useQueryClient();
@@ -219,36 +233,10 @@ export const useUpdateInboundRequestStatus = () => {
     }: {
       requestId: number;
       approverId: number;
-      status: string;
-    }) => updateInboundRequestStatus(requestId, approverId, status as any),
+      status: 'Approved' | 'Rejected';
+    }) => updateInboundRequestStatus(requestId, approverId, status),
     onSuccess: () => {
-      // Invalidate both inbound orders and general requisitions cache
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['requisitions'] });
-    },
-  });
-};
-
-/**
- * Hook cập nhật trạng thái yêu cầu xuất kho
- */
-export const useUpdateOutboundRequestStatus = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({
-      requestId,
-      approverId,
-      status,
-    }: {
-      requestId: number;
-      approverId: number;
-      status: string;
-    }) => import('@/services/outbound-order.api').then(m => m.updateOutboundRequestStatus(requestId, approverId, status)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['requisitions'] });
-      queryClient.invalidateQueries({ queryKey: ['outbound-requisitions'] });
     },
   });
 };
@@ -281,16 +269,5 @@ export const useUpdateInboundTicketItems = () => {
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.all });
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.detail(variables.ticketId) });
     },
-  });
-};
-
-/**
- * Hook lấy danh sách phiếu nhập kho của Staff cụ thể
- */
-export const useInboundTasksByStaff = (companyId: number, staffId: number) => {
-  return useQuery({
-    queryKey: [...inboundOrderKeys.tickets(), 'staff', staffId],
-    queryFn: () => getInboundOrdersByStaff(companyId, staffId),
-    enabled: !!companyId && !!staffId,
   });
 };

@@ -18,16 +18,17 @@ const REQUEST_STATUS_CONFIG: Record<RequestStatusKey, { label: string; color: st
     Rejected: { label: 'Từ chối', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
-// Status config cho Ticket
-type TicketStatusKey = 'Pending' | 'Picking' | 'Packed' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled';
+// Status config cho Ticket - theo BE
+// BE statuses: Created -> Picking -> QualityCheck -> IssueReported/Packing -> LoadHandover -> Completed
+type TicketStatusKey = 'Created' | 'Picking' | 'QualityCheck' | 'IssueReported' | 'Packing' | 'LoadHandover' | 'Completed';
 const TICKET_STATUS_CONFIG: Record<TicketStatusKey, { label: string; color: string; bgColor: string }> = {
-    Pending: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Created: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
     Picking: { label: 'Đang lấy hàng', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
-    Packed: { label: 'Đã đóng gói', color: COLORS.slate700, bgColor: COLORS.slate200 },
-    Ready: { label: 'Sẵn sàng', color: COLORS.teal600, bgColor: COLORS.teal50 },
-    Shipped: { label: 'Đã xuất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    QualityCheck: { label: 'Kiểm tra CL', color: COLORS.slate700, bgColor: COLORS.slate200 },
+    IssueReported: { label: 'Có vấn đề', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    Packing: { label: 'Đóng gói', color: COLORS.teal600, bgColor: COLORS.teal50 },
+    LoadHandover: { label: 'Bàn giao', color: COLORS.success, bgColor: COLORS.success + '20' },
     Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
-    Cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
 const getRequestStatusConfig = (status?: string) => {
@@ -35,7 +36,14 @@ const getRequestStatusConfig = (status?: string) => {
 };
 
 const getTicketStatusConfig = (status?: string) => {
-    return TICKET_STATUS_CONFIG[status as TicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
+    if (!status) return TICKET_STATUS_CONFIG.Created;
+    // Normalize status từ BE
+    const normalizedStatus = status.trim();
+    if (normalizedStatus in TICKET_STATUS_CONFIG) {
+        return TICKET_STATUS_CONFIG[normalizedStatus as TicketStatusKey];
+    }
+    // Fallback
+    return TICKET_STATUS_CONFIG.Created;
 };
 
 export default function OutboundOrdersScreen() {
@@ -43,7 +51,7 @@ export default function OutboundOrdersScreen() {
     const [viewMode, setViewMode] = useState<ViewMode>('tickets');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedRequestStatus, setSelectedRequestStatus] = useState<RequestStatusKey | 'all'>('all');
-    const [selectedTicketStatus, setSelectedTicketStatus] = useState<TicketStatusKey | 'all'>('all');
+    const [selectedTicketStatus, setSelectedTicketStatus] = useState<'all' | 'Created' | 'InProgress' | 'Completed'>('all');
 
     // Fetch both requests and tickets
     const { data: requests = [], isLoading: requestsLoading } = useOutboundRequests();
@@ -78,7 +86,19 @@ export default function OutboundOrdersScreen() {
             );
         }
         if (selectedTicketStatus !== 'all') {
-            items = items.filter(t => t.status === selectedTicketStatus);
+            if (selectedTicketStatus === 'Created') {
+                items = items.filter(t => t.status === 'Created');
+            } else if (selectedTicketStatus === 'InProgress') {
+                items = items.filter(t => 
+                    t.status === 'Picking' || 
+                    t.status === 'QualityCheck' || 
+                    t.status === 'IssueReported' || 
+                    t.status === 'Packing' || 
+                    t.status === 'LoadHandover'
+                );
+            } else if (selectedTicketStatus === 'Completed') {
+                items = items.filter(t => t.status === 'Completed');
+            }
         }
         return items;
     }, [tickets, searchQuery, selectedTicketStatus]);
@@ -92,8 +112,14 @@ export default function OutboundOrdersScreen() {
 
     const ticketCounts = useMemo(() => ({
         all: tickets.length,
-        Pending: tickets.filter(t => t.status === 'Pending').length,
-        Picking: tickets.filter(t => t.status === 'Picking').length,
+        Created: tickets.filter(t => t.status === 'Created').length,
+        InProgress: tickets.filter(t => 
+            t.status === 'Picking' || 
+            t.status === 'QualityCheck' || 
+            t.status === 'IssueReported' || 
+            t.status === 'Packing' || 
+            t.status === 'LoadHandover'
+        ).length,
         Completed: tickets.filter(t => t.status === 'Completed').length,
     }), [tickets]);
 
@@ -324,28 +350,28 @@ export default function OutboundOrdersScreen() {
                                 </View>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.tab, selectedTicketStatus === 'Pending' && styles.tabActive]}
-                                onPress={() => setSelectedTicketStatus('Pending')}
+                                style={[styles.tab, selectedTicketStatus === 'Created' && styles.tabActive]}
+                                onPress={() => setSelectedTicketStatus('Created')}
                             >
-                                <Text style={[styles.tabText, selectedTicketStatus === 'Pending' && styles.tabTextActive]}>
+                                <Text style={[styles.tabText, selectedTicketStatus === 'Created' && styles.tabTextActive]}>
                                     Chờ xử lý
                                 </Text>
-                                <View style={[styles.tabCount, selectedTicketStatus === 'Pending' && styles.tabCountActive]}>
-                                    <Text style={[styles.tabCountText, selectedTicketStatus === 'Pending' && styles.tabCountTextActive]}>
-                                        {ticketCounts.Pending}
+                                <View style={[styles.tabCount, selectedTicketStatus === 'Created' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedTicketStatus === 'Created' && styles.tabCountTextActive]}>
+                                        {ticketCounts.Created}
                                     </Text>
                                 </View>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.tab, selectedTicketStatus === 'Picking' && styles.tabActive]}
-                                onPress={() => setSelectedTicketStatus('Picking')}
+                                style={[styles.tab, selectedTicketStatus === 'InProgress' && styles.tabActive]}
+                                onPress={() => setSelectedTicketStatus('InProgress')}
                             >
-                                <Text style={[styles.tabText, selectedTicketStatus === 'Picking' && styles.tabTextActive]}>
-                                    Đang lấy
+                                <Text style={[styles.tabText, selectedTicketStatus === 'InProgress' && styles.tabTextActive]}>
+                                    Đang xử lý
                                 </Text>
-                                <View style={[styles.tabCount, selectedTicketStatus === 'Picking' && styles.tabCountActive]}>
-                                    <Text style={[styles.tabCountText, selectedTicketStatus === 'Picking' && styles.tabCountTextActive]}>
-                                        {ticketCounts.Picking}
+                                <View style={[styles.tabCount, selectedTicketStatus === 'InProgress' && styles.tabCountActive]}>
+                                    <Text style={[styles.tabCountText, selectedTicketStatus === 'InProgress' && styles.tabCountTextActive]}>
+                                        {ticketCounts.InProgress}
                                     </Text>
                                 </View>
                             </TouchableOpacity>

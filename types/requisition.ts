@@ -1,5 +1,7 @@
 export type RequisitionType = 'inbound' | 'outbound';
-export type RequisitionStatus = 'pending' | 'approved' | 'rejected' | 'completed' | 'ordered';
+// BE InboundRequest statuses: Pending, Approved, Rejected, Transported
+// BE OutboundRequest statuses: Pending, Approved, Rejected
+export type RequisitionStatus = 'pending' | 'approved' | 'rejected' | 'transported';
 
 export interface GoodsRequisition {
   id: number;

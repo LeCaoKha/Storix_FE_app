@@ -16,13 +16,13 @@ const REQUEST_STATUS_CONFIG: Record<RequestStatusKey, { label: string; color: st
     Transported: { label: 'Đang vận chuyển', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
 };
 
-// Status config cho Ticket
-type TicketStatusKey = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
+// Status config cho Ticket - theo BE
+// BE statuses: 'Waiting for payment', 'Partially Completed', 'Completed'
+type TicketStatusKey = 'Waiting for payment' | 'Partially Completed' | 'Completed';
 const TICKET_STATUS_CONFIG: Record<TicketStatusKey, { label: string; color: string; bgColor: string }> = {
-    Pending: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    Processing: { label: 'Đang xử lý', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
-    Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
-    Cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    'Waiting for payment': { label: 'Chờ thanh toán', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    'Partially Completed': { label: 'Đang nhập', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    'Completed': { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
 };
 
 const getRequestStatusConfig = (status?: string) => {
@@ -31,9 +31,17 @@ const getRequestStatusConfig = (status?: string) => {
 };
 
 const getTicketStatusConfig = (status?: string) => {
-    if (!status) return TICKET_STATUS_CONFIG.Pending;
-    const normalizedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-    return TICKET_STATUS_CONFIG[normalizedStatus as TicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
+    if (!status) return TICKET_STATUS_CONFIG['Waiting for payment'];
+    // Normalize status từ BE
+    const normalizedStatus = status.trim();
+    if (normalizedStatus in TICKET_STATUS_CONFIG) {
+        return TICKET_STATUS_CONFIG[normalizedStatus as TicketStatusKey];
+    }
+    // Fallback mapping cho các status cũ
+    if (normalizedStatus.toLowerCase() === 'pending' || normalizedStatus.toLowerCase() === 'processing') {
+        return TICKET_STATUS_CONFIG['Waiting for payment'];
+    }
+    return TICKET_STATUS_CONFIG['Waiting for payment'];
 };
 
 type ViewMode = 'requests' | 'tickets';
@@ -92,8 +100,8 @@ export default function InboundOrdersScreen() {
 
     const ticketCounts = useMemo(() => ({
         all: tickets.length,
-        Pending: tickets.filter(t => t.status === 'Pending').length,
-        Processing: tickets.filter(t => t.status === 'Processing').length,
+        'Waiting for payment': tickets.filter(t => t.status === 'Waiting for payment').length,
+        'Partially Completed': tickets.filter(t => t.status === 'Partially Completed').length,
         Completed: tickets.filter(t => t.status === 'Completed').length,
     }), [tickets]);
 
@@ -291,8 +299,8 @@ export default function InboundOrdersScreen() {
                     >
                         {[
                             { key: 'all' as const, label: 'Tất cả', count: ticketCounts.all },
-                            { key: 'Pending' as const, label: 'Chờ xử lý', count: ticketCounts.Pending },
-                            { key: 'Processing' as const, label: 'Đang xử lý', count: ticketCounts.Processing },
+                            { key: 'Waiting for payment' as const, label: 'Chờ thanh toán', count: ticketCounts['Waiting for payment'] },
+                            { key: 'Partially Completed' as const, label: 'Đang nhập', count: ticketCounts['Partially Completed'] },
                             { key: 'Completed' as const, label: 'Hoàn tất', count: ticketCounts.Completed },
                         ].map(({ key, label, count }) => (
                             <TouchableOpacity

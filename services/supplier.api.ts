@@ -41,8 +41,8 @@ export const updateSupplier = async (
 
 /**
  * Delete supplier
- * NOTE: Backend may not have delete endpoint
+ * BE requires userId to resolve companyId for authorization
  */
-export const deleteSupplier = async (supplierId: number): Promise<void> => {
-  await api.delete(`/api/Suppliers/${supplierId}`);
+export const deleteSupplier = async (userId: number, supplierId: number): Promise<void> => {
+  await api.delete(`/api/Suppliers/delete-a-supplier/${userId}/${supplierId}`);
 };

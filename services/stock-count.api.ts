@@ -43,8 +43,8 @@ export interface UpdateStockCountItemPayload {
  * Lấy danh sách phiếu kiểm kê của công ty
  */
 export const getStockCountTickets = async (_companyId: number, warehouseId?: number, status?: string) => {
-    // Chuyển sang PascalCase để đồng bộ với các API khác (InventoryInbound, InventoryOutbound)
-    const baseUrl = '/api/StockCountTickets';
+    // Sử dụng kebab-case để khớp với BE route: [Route("api/stock-count-tickets")]
+    const baseUrl = '/api/stock-count-tickets';
     const params = new URLSearchParams();
     if (warehouseId) params.append('warehouseId', warehouseId.toString());
     if (status) params.append('status', status);
@@ -60,7 +60,7 @@ export const getStockCountTickets = async (_companyId: number, warehouseId?: num
  * Lấy chi tiết phiếu kiểm kê theo ID
  */
 export const getStockCountTicketById = async (ticketId: number) => {
-    const res = await api.get(`/api/StockCountTickets/${ticketId}`);
+    const res = await api.get(`/api/stock-count-tickets/${ticketId}`);
     return res.data as StockCountTicketDetail;
 };
 
@@ -68,6 +68,6 @@ export const getStockCountTicketById = async (ticketId: number) => {
  * Cập nhật số lượng đếm thực tế của một item trong phiếu kiểm kê
  */
 export const updateStockCountItem = async (itemId: number, payload: UpdateStockCountItemPayload) => {
-    const res = await api.patch(`/api/StockCountItems/${itemId}`, payload);
+    const res = await api.patch(`/api/stock-count-items/${itemId}`, payload);
     return res.data as StockCountItem;
 };

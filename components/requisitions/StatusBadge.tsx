@@ -17,12 +17,22 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         return '#34C759';
       case 'pending':
       case 'in_progress':
+      case 'waiting for payment':
+      case 'partially completed':
         return '#FF9500';
       case 'rejected':
       case 'cancelled':
+      case 'issuereported':
         return '#FF3B30';
       case 'draft':
         return '#8E8E93';
+      case 'transported':
+      case 'picking':
+      case 'qualitycheck':
+      case 'packing':
+      case 'loadhandover':
+      case 'created':
+        return '#007AFF';
       default:
         return '#6B7280';
     }

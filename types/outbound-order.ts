@@ -1,7 +1,18 @@
 // ============== Outbound Order Types (khớp với Backend) ==============
 
-export type OutboundOrderStatus = 'Pending' | 'Picking' | 'Packed' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled';
-export type OutboundRequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Completed';
+// OutboundOrder statuses từ BE:
+// Created -> Picking -> QualityCheck -> IssueReported/Packing -> LoadHandover -> Completed
+export type OutboundOrderStatus = 
+  | 'Created' 
+  | 'Picking' 
+  | 'QualityCheck' 
+  | 'IssueReported' 
+  | 'Packing' 
+  | 'LoadHandover' 
+  | 'Completed';
+
+// OutboundRequest statuses từ BE: Pending -> Approved/Rejected
+export type OutboundRequestStatus = 'Pending' | 'Approved' | 'Rejected';
 
 // Legacy status types for backward compatibility
 export type OutboundStatus = 'open' | 'picking' | 'packing' | 'ready' | 'shipped' | 'completed' | 'delivered' | 'cancelled' | 'on_hold';

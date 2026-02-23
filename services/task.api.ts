@@ -75,37 +75,30 @@ export const getTasks = async (staffId: number, companyId: number): Promise<Task
 
 function mapInboundStatus(status?: string): TaskStatus {
     switch (status?.toLowerCase()) {
-        case 'created':
-        case 'pending':
+        case 'waiting for payment':
             return TaskStatus.PENDING;
-        case 'processing':
+        case 'partially completed':
             return TaskStatus.IN_PROGRESS;
         case 'completed':
             return TaskStatus.COMPLETED;
-        case 'cancelled':
-            return TaskStatus.CANCELLED;
         default:
             return TaskStatus.PENDING;
     }
 }
 
 function mapOutboundStatus(status?: string): TaskStatus {
+    // BE OutboundOrder statuses: Created, Picking, QualityCheck, IssueReported, Packing, LoadHandover, Completed
     switch (status?.toLowerCase()) {
-        case 'pending':
+        case 'created':
             return TaskStatus.PENDING;
         case 'picking':
         case 'qualitycheck':
         case 'packing':
-        case 'packed':
-        case 'ready':
         case 'loadhandover':
         case 'issuereported':
             return TaskStatus.IN_PROGRESS;
-        case 'shipped':
         case 'completed':
             return TaskStatus.COMPLETED;
-        case 'cancelled':
-            return TaskStatus.CANCELLED;
         default:
             return TaskStatus.PENDING;
     }

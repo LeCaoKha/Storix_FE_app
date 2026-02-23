@@ -26,12 +26,9 @@ export default function OutboundRequisitionsScreen() {
 
     // Filter OUTBOUND requisitions only
     const filteredRequisitions = useMemo(() => {
-        // Filter by type and hide processed ones
-        let results = requisitions.filter(req =>
-            req.type === 'outbound' &&
-            req.status !== 'ordered' &&
-            req.status !== 'completed'
-        );
+        // Filter by type - hiển thị tất cả requisitions (Pending, Approved, Rejected)
+        // OutboundRequest không có status 'Transported' như InboundRequest
+        let results = requisitions.filter(req => req.type === 'outbound');
 
         // Apply search
         if (searchQuery.trim()) {
