@@ -6,12 +6,12 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-type TabType = 'all' | 'created' | 'in_progress' | 'completed';
+type TabType = 'all' | 'waiting' | 'partial' | 'completed';
 
 const TABS: { key: TabType; label: string }[] = [
     { key: 'all', label: 'Tất cả' },
-    { key: 'created', label: 'Chờ xử lý' },
-    { key: 'in_progress', label: 'Đang xử lý' },
+    { key: 'waiting', label: 'Chờ thanh toán' },
+    { key: 'partial', label: 'Nhập một phần' },
     { key: 'completed', label: 'Hoàn thành' },
 ];
 
@@ -37,15 +37,15 @@ export default function StaffOrdersListScreen() {
             );
         }
 
-        // Apply status filter
+        // Apply status filter - match BE: "Waiting for payment" / "Partially Completed" / "Completed"
         if (activeTab !== 'all') {
             const statusMap: Record<string, string> = {
-                created: 'Created',
-                in_progress: 'In Progress',
+                waiting: 'Waiting for payment',
+                partial: 'Partially Completed',
                 completed: 'Completed',
             };
             results = results.filter(ticket => 
-                ticket.status?.toLowerCase() === statusMap[activeTab]?.toLowerCase()
+                ticket.status === statusMap[activeTab]
             );
         }
 
@@ -68,14 +68,12 @@ export default function StaffOrdersListScreen() {
     };
 
     const getStatusBadgeStyle = (status: string) => {
-        const normalizedStatus = status?.toLowerCase();
-        switch (normalizedStatus) {
-            case 'created':
-                return { bg: '#EFF6FF', text: '#1E40AF', label: 'Chờ xử lý' };
-            case 'in progress':
-            case 'in_progress':
-                return { bg: '#FEF3C7', text: '#92400E', label: 'Đang xử lý' };
-            case 'completed':
+        switch (status) {
+            case 'Waiting for payment':
+                return { bg: '#EFF6FF', text: '#1E40AF', label: 'Chờ thanh toán' };
+            case 'Partially Completed':
+                return { bg: '#FEF3C7', text: '#92400E', label: 'Nhập một phần' };
+            case 'Completed':
                 return { bg: '#D1FAE5', text: '#065F46', label: 'Hoàn thành' };
             default:
                 return { bg: '#F3F4F6', text: '#6B7280', label: status || 'N/A' };
@@ -103,11 +101,11 @@ export default function StaffOrdersListScreen() {
                             ? filteredTickets.length
                             : tickets.filter((t: any) => {
                                 const statusMap: Record<string, string> = {
-                                    created: 'Created',
-                                    in_progress: 'In Progress',
+                                    waiting: 'Waiting for payment',
+                                    partial: 'Partially Completed',
                                     completed: 'Completed',
                                 };
-                                return t.status?.toLowerCase() === statusMap[tab.key]?.toLowerCase();
+                                return t.status === statusMap[tab.key];
                             }).length;
 
                         return (

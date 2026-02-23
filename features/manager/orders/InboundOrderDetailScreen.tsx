@@ -22,21 +22,21 @@ import {
     View,
 } from 'react-native';
 
-// Status config cho Request (chờ duyệt)
-type InboundRequestStatusKey = 'Pending' | 'Approved' | 'Rejected';
+// Status config cho Request - match BE: Pending→Approved/Rejected→Transported
+type InboundRequestStatusKey = 'Pending' | 'Approved' | 'Rejected' | 'Transported';
 const REQUEST_STATUS_CONFIG: Record<InboundRequestStatusKey, { label: string; color: string; bgColor: string }> = {
     Pending: { label: 'Chờ duyệt', color: COLORS.warning, bgColor: COLORS.warning + '20' },
     Approved: { label: 'Đã duyệt', color: COLORS.success, bgColor: COLORS.success + '20' },
     Rejected: { label: 'Từ chối', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    Transported: { label: 'Đang vận chuyển', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
 };
 
-// Status config cho Ticket (đang xử lý)
-type InboundTicketStatusKey = 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
+// Status config cho Ticket - match BE: "Waiting for payment"→"Partially Completed"→"Completed"
+type InboundTicketStatusKey = 'Waiting for payment' | 'Partially Completed' | 'Completed';
 const TICKET_STATUS_CONFIG: Record<InboundTicketStatusKey, { label: string; color: string; bgColor: string }> = {
-    Pending: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    Processing: { label: 'Đang xử lý', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    'Waiting for payment': { label: 'Chờ thanh toán', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    'Partially Completed': { label: 'Nhập một phần', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
     Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
-    Cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
 const getRequestStatusConfig = (status?: string) => {
@@ -46,9 +46,8 @@ const getRequestStatusConfig = (status?: string) => {
 };
 
 const getTicketStatusConfig = (status?: string) => {
-    if (!status) return TICKET_STATUS_CONFIG.Pending;
-    const normalizedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-    return TICKET_STATUS_CONFIG[normalizedStatus as InboundTicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
+    if (!status) return TICKET_STATUS_CONFIG['Waiting for payment'];
+    return TICKET_STATUS_CONFIG[status as InboundTicketStatusKey] || TICKET_STATUS_CONFIG['Waiting for payment'];
 };
 
 export default function InboundOrderDetailScreen() {
@@ -101,7 +100,9 @@ export default function InboundOrderDetailScreen() {
 
     const isRequest = type === 'request';
     const statusConfig = isRequest ? getRequestStatusConfig(data.status) : getTicketStatusConfig(data.status);
-    const canApproveReject = isRequest && data.status === 'Pending';
+    // Only Admin (roleId=2) can approve/reject inbound requests
+    const isAdmin = user?.roleId === 2;
+    const canApproveReject = isRequest && data.status === 'Pending' && isAdmin;
     const canCreateTicket = isRequest && data.status === 'Approved';
 
     // Handle approve request

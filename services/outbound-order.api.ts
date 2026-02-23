@@ -1,16 +1,16 @@
 import type {
-  CreateOutboundRequestPayload,
-  InventoryAvailability,
-  OutboundOrder,
-  UpdateOutboundItemPayload,
+    CreateOutboundRequestPayload,
+    InventoryAvailability,
+    OutboundOrder,
+    UpdateOutboundItemPayload,
 } from '@/types/outbound-order';
 import { api } from './axios.instance';
 
 // Re-export types để tiện sử dụng
 export type {
-  ConfirmOutboundPayload, CreateOutboundRequestPayload, CreateOutboundTicketPayload, InventoryAvailability, OutboundOrder,
-  OutboundOrderItem,
-  OutboundRequest, UpdateOutboundItemPayload, UpdateOutboundRequestStatusPayload, UpdateOutboundStatusPayload
+    ConfirmOutboundPayload, CreateOutboundRequestPayload, CreateOutboundTicketPayload, InventoryAvailability, OutboundOrder,
+    OutboundOrderItem,
+    OutboundRequest, UpdateOutboundItemPayload, UpdateOutboundRequestStatusPayload, UpdateOutboundStatusPayload
 } from '@/types/outbound-order';
 
 // ============== API Functions ==============
@@ -84,7 +84,7 @@ export const updateOutboundTicketItems = async (
 
 /**
  * Cập nhật trạng thái phiếu xuất (Staff only)
- * Status: 'Picking' | 'Packed' | 'Ready'
+ * Status: 'Picking' | 'QualityCheck' | 'IssueReported' | 'Packing' | 'LoadHandover'
  */
 export const updateOutboundTicketStatus = async (
   ticketId: number,

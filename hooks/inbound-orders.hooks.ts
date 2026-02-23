@@ -5,6 +5,7 @@ import {
     createInboundTicket,
     getAllInboundRequests,
     getAllInboundTickets,
+    getInboundOrdersByStaff,
     updateInboundRequestStatus,
     updateInboundTicketItems,
     type InboundOrder as ApiInboundOrder,
@@ -253,6 +254,19 @@ export const useCreateInboundTicket = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.all });
     },
+  });
+};
+
+/**
+ * Hook lấy danh sách phiếu nhập kho được gán cho Staff
+ * Dùng endpoint GET /get-inbound-orders-for-staff/{companyId}/{staffId}
+ * (filter đúng theo Warehouse.CompanyId thay vì CreatedByNavigation.CompanyId)
+ */
+export const useInboundOrdersByStaff = (companyId: number, staffId: number) => {
+  return useQuery({
+    queryKey: [...inboundOrderKeys.tickets(), 'staff', companyId, staffId],
+    queryFn: () => getInboundOrdersByStaff(companyId, staffId),
+    enabled: !!companyId && !!staffId,
   });
 };
 

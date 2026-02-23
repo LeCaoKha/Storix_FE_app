@@ -1,12 +1,12 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundTasksByStaff, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundOrdersByStaff, useUpdateInboundTicketItems } from '@/hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function InboundDetailScreen() {
@@ -16,11 +16,11 @@ export default function InboundDetailScreen() {
     const companyId = user?.companyId ?? 0;
     const staffId = user?.id ?? 0;
 
-    // Lấy data từ staff task list (dùng Warehouse.CompanyId - đúng filter)
-    // thay vì gọi lại GET /tickets/{companyId}/{id} (dùng CreatedByNavigation.CompanyId - sai)
-    const { data: staffTasks, isLoading } = useInboundTasksByStaff(companyId, staffId);
-    const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
-    const order = staffTasks?.find(t => t.id === numericId) ?? null;
+    // Dùng endpoint staff-specific (filter theo Warehouse.CompanyId — đúng)
+    // thay vì GET /tickets/{companyId}/{id} (filter theo CreatedByNavigation.CompanyId — sai, gây 404)
+    const { data: staffOrders, isLoading } = useInboundOrdersByStaff(companyId, staffId);
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
+    const order = useMemo(() => staffOrders?.find(t => t.id === numericId) ?? null, [staffOrders, numericId]);
     const error = !isLoading && !order;
 
     const updateItems = useUpdateInboundTicketItems();

@@ -140,7 +140,7 @@ export default function LoginScreen() {
                         <View style={styles.logoContainer}>
                             <ExpoImage
                                 source={require('@/assets/images/logoStorix.png')}
-                                style={{ width: 110, height: 110 }}
+                                style={{ width: 130, height: 130 }}
                                 contentFit="contain"
                             />
                         </View>
@@ -156,7 +156,7 @@ export default function LoginScreen() {
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Email</Text>
                             <Input
-                                placeholder="ví dụ: staff@storix.com"
+                                placeholder="Nhập email"
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
@@ -229,16 +229,15 @@ const styles = StyleSheet.create({
     logoContainer: {
         width: 140,
         height: 140,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 15,
-        elevation: 8,
+        // Drop shadow trắng nhẹ giúp logo nổi trên nền gradient mà không cần background trắng
+        shadowColor: '#fff',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 0,
     },
     appName: {
         fontSize: 28,

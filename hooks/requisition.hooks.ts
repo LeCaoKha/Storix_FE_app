@@ -137,6 +137,7 @@ export const useLinkOrderToRequisition = () => {
 
 // Note: useUpdateInboundRequestStatus is now moved to inbound-orders.hooks.ts 
 // to avoid duplication and ensure consistent invalidation.
-export { useUpdateInboundRequestStatus, useUpdateOutboundRequestStatus } from './inbound-orders.hooks';
+export { useUpdateInboundRequestStatus } from './inbound-orders.hooks';
+export { useUpdateOutboundRequestStatus } from './outbound-orders.hooks';
 
 

@@ -1,6 +1,6 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useConfirmOutboundOrder, useOutboundTasksByStaff, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
+import { useOutboundTasksByStaff, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
@@ -8,6 +8,34 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// BE Status Flow (Staff allowed transitions):
+// Created → Picking → QualityCheck → (IssueReported | Packing) → Packing → LoadHandover
+// Manager confirms LoadHandover → Completed
+// Items update only during: QualityCheck or IssueReported
+type TicketStatus = 'Created' | 'Picking' | 'QualityCheck' | 'IssueReported' | 'Packing' | 'LoadHandover' | 'Completed';
+
+const STATUS_CONFIG: Record<TicketStatus, { label: string; color: string; bgColor: string }> = {
+    Created: { label: 'Đã tạo', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Picking: { label: 'Đang lấy hàng', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    QualityCheck: { label: 'Kiểm tra chất lượng', color: '#7C3AED', bgColor: '#7C3AED20' },
+    IssueReported: { label: 'Có vấn đề', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    Packing: { label: 'Đóng gói', color: COLORS.teal600, bgColor: COLORS.teal50 },
+    LoadHandover: { label: 'Chờ Manager xác nhận', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
+};
+
+// Get next staff action based on current status
+const getNextAction = (status: TicketStatus): { label: string; nextStatus: TicketStatus; color: string } | null => {
+    switch (status) {
+        case 'Created': return { label: 'Bắt đầu lấy hàng', nextStatus: 'Picking', color: COLORS.primary };
+        case 'Picking': return { label: 'Hoàn tất lấy hàng → Kiểm tra', nextStatus: 'QualityCheck', color: '#7C3AED' };
+        case 'QualityCheck': return { label: 'Đạt chất lượng → Đóng gói', nextStatus: 'Packing', color: COLORS.teal600 };
+        case 'IssueReported': return { label: 'Đã khắc phục → Đóng gói', nextStatus: 'Packing', color: COLORS.teal600 };
+        case 'Packing': return { label: 'Đóng gói xong → Bàn giao', nextStatus: 'LoadHandover', color: COLORS.warning };
+        default: return null; // LoadHandover & Completed: no staff action
+    }
+};
 
 export default function OutboundDetailScreen() {
     const router = useRouter();
@@ -22,14 +50,20 @@ export default function OutboundDetailScreen() {
     const order = staffTasks?.find(t => t.id === numericId) ?? null;
     const error = !isLoading && !order;
 
-
     const updateItems = useUpdateOutboundTicketItems();
     const updateStatus = useUpdateOutboundTicketStatus();
-    const confirmOrder = useConfirmOutboundOrder();
 
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [isSaving, setIsSaving] = useState(false);
-    const [isConfirming, setIsConfirming] = useState(false);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
+    const currentStatus = (order?.status as TicketStatus) || 'Created';
+    const statusConfig = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.Created;
+    const nextAction = getNextAction(currentStatus);
+    // BE: Items can only be updated during QualityCheck or IssueReported
+    const canEditItems = currentStatus === 'QualityCheck' || currentStatus === 'IssueReported';
+    // BE: IssueReported only from QualityCheck
+    const canReportIssue = currentStatus === 'QualityCheck';
 
     // Initialize state when order data is loaded
     useEffect(() => {
@@ -37,7 +71,7 @@ export default function OutboundDetailScreen() {
         if (orderItems) {
             const initialQty: Record<number, number> = {};
             orderItems.forEach((item: OutboundOrderItem) => {
-                initialQty[item.id] = 0; // Số lượng đã lấy ban đầu = 0
+                initialQty[item.id] = item.quantity || 0;
             });
             setLocalQuantities(initialQty);
         }
@@ -53,15 +87,6 @@ export default function OutboundDetailScreen() {
             return nameA.localeCompare(nameB);
         });
     }, [order]);
-
-    // Check if all items are picked
-    const allItemsPicked = React.useMemo(() => {
-        const orderItems = order?.items || order?.outboundOrderItems;
-        if (!orderItems || orderItems.length === 0) return false;
-        return orderItems.every(
-            (item: OutboundOrderItem) => (localQuantities[item.id] || 0) >= (item.quantity || 0)
-        );
-    }, [order, localQuantities]);
 
     if (isLoading) {
         return (
@@ -87,6 +112,10 @@ export default function OutboundDetailScreen() {
     }
 
     const handleUpdateQty = (itemId: number, increment: boolean) => {
+        if (!canEditItems) {
+            AlertService.warning('Không thể sửa', 'Chỉ được cập nhật số lượng khi đang ở bước Kiểm tra chất lượng hoặc Báo lỗi.');
+            return;
+        }
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
             const orderItems = order?.items || order?.outboundOrderItems || [];
@@ -99,11 +128,10 @@ export default function OutboundDetailScreen() {
         });
     };
 
-    const handleSave = async () => {
-        if (!order) return;
+    const handleSaveItems = async () => {
+        if (!order || !canEditItems) return;
         setIsSaving(true);
         try {
-            // Update items with picked quantities
             const orderItems = order.items || order.outboundOrderItems || [];
             const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
                 id: item.id,
@@ -116,7 +144,7 @@ export default function OutboundDetailScreen() {
                 items: updatedItems,
             });
 
-            AlertService.success('Thành công', 'Đã cập nhật số lượng lấy hàng');
+            AlertService.success('Thành công', 'Đã cập nhật số lượng');
         } catch {
             AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
         } finally {
@@ -124,47 +152,55 @@ export default function OutboundDetailScreen() {
         }
     };
 
-    const handleConfirmComplete = async () => {
-        if (!order || !user) return;
+    // Transition to next status
+    const handleTransition = async () => {
+        if (!order || !user || !nextAction) return;
+
+        const confirmMsg = nextAction.nextStatus === 'LoadHandover'
+            ? 'Sau khi bàn giao, Manager sẽ xác nhận hoàn thành đơn.'
+            : `Chuyển trạng thái sang "${STATUS_CONFIG[nextAction.nextStatus].label}"?`;
 
         AlertService.confirm(
-            'Xác nhận hoàn tất xuất kho',
-            'Bạn có chắc chắn đã lấy đủ và kiểm tra tất cả hàng hóa? Sau khi xác nhận, phiếu xuất sẽ được đánh dấu hoàn thành.',
+            nextAction.label,
+            confirmMsg,
             async () => {
-                setIsConfirming(true);
+                setIsTransitioning(true);
                 try {
-                    // Update items with final quantities
-                    const orderItems = order.items || order.outboundOrderItems || [];
-                    const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
-                        id: item.id,
-                        productId: item.productId || 0,
-                        quantity: localQuantities[item.id] || item.quantity || 0,
-                    }));
-
-                    await updateItems.mutateAsync({
-                        ticketId: order.id,
-                        items: updatedItems,
-                    });
-
-                    // Update ticket status to Completed
                     await updateStatus.mutateAsync({
                         ticketId: order.id,
                         performedBy: user.id || 0,
-                        status: 'Completed',
+                        status: nextAction.nextStatus,
                     });
+                    AlertService.success('Thành công', `Đã chuyển sang: ${STATUS_CONFIG[nextAction.nextStatus].label}`);
+                } catch {
+                    AlertService.error('Lỗi', 'Không thể cập nhật trạng thái');
+                } finally {
+                    setIsTransitioning(false);
+                }
+            }
+        );
+    };
 
-                    // Confirm the flow
-                    await confirmOrder.mutateAsync({
+    // Report issue (only from QualityCheck)
+    const handleReportIssue = async () => {
+        if (!order || !user || !canReportIssue) return;
+
+        AlertService.confirm(
+            'Báo lỗi',
+            'Xác nhận có vấn đề với đơn hàng? Bạn có thể sửa số lượng sau khi báo lỗi.',
+            async () => {
+                setIsTransitioning(true);
+                try {
+                    await updateStatus.mutateAsync({
                         ticketId: order.id,
                         performedBy: user.id || 0,
+                        status: 'IssueReported',
                     });
-
-                    AlertService.success('Hoàn thành', 'Đơn hàng đã được xuất kho thành công');
-                    router.back();
+                    AlertService.success('Đã báo lỗi', 'Hãy cập nhật số lượng rồi chuyển tiếp.');
                 } catch {
-                    AlertService.error('Lỗi', 'Không thể hoàn tất đơn hàng');
+                    AlertService.error('Lỗi', 'Không thể báo lỗi');
                 } finally {
-                    setIsConfirming(false);
+                    setIsTransitioning(false);
                 }
             }
         );
@@ -178,7 +214,16 @@ export default function OutboundDetailScreen() {
             />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+                {/* Current Status Badge */}
                 <Card style={styles.infoCard}>
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoText}>Trạng thái:</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                            <Text style={[styles.statusBadgeText, { color: statusConfig.color }]}>
+                                {statusConfig.label}
+                            </Text>
+                        </View>
+                    </View>
                     <View style={styles.infoRow}>
                         <Feather name="user" size={16} color={COLORS.textMuted} />
                         <Text style={styles.infoText}>Người tạo: <Text style={styles.boldText}>{order.createdByUser?.fullName || order.createdByUser?.email || order.createdByNavigation?.email || 'N/A'}</Text></Text>
@@ -187,6 +232,11 @@ export default function OutboundDetailScreen() {
                         <Feather name="map-pin" size={16} color={COLORS.textMuted} />
                         <Text style={styles.infoText}>Giao đến: <Text style={styles.boldText}>{order.destination || 'N/A'}</Text></Text>
                     </View>
+                    {!canEditItems && currentStatus !== 'LoadHandover' && currentStatus !== 'Completed' && (
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: 'italic', marginTop: 4 }}>
+                            Cập nhật số lượng chỉ khả dụng ở bước Kiểm tra CL / Báo lỗi
+                        </Text>
+                    )}
                 </Card>
 
                 <View style={styles.sectionHeader}>
@@ -248,32 +298,57 @@ export default function OutboundDetailScreen() {
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
-                    <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
-                </TouchableOpacity>
+                {/* Report Issue button - only during QualityCheck */}
+                {canReportIssue && (
+                    <TouchableOpacity
+                        style={styles.reportBtn}
+                        onPress={handleReportIssue}
+                        disabled={isTransitioning}
+                    >
+                        <Feather name="alert-triangle" size={20} color={COLORS.danger} />
+                        <Text style={styles.reportBtnText}>Báo lỗi</Text>
+                    </TouchableOpacity>
+                )}
 
-                {!allItemsPicked ? (
+                {/* Save items - only during QualityCheck/IssueReported */}
+                {canEditItems && (
                     <TouchableOpacity
                         style={[styles.saveBtn, isSaving && styles.disabledBtn]}
-                        onPress={handleSave}
+                        onPress={handleSaveItems}
                         disabled={isSaving}
                     >
                         <Text style={styles.saveBtnText}>
-                            {isSaving ? 'Đang lưu...' : 'Lưu tiến độ'}
+                            {isSaving ? 'Đang lưu...' : 'Lưu số lượng'}
                         </Text>
                     </TouchableOpacity>
-                ) : (
+                )}
+
+                {/* Next status transition button */}
+                {nextAction && (
                     <TouchableOpacity
-                        style={[styles.confirmBtn, isConfirming && styles.disabledBtn]}
-                        onPress={handleConfirmComplete}
-                        disabled={isConfirming}
+                        style={[styles.confirmBtn, { backgroundColor: nextAction.color }, isTransitioning && styles.disabledBtn]}
+                        onPress={handleTransition}
+                        disabled={isTransitioning}
                     >
-                        <Feather name="check-circle" size={20} color="#fff" />
+                        <Feather name="arrow-right-circle" size={20} color="#fff" />
                         <Text style={styles.confirmBtnText}>
-                            {isConfirming ? 'Đang xử lý...' : 'Xác nhận hoàn tất'}
+                            {isTransitioning ? 'Đang xử lý...' : nextAction.label}
                         </Text>
                     </TouchableOpacity>
+                )}
+
+                {/* LoadHandover / Completed: Read-only info */}
+                {currentStatus === 'LoadHandover' && (
+                    <View style={[styles.confirmBtn, { backgroundColor: COLORS.warning }]}>
+                        <Feather name="clock" size={20} color="#fff" />
+                        <Text style={styles.confirmBtnText}>Chờ Manager xác nhận</Text>
+                    </View>
+                )}
+                {currentStatus === 'Completed' && (
+                    <View style={[styles.confirmBtn, { backgroundColor: COLORS.success }]}>
+                        <Feather name="check-circle" size={20} color="#fff" />
+                        <Text style={styles.confirmBtnText}>Đã hoàn tất</Text>
+                    </View>
                 )}
             </View>
         </View>

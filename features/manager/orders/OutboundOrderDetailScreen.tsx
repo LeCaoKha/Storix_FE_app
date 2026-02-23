@@ -28,16 +28,16 @@ const REQUEST_STATUS_CONFIG: Record<OutboundRequestStatusKey, { label: string; c
     Rejected: { label: 'Từ chối', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
-// Status config cho Ticket (đang xử lý)
-type OutboundTicketStatusKey = 'Pending' | 'Picking' | 'Packed' | 'Ready' | 'Shipped' | 'Completed' | 'Cancelled';
+// Status config cho Ticket (đang xử lý) - match BE: Created→Picking→QualityCheck→IssueReported/Packing→LoadHandover→Completed
+type OutboundTicketStatusKey = 'Created' | 'Picking' | 'QualityCheck' | 'IssueReported' | 'Packing' | 'LoadHandover' | 'Completed';
 const TICKET_STATUS_CONFIG: Record<OutboundTicketStatusKey, { label: string; color: string; bgColor: string }> = {
-    Pending: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Created: { label: 'Đã tạo', color: COLORS.warning, bgColor: COLORS.warning + '20' },
     Picking: { label: 'Đang lấy hàng', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
-    Packed: { label: 'Đã đóng gói', color: COLORS.slate700, bgColor: COLORS.slate200 },
-    Ready: { label: 'Sẵn sàng', color: COLORS.teal600, bgColor: COLORS.teal50 },
-    Shipped: { label: 'Đã xuất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    QualityCheck: { label: 'Kiểm tra CL', color: COLORS.slate700, bgColor: COLORS.slate200 },
+    IssueReported: { label: 'Có vấn đề', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    Packing: { label: 'Đóng gói', color: COLORS.teal600, bgColor: COLORS.teal50 },
+    LoadHandover: { label: 'Chờ xác nhận', color: COLORS.warning, bgColor: COLORS.warning + '20' },
     Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
-    Cancelled: { label: 'Đã hủy', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
 const getRequestStatusConfig = (status?: string) => {
@@ -45,7 +45,7 @@ const getRequestStatusConfig = (status?: string) => {
 };
 
 const getTicketStatusConfig = (status?: string) => {
-    return TICKET_STATUS_CONFIG[status as OutboundTicketStatusKey] || TICKET_STATUS_CONFIG.Pending;
+    return TICKET_STATUS_CONFIG[status as OutboundTicketStatusKey] || TICKET_STATUS_CONFIG.Created;
 };
 
 export default function OutboundOrderDetailScreen() {
@@ -107,7 +107,7 @@ export default function OutboundOrderDetailScreen() {
     const isAdmin = user?.roleId === 2;
     const canApproveReject = isRequest && data.status === 'Pending' && isAdmin;
     const canCreateTicket = isRequest && data.status === 'Approved';
-    const canConfirmComplete = !isRequest && data.status === 'Ready';
+    const canConfirmComplete = !isRequest && data.status === 'LoadHandover';
 
     // Handle approve request
     const handleApprove = () => {
