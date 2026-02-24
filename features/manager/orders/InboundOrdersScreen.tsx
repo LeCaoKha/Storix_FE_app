@@ -20,7 +20,7 @@ const REQUEST_STATUS_CONFIG: Record<RequestStatusKey, { label: string; color: st
 // BE statuses: 'Waiting for payment', 'Partially Completed', 'Completed'
 type TicketStatusKey = 'Waiting for payment' | 'Partially Completed' | 'Completed';
 const TICKET_STATUS_CONFIG: Record<TicketStatusKey, { label: string; color: string; bgColor: string }> = {
-    'Waiting for payment': { label: 'Chờ thanh toán', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    'Waiting for payment': { label: 'Chờ nhận hàng', color: COLORS.warning, bgColor: COLORS.warning + '20' },
     'Partially Completed': { label: 'Đang nhập', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
     'Completed': { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
 };
@@ -299,7 +299,7 @@ export default function InboundOrdersScreen() {
                     >
                         {[
                             { key: 'all' as const, label: 'Tất cả', count: ticketCounts.all },
-                            { key: 'Waiting for payment' as const, label: 'Chờ thanh toán', count: ticketCounts['Waiting for payment'] },
+                            { key: 'Waiting for payment' as const, label: 'Chờ nhận hàng', count: ticketCounts['Waiting for payment'] },
                             { key: 'Partially Completed' as const, label: 'Đang nhập', count: ticketCounts['Partially Completed'] },
                             { key: 'Completed' as const, label: 'Hoàn tất', count: ticketCounts.Completed },
                         ].map(({ key, label, count }) => (
@@ -361,7 +361,6 @@ const styles = StyleSheet.create({
     },
     viewToggle: {
         flexDirection: 'row',
-        marginHorizontal: 20,
         marginTop: 12,
         marginBottom: 4,
         backgroundColor: '#f0f0f0',
@@ -394,8 +393,7 @@ const styles = StyleSheet.create({
         maxHeight: 50,
     },
     tabsContainer: {
-        paddingHorizontal: 20,
-        paddingBottom: 12,
+        paddingBottom: 4,
     },
     tab: {
         flexDirection: 'row',

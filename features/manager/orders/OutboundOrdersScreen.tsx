@@ -168,7 +168,7 @@ export default function OutboundOrdersScreen() {
                         <Feather name="package" size={16} color={COLORS.textMuted} />
                         <Text style={styles.cardLabel}>Sản phẩm:</Text>
                         <Text style={styles.cardValue}>
-                            {request.outboundOrderItems?.length || 0} mặt hàng
+                            {((request as any).items || request.outboundOrderItems)?.length || 0} mặt hàng
                         </Text>
                     </View>
 
@@ -235,7 +235,7 @@ export default function OutboundOrdersScreen() {
                         <Feather name="package" size={16} color={COLORS.textMuted} />
                         <Text style={styles.cardLabel}>Sản phẩm:</Text>
                         <Text style={styles.cardValue}>
-                            {ticket.outboundOrderItems?.length || 0} mặt hàng
+                            {((ticket as any).items || ticket.outboundOrderItems)?.length || 0} mặt hàng
                         </Text>
                     </View>
 

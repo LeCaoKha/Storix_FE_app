@@ -34,7 +34,7 @@ const REQUEST_STATUS_CONFIG: Record<InboundRequestStatusKey, { label: string; co
 // Status config cho Ticket - match BE: "Waiting for payment"→"Partially Completed"→"Completed"
 type InboundTicketStatusKey = 'Waiting for payment' | 'Partially Completed' | 'Completed';
 const TICKET_STATUS_CONFIG: Record<InboundTicketStatusKey, { label: string; color: string; bgColor: string }> = {
-    'Waiting for payment': { label: 'Chờ thanh toán', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    'Waiting for payment': { label: 'Chờ nhận hàng', color: COLORS.warning, bgColor: COLORS.warning + '20' },
     'Partially Completed': { label: 'Nhập một phần', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
     Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
 };
@@ -279,11 +279,11 @@ export default function InboundOrderDetailScreen() {
                             </Text>
                         </View>
                     )}
-                    {!isRequest && (data as any).createdByNavigation && (
+                    {!isRequest && ((data as any).createdByUser || (data as any).createdByNavigation) && (
                         <View style={styles.infoRow}>
                             <Feather name="user" size={16} color={COLORS.textMuted} />
                             <Text style={styles.infoLabel}>Người tạo:</Text>
-                            <Text style={styles.infoValue}>{(data as any).createdByNavigation.email}</Text>
+                            <Text style={styles.infoValue}>{(data as any).createdByUser?.email || (data as any).createdByNavigation?.email || 'N/A'}</Text>
                         </View>
                     )}
                 </Card>
@@ -299,10 +299,10 @@ export default function InboundOrderDetailScreen() {
                             <View style={styles.itemRow}>
                                 <View style={styles.itemLeft}>
                                     <Text style={styles.itemName}>
-                                        {item.product?.name || `Sản phẩm #${item.productId}`}
+                                        {item.name || item.product?.name || `Sản phẩm #${item.productId}`}
                                     </Text>
-                                    {item.product?.sku && (
-                                        <Text style={styles.itemSKU}>{item.product.sku}</Text>
+                                    {(item.sku || item.product?.sku) && (
+                                        <Text style={styles.itemSKU}>{item.sku || item.product?.sku}</Text>
                                     )}
                                 </View>
                                 <View style={styles.itemRight}>

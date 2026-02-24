@@ -42,8 +42,9 @@ export default function RequisitionDetailScreen() {
         ? { label: 'Nhập kho', icon: 'arrow-down-circle' as const, color: '#3B82F6' }
         : { label: 'Xuất kho', icon: 'arrow-up-circle' as const, color: '#8B5CF6' };
 
-    const canEdit = requisition.status === 'pending';
-    const canCreateOrder = requisition.status === 'approved' && !requisition.linkedOrderId;
+    const normalizedStatus = requisition.status?.toLowerCase().trim() || '';
+    const canEdit = normalizedStatus === 'pending';
+    const canCreateOrder = (normalizedStatus === 'approved' || normalizedStatus === 'approve') && !requisition.linkedOrderId;
 
     const handleEdit = () => {
         // TODO: Navigate to edit screen

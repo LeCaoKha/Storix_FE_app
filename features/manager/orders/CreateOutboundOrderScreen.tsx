@@ -79,17 +79,6 @@ export default function CreateOutboundOrderScreen() {
         <View style={styles.container}>
             <ScreenHeader
                 title="Tạo Đơn Xuất Kho"
-                rightButton={
-                    <TouchableOpacity
-                        style={[styles.submitButton, isCreating && styles.submitButtonDisabled]}
-                        onPress={handleCreate}
-                        disabled={isCreating}
-                    >
-                        <Text style={styles.submitButtonText}>
-                            {isCreating ? 'Đang tạo...' : 'Tạo'}
-                        </Text>
-                    </TouchableOpacity>
-                }
             />
 
             <ScrollView style={styles.content}>
@@ -142,21 +131,24 @@ export default function CreateOutboundOrderScreen() {
                     />
                 </Card>
 
-                {requisition && requisition.outboundOrderItems && requisition.outboundOrderItems.length > 0 && (
+                {(() => {
+                    const orderItems = requisition?.items || requisition?.outboundOrderItems;
+                    if (!requisition || !orderItems || orderItems.length === 0) return null;
+                    return (
                     <Card style={styles.card}>
                         <Text style={styles.sectionTitle}>
-                            Sản Phẩm ({requisition.outboundOrderItems.length})
+                            Sản Phẩm ({orderItems.length})
                         </Text>
-                        {requisition.outboundOrderItems.map((item, index) => (
+                        {orderItems.map((item, index) => (
                             <View key={item.id || index}>
                                 {index > 0 && <View style={styles.itemDivider} />}
                                 <View style={styles.itemRow}>
                                     <View style={styles.itemInfo}>
                                         <Text style={styles.itemName}>
-                                            {item.product?.name || `Product #${item.productId}`}
+                                            {item.productName || item.name || item.product?.name || `Product #${item.productId}`}
                                         </Text>
-                                        {item.product?.sku && (
-                                            <Text style={styles.itemSku}>SKU: {item.product.sku}</Text>
+                                        {(item.sku || item.product?.sku) && (
+                                            <Text style={styles.itemSku}>SKU: {item.sku || item.product?.sku}</Text>
                                         )}
                                     </View>
                                     <Text style={styles.itemQty}>
@@ -166,7 +158,8 @@ export default function CreateOutboundOrderScreen() {
                             </View>
                         ))}
                     </Card>
-                )}
+                    );
+                })()}
             </ScrollView>
 
             <Modal

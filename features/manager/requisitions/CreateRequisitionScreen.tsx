@@ -518,34 +518,41 @@ export default function CreateRequisitionScreen() {
                                 const latestPrice = item.product ? getLatestPrice(item.product) : 0;
                                 const totalPrice = latestPrice * item.quantity;
                                 return (
-                                    <View key={item.id}>
+                                    <View key={`item-${item.id}-${index}`}>
                                         <View style={styles.itemCardContent}>
-                                            {/* Top Row: Name and Remove */}
-                                            <View style={styles.itemMainInfo}>
+                                            {/* Row 1: Name + Unit badge + Delete */}
+                                            <View style={styles.itemTopRow}>
                                                 <View style={styles.itemHeader}>
                                                     <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
-                                                    <Text style={styles.itemSku}>SKU: {item.sku}</Text>
+                                                </View>
+                                                <View style={styles.itemUnitBadge}>
+                                                    <Text style={styles.itemUnitText}>{item.quantity} {item.unit || 'Cái'}</Text>
                                                 </View>
                                                 <TouchableOpacity
                                                     style={styles.deleteButton}
                                                     onPress={() => handleRemoveItem(item.id)}
                                                 >
-                                                    <Feather name="trash-2" size={18} color="#EF4444" />
+                                                    <Feather name="trash-2" size={16} color="#EF4444" />
                                                 </TouchableOpacity>
                                             </View>
 
-                                            {/* Bottom Row: Price and Quantity */}
-                                            <View style={styles.itemFooter}>
-                                                <View style={styles.priceSection}>
-                                                    <Text style={styles.unitPriceText}>
-                                                        {formatVND(latestPrice)}/đv
-                                                    </Text>
-                                                    <View style={styles.totalSection}>
-                                                        <Text style={styles.totalLabel}>THÀNH TIỀN</Text>
-                                                        <Text style={styles.totalValue}>{formatVND(totalPrice)}</Text>
-                                                    </View>
-                                                </View>
+                                            {/* Row 2: SKU */}
+                                            <Text style={styles.itemSku}>SKU: {item.sku}</Text>
 
+                                            {/* Row 3: Price info */}
+                                            <View style={styles.itemPriceRow}>
+                                                <Text style={styles.unitPriceText}>
+                                                    {formatVND(latestPrice)}/{item.unit || 'đv'}
+                                                </Text>
+                                                <View style={styles.totalSection}>
+                                                    <Text style={styles.totalLabel}>THÀNH TIỀN</Text>
+                                                    <Text style={styles.totalValue}>{formatVND(totalPrice)}</Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Row 4: Quantity controls */}
+                                            <View style={styles.itemQuantityRow}>
+                                                <Text style={styles.quantityLabel}>Số lượng</Text>
                                                 <View style={styles.quantityInput}>
                                                     <TouchableOpacity
                                                         onPress={() => handleUpdateQuantity(item.id, String(Math.max(1, item.quantity - 1)))}
@@ -611,7 +618,7 @@ export default function CreateRequisitionScreen() {
                     ) : (
                         <FlatList
                             data={filteredProducts}
-                            keyExtractor={item => String(item.id)}
+                            keyExtractor={(item, index) => `product-${item.id}-${index}`}
                             renderItem={({ item }) => {
                                 const latestPrice = getLatestPrice(item);
                                 return (
@@ -676,7 +683,7 @@ export default function CreateRequisitionScreen() {
                     ) : (
                         <FlatList
                             data={warehouses}
-                            keyExtractor={item => String(item.warehouseId || item.id)}
+                            keyExtractor={(item, index) => `wh-${item.warehouseId || item.id}-${index}`}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
                                     style={[
@@ -731,7 +738,7 @@ export default function CreateRequisitionScreen() {
                     ) : (
                         <FlatList
                             data={suppliers}
-                            keyExtractor={item => String(item.supplierId || item.id)}
+                            keyExtractor={(item, index) => `sup-${item.supplierId || item.id}-${index}`}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
                                     style={[
@@ -966,22 +973,33 @@ const styles = StyleSheet.create({
     },
     itemCardContent: {
         padding: 16,
+        gap: 10,
     },
-    itemMainInfo: {
+    itemTopRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 12,
+        alignItems: 'center',
+        gap: 8,
     },
     itemHeader: {
         flex: 1,
-        marginRight: 12,
     },
     itemName: {
         fontSize: 15,
         fontWeight: '700',
         color: COLORS.text,
-        marginBottom: 4,
+    },
+    itemUnitBadge: {
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    itemUnitText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#2563EB',
     },
     itemSku: {
         fontSize: 12,
@@ -989,34 +1007,44 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     deleteButton: {
-        padding: 4,
+        padding: 6,
     },
-    itemFooter: {
+    itemPriceRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-end',
-    },
-    priceSection: {
-        flex: 1,
+        paddingTop: 4,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
     },
     unitPriceText: {
-        fontSize: 12,
+        fontSize: 13,
         color: COLORS.textMuted,
-        marginBottom: 4,
     },
     totalSection: {
-        gap: 2,
+        alignItems: 'flex-end',
     },
     totalLabel: {
         fontSize: 10,
         fontWeight: '700',
         color: COLORS.textMuted,
         letterSpacing: 0.5,
+        marginBottom: 2,
     },
     totalValue: {
         fontSize: 17,
         fontWeight: '800',
-        color: '#10B981', // Emerald 500
+        color: '#10B981',
+    },
+    itemQuantityRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    quantityLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.textMuted,
     },
     quantityInput: {
         flexDirection: 'row',

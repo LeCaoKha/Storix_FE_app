@@ -268,31 +268,34 @@ export default function OutboundDetailScreen() {
 
                         <View style={styles.counterRow}>
                             <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
-                            <View style={styles.counter}>
-                                <TouchableOpacity
-                                    style={styles.counterBtn}
-                                    onPress={() => handleUpdateQty(item.id, false)}
-                                >
-                                    <Feather name="minus" size={20} color={COLORS.primary} />
-                                </TouchableOpacity>
+                            {canEditItems ? (
+                                <View style={styles.counter}>
+                                    <TouchableOpacity
+                                        style={styles.counterBtn}
+                                        onPress={() => handleUpdateQty(item.id, false)}
+                                    >
+                                        <Feather name="minus" size={20} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                    <View style={styles.qtyDisplay}>
+                                        <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
+                                        <Text style={styles.qtyTotal}>/ {item.quantity || 0}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.counterBtn}
+                                        onPress={() => handleUpdateQty(item.id, true)}
+                                    >
+                                        <Feather name="plus" size={20} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
                                 <View style={styles.qtyDisplay}>
-                                    <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
+                                    <Text style={[styles.qtyValue, currentStatus === 'Completed' && { color: COLORS.success }]}>{item.quantity || 0}</Text>
                                     <Text style={styles.qtyTotal}>/ {item.quantity || 0}</Text>
                                 </View>
-                                <TouchableOpacity
-                                    style={styles.counterBtn}
-                                    onPress={() => handleUpdateQty(item.id, true)}
-                                >
-                                    <Feather name="plus" size={20} color={COLORS.primary} />
-                                </TouchableOpacity>
-                            </View>
+                            )}
                         </View>
 
-                        {item.price != null && (
-                            <View style={styles.priceRow}>
-                                <Text style={styles.priceText}>Đơn giá: <Text style={styles.boldText}>{item.price.toLocaleString('vi-VN')} ₫</Text></Text>
-                            </View>
-                        )}
+
                     </Card>
                 ))}
             </ScrollView>
@@ -345,9 +348,9 @@ export default function OutboundDetailScreen() {
                     </View>
                 )}
                 {currentStatus === 'Completed' && (
-                    <View style={[styles.confirmBtn, { backgroundColor: COLORS.success }]}>
-                        <Feather name="check-circle" size={20} color="#fff" />
-                        <Text style={styles.confirmBtnText}>Đã hoàn tất</Text>
+                    <View style={styles.completedBanner}>
+                        <Feather name="check-circle" size={20} color={COLORS.success} />
+                        <Text style={styles.completedBannerText}>Đơn xuất kho đã hoàn tất</Text>
                     </View>
                 )}
             </View>
@@ -651,5 +654,22 @@ const styles = StyleSheet.create({
     priceText: {
         fontSize: 13,
         color: COLORS.textMuted,
+    },
+    completedBanner: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        height: 56,
+        backgroundColor: COLORS.success + '15',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLORS.success + '30',
+    },
+    completedBannerText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.success,
     },
 });

@@ -36,6 +36,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     }
   };
 
+
+
   const handlePress = () => {
     if (onPress) {
       onPress();
@@ -66,9 +68,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Text style={styles.title} numberOfLines={1}>{task.title}</Text>
-          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(task.priority) + '20' }]}>
-            <Text style={[styles.priorityText, { color: getPriorityColor(task.priority) }]}>{task.priority}</Text>
-          </View>
         </View>
         <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
       </View>

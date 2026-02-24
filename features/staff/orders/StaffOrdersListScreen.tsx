@@ -10,9 +10,9 @@ type TabType = 'all' | 'waiting' | 'partial' | 'completed';
 
 const TABS: { key: TabType; label: string }[] = [
     { key: 'all', label: 'Tất cả' },
-    { key: 'waiting', label: 'Chờ thanh toán' },
-    { key: 'partial', label: 'Nhập một phần' },
-    { key: 'completed', label: 'Hoàn thành' },
+    { key: 'waiting', label: 'Chờ nhận hàng' },
+    { key: 'partial', label: 'Đang nhập' },
+    { key: 'completed', label: 'Hoàn tất' },
 ];
 
 export default function StaffOrdersListScreen() {
@@ -70,11 +70,11 @@ export default function StaffOrdersListScreen() {
     const getStatusBadgeStyle = (status: string) => {
         switch (status) {
             case 'Waiting for payment':
-                return { bg: '#EFF6FF', text: '#1E40AF', label: 'Chờ thanh toán' };
+                return { bg: '#EFF6FF', text: '#1E40AF', label: 'Chờ nhận hàng' };
             case 'Partially Completed':
-                return { bg: '#FEF3C7', text: '#92400E', label: 'Nhập một phần' };
+                return { bg: '#FEF3C7', text: '#92400E', label: 'Đang nhập' };
             case 'Completed':
-                return { bg: '#D1FAE5', text: '#065F46', label: 'Hoàn thành' };
+                return { bg: '#D1FAE5', text: '#065F46', label: 'Hoàn tất' };
             default:
                 return { bg: '#F3F4F6', text: '#6B7280', label: status || 'N/A' };
         }

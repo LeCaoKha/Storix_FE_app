@@ -1,16 +1,16 @@
 import {
-    getInboundRequestById as apiGetInboundRequestById,
-    getInboundTicketById as apiGetInboundTicketById,
-    createInboundRequest,
-    createInboundTicket,
-    getAllInboundRequests,
-    getAllInboundTickets,
-    getInboundOrdersByStaff,
-    updateInboundRequestStatus,
-    updateInboundTicketItems,
-    type InboundOrder as ApiInboundOrder,
-    type CreateInboundRequestPayload,
-    type UpdateInboundItemPayload,
+  getInboundRequestById as apiGetInboundRequestById,
+  getInboundTicketById as apiGetInboundTicketById,
+  createInboundRequest,
+  createInboundTicket,
+  getAllInboundRequests,
+  getAllInboundTickets,
+  getInboundOrdersByStaff,
+  updateInboundRequestStatus,
+  updateInboundTicketItems,
+  type InboundOrder as ApiInboundOrder,
+  type CreateInboundRequestPayload,
+  type UpdateInboundItemPayload,
 } from '@/services/inbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { InboundRequest } from '@/types/inbound-order';

@@ -22,12 +22,12 @@ export const supplierKeys = {
  * Hook to fetch all suppliers
  */
 export const useSuppliers = () => {
-  const companyId = useAuthStore((state) => state.user?.companyId);
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useQuery({
-    queryKey: [...supplierKeys.lists(), companyId],
-    queryFn: () => getSuppliers(companyId!),
-    enabled: !!companyId,
+    queryKey: [...supplierKeys.lists(), userId],
+    queryFn: () => getSuppliers(userId!),
+    enabled: !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };

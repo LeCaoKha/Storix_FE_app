@@ -191,8 +191,8 @@ export default function OutboundOrderDetailScreen() {
         );
     };
 
-    // Get items - support both request and ticket structure
-    const items = (data as any).outboundOrderItems || [];
+    // Get items - support both DTO format (items) and raw entity format (outboundOrderItems)
+    const items = (data as any).items || (data as any).outboundOrderItems || [];
     const warehouse = (data as any).warehouse;
 
     return (
@@ -286,11 +286,11 @@ export default function OutboundOrderDetailScreen() {
                             </Text>
                         </View>
                     )}
-                    {!isRequest && (data as any).staff && (
+                    {!isRequest && ((data as any).createdByUser || (data as any).staff) && (
                         <View style={styles.infoRow}>
                             <Feather name="user" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoLabel}>Nhân viên:</Text>
-                            <Text style={styles.infoValue}>{(data as any).staff.email}</Text>
+                            <Text style={styles.infoLabel}>Người tạo:</Text>
+                            <Text style={styles.infoValue}>{(data as any).createdByUser?.email || (data as any).staff?.email || 'N/A'}</Text>
                         </View>
                     )}
                 </Card>
@@ -306,10 +306,10 @@ export default function OutboundOrderDetailScreen() {
                             <View style={styles.itemRow}>
                                 <View style={styles.itemLeft}>
                                     <Text style={styles.itemName}>
-                                        {item.product?.name || `Sản phẩm #${item.productId}`}
+                                        {item.productName || item.name || item.product?.name || `Sản phẩm #${item.productId}`}
                                     </Text>
-                                    {item.product?.sku && (
-                                        <Text style={styles.itemSKU}>{item.product.sku}</Text>
+                                    {(item.sku || item.product?.sku) && (
+                                        <Text style={styles.itemSKU}>{item.sku || item.product?.sku}</Text>
                                     )}
                                 </View>
                                 <View style={styles.itemRight}>

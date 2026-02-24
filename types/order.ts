@@ -20,6 +20,7 @@ export enum TaskType {
   PUTAWAY = 'putaway',
   PICKING = 'picking',
   TRANSFER = 'transfer',
+  COUNT = 'count',
 }
 
 export enum TaskStatus {

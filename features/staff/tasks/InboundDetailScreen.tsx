@@ -61,7 +61,13 @@ export default function InboundDetailScreen() {
         );
     }
 
+    // Kiểm tra trạng thái đơn - nếu đã hoàn thành thì không cho sửa
+    const isCompleted = order?.status === 'Completed';
+    const isPartiallyCompleted = order?.status === 'Partially Completed';
+    const canEdit = !isCompleted; // Cho sửa khi Waiting for payment hoặc Partially Completed
+
     const handleUpdateQty = (itemId: number, increment: boolean) => {
+        if (!canEdit) return;
         setLocalQuantities(prev => {
             const current = prev[itemId] || 0;
             const item = order?.inboundOrderItems.find((i: InboundOrderItem) => i.id === itemId);
@@ -175,82 +181,92 @@ export default function InboundDetailScreen() {
                                 <Text style={styles.skuText}>SKU: {item.sku || item.product?.sku || 'N/A'}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
-                                backgroundColor: (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? COLORS.success + '20' : COLORS.warning + '20'
+                                backgroundColor: (isCompleted || (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)) ? COLORS.success + '20' : COLORS.warning + '20'
                             }]}>
                                 <Text style={[styles.statusBadgeText, {
-                                    color: (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? COLORS.success : COLORS.warning
+                                    color: (isCompleted || (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)) ? COLORS.success : COLORS.warning
                                 }]}>
-                                    {(localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? 'Đủ' : 'Chờ'}
+                                    {(isCompleted || (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)) ? 'Đủ' : 'Chờ'}
                                 </Text>
                             </View>
                         </View>
 
                         <View style={styles.counterRow}>
                             <Text style={styles.qtyLabel}>Số lượng đã nhận:</Text>
-                            <View style={styles.counter}>
-                                <TouchableOpacity
-                                    style={styles.counterBtn}
-                                    onPress={() => handleUpdateQty(item.id, false)}
-                                >
-                                    <Feather name="minus" size={20} color={COLORS.primary} />
-                                </TouchableOpacity>
+                            {canEdit ? (
+                                <View style={styles.counter}>
+                                    <TouchableOpacity
+                                        style={styles.counterBtn}
+                                        onPress={() => handleUpdateQty(item.id, false)}
+                                    >
+                                        <Feather name="minus" size={20} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                    <View style={styles.qtyDisplay}>
+                                        <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
+                                        <Text style={styles.qtyTotal}>/ {item.expectedQuantity || 0}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.counterBtn}
+                                        onPress={() => handleUpdateQty(item.id, true)}
+                                    >
+                                        <Feather name="plus" size={20} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
                                 <View style={styles.qtyDisplay}>
-                                    <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
+                                    <Text style={[styles.qtyValue, isCompleted && { color: COLORS.success }]}>
+                                        {isCompleted 
+                                            ? (item.receivedQuantity || item.expectedQuantity || 0)
+                                            : (item.receivedQuantity || 0)}
+                                    </Text>
                                     <Text style={styles.qtyTotal}>/ {item.expectedQuantity || 0}</Text>
                                 </View>
-                                <TouchableOpacity
-                                    style={styles.counterBtn}
-                                    onPress={() => handleUpdateQty(item.id, true)}
-                                >
-                                    <Feather name="plus" size={20} color={COLORS.primary} />
-                                </TouchableOpacity>
-                            </View>
+                            )}
                         </View>
 
-                        {/* Giá & Chiết khấu — từ InboundOrderItem.Price / Discount */}
-                        {(item.price != null || item.discount != null) && (
-                            <View style={styles.priceRow}>
-                                {item.price != null && (
-                                    <Text style={styles.priceText}>Đơn giá: <Text style={styles.boldText}>{item.price.toLocaleString('vi-VN')} ₫</Text></Text>
-                                )}
-                                {item.discount != null && item.discount > 0 && (
-                                    <Text style={styles.discountText}>CK: {item.discount}%</Text>
-                                )}
-                            </View>
-                        )}
+
                     </Card>
                 ))}
             </ScrollView>
 
-            <View style={styles.footer}>
-                <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
-                    <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
-                </TouchableOpacity>
+            {isCompleted ? (
+                <View style={styles.footer}>
+                    <View style={[styles.completedBanner, { flex: 1 }]}>
+                        <Feather name="check-circle" size={20} color={COLORS.success} />
+                        <Text style={styles.completedBannerText}>Đơn nhập kho đã hoàn tất</Text>
+                    </View>
+                </View>
+            ) : (
+                <View style={styles.footer}>
+                    <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
+                        <Feather name="alert-triangle" size={20} color={COLORS.danger} />
+                        <Text style={styles.reportBtnText}>Báo lỗi</Text>
+                    </TouchableOpacity>
 
-                {!allItemsReceived ? (
-                    <TouchableOpacity
-                        style={[styles.saveBtn, isSaving && styles.disabledBtn]}
-                        onPress={handleSave}
-                        disabled={isSaving}
-                    >
-                        <Text style={styles.saveBtnText}>
-                            {isSaving ? 'Đang lưu...' : 'Lưu tiến độ'}
-                        </Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity
-                        style={[styles.confirmBtn, isConfirming && styles.disabledBtn]}
-                        onPress={handleConfirmComplete}
-                        disabled={isConfirming}
-                    >
-                        <Feather name="check-circle" size={20} color="#fff" />
-                        <Text style={styles.confirmBtnText}>
-                            {isConfirming ? 'Đang xử lý...' : 'Xác nhận hoàn tất'}
-                        </Text>
-                    </TouchableOpacity>
-                )}
-            </View>
+                    {!allItemsReceived ? (
+                        <TouchableOpacity
+                            style={[styles.saveBtn, isSaving && styles.disabledBtn]}
+                            onPress={handleSave}
+                            disabled={isSaving}
+                        >
+                            <Text style={styles.saveBtnText}>
+                                {isSaving ? 'Đang lưu...' : 'Lưu tiến độ'}
+                            </Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity
+                            style={[styles.confirmBtn, isConfirming && styles.disabledBtn]}
+                            onPress={handleConfirmComplete}
+                            disabled={isConfirming}
+                        >
+                            <Feather name="check-circle" size={20} color="#fff" />
+                            <Text style={styles.confirmBtnText}>
+                                {isConfirming ? 'Đang xử lý...' : 'Xác nhận hoàn tất'}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            )}
         </View>
     );
 }
@@ -579,5 +595,21 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: COLORS.success,
         fontWeight: '600',
+    },
+    completedBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        height: 56,
+        backgroundColor: COLORS.success + '15',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLORS.success + '30',
+    },
+    completedBannerText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.success,
     },
 });

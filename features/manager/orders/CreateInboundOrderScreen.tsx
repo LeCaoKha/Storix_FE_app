@@ -97,17 +97,6 @@ export default function CreateInboundOrderScreen() {
         <View style={styles.container}>
             <ScreenHeader
                 title="Tạo Đơn Nhập Kho"
-                rightButton={
-                    <TouchableOpacity
-                        style={[styles.submitButton, isCreating && styles.submitButtonDisabled]}
-                        onPress={handleCreate}
-                        disabled={isCreating}
-                    >
-                        <Text style={styles.submitButtonText}>
-                            {isCreating ? 'Đang tạo...' : 'Tạo'}
-                        </Text>
-                    </TouchableOpacity>
-                }
             />
 
             <ScrollView style={styles.content}>

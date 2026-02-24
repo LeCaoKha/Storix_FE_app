@@ -70,7 +70,7 @@ export default function LoginScreen() {
                 });
 
                 // Save to store with extracted profile data
-                loginStore(data.accessToken, {
+                loginStore(data.accessToken, data.refreshToken, {
                     id: data.userId,
                     roleId: data.roleId,
                     companyId: data.companyId,
@@ -85,7 +85,7 @@ export default function LoginScreen() {
             } catch (profileError) {
                 console.warn('Failed to fetch user profile, using basic info:', profileError);
                 // Fallback to basic info if profile fetch fails
-                loginStore(data.accessToken, {
+                loginStore(data.accessToken, data.refreshToken, {
                     id: data.userId,
                     roleId: data.roleId,
                     companyId: data.companyId,

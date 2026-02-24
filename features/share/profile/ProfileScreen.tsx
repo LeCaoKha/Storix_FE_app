@@ -40,9 +40,14 @@ export default function ProfileScreen() {
         AlertService.confirm(
             'Đăng xuất',
             'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng?',
-            () => {
-                logout();
-                router.replace('/login');
+            async () => {
+                try {
+                    await logout();
+                    router.replace('/login');
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    router.replace('/login');
+                }
             }
         );
     };

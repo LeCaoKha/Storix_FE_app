@@ -18,8 +18,12 @@ export const loginRequest = async (email: string, password: string): Promise<Log
     }
 };
 
-export const logoutRequest = async (): Promise<void> => {
-    // No explicit logout endpoint in BE yet
+export const logoutRequest = async (refreshToken: string | null): Promise<void> => {
+    if (!refreshToken) return;
 
-    return Promise.resolve();
+    try {
+        await api.post('/api/Home/logout', { refreshToken });
+    } catch (error) {
+        console.warn('[LOGOUT] API call failed, but clearing local session anyway:', error);
+    }
 };

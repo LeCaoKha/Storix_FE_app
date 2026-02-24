@@ -9,11 +9,11 @@ export const useLogin = () => {
         mutationFn: ({ email, password }: { email: string; password: string }) =>
             loginRequest(email, password),
         onSuccess: (data) => {
-            login(data.accessToken, {
+            login(data.accessToken, data.refreshToken, {
                 id: data.userId,
                 roleId: data.roleId,
                 companyId: data.companyId,
-                email: '', // Email is not returned by Login endpoint directly in the response object apart from claims
+                email: '',
             });
         },
     });
@@ -22,10 +22,12 @@ export const useLogin = () => {
 
 export const useLogout = () => {
     const logout = useAuthStore((state) => state.logout);
+    const refreshToken = useAuthStore((state) => state.refreshToken);
 
     return useMutation({
-        mutationFn: logoutRequest,
-        onSuccess: () => {
+        mutationFn: () => logoutRequest(refreshToken),
+        onSettled: () => {
+            // Clear local session regardless of API success
             logout();
         },
     });
