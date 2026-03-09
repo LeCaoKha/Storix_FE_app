@@ -25,6 +25,13 @@ export default function StaffTabLayout() {
                 }}
             />
             <Tabs.Screen
+                name="warehouse"
+                options={{
+                    title: "Warehouse",
+                    tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                }}
+            />
+            <Tabs.Screen
                 name="orders"
                 options={{
                     href: null,

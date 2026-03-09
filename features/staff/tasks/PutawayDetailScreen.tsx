@@ -1,111 +1,156 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
+import { useInboundOrdersByStaff, useUpdateInboundTicketItems } from '@/hooks';
 import { AlertService } from '@/stores/alert.store';
+import { useAuthStore } from '@/stores/auth.store';
+import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function PutawayDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
+    const user = useAuthStore((state) => state.user);
+    const companyId = user?.companyId ?? 0;
+    const staffId = user?.id ?? 0;
 
-    // In a real app, we would fetch this from a context
-    const mockTask = {
-        id: 'put-001',
-        orderNumber: 'PUT-2026-001',
-        type: 'putaway',
-        status: 'pending',
-        priority: 'low',
-        itemCount: 12,
-        warehouse: 'WH-HCM-01',
-        location: 'Zone A',
-        targetLocation: 'RACK-B12',
-        items: [
-            { id: '1', productName: 'iPhone 15 Pro', sku: 'IP15P-256-GRY', quantity: 5 },
-            { id: '2', productName: 'MacBook Air M2', sku: 'MBA-M2-8-256-SLV', quantity: 7 },
-        ]
-    };
+    const { data: staffOrders, isLoading } = useInboundOrdersByStaff(companyId, staffId);
+    const updateItems = useUpdateInboundTicketItems();
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
+    const order = useMemo(() => staffOrders?.find((t) => t.id === numericId) ?? null, [staffOrders, numericId]);
+    const error = !isLoading && !order;
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [scannedLocation, setScannedLocation] = useState('');
     const [isVerified, setIsVerified] = useState(false);
-    const [isPicking, setIsPicking] = useState(false); // New state for the final completion process
+    const [isCompleting, setIsCompleting] = useState(false);
+    const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
+
+    useEffect(() => {
+        if (order?.inboundOrderItems) {
+            const initial: Record<number, number> = {};
+            order.inboundOrderItems.forEach((item) => {
+                initial[item.id] = item.receivedQuantity || item.expectedQuantity || 0;
+            });
+            setLocalQuantities(initial);
+        }
+    }, [order]);
+
+    if (isLoading) {
+        return (
+            <View style={styles.container}>
+                <ScreenHeader title="Đang tải..." />
+            </View>
+        );
+    }
+
+    if (!order || error) {
+        return (
+            <View style={styles.container}>
+                <ScreenHeader title="Lỗi" />
+                <View style={styles.centered}>
+                    <Feather name="alert-circle" size={48} color={COLORS.danger} />
+                    <Text style={styles.errorText}>Không tìm thấy đơn putaway</Text>
+                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                        <Text style={styles.backButtonText}>Quay lại</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }
+
+    const targetLocation = `WH-${order.warehouse?.id || order.warehouseId || 'NA'}-INB-${order.id}`;
+    const items = order.inboundOrderItems || [];
 
     const handleScanLocation = () => {
         setIsProcessing(true);
-        // Simulate scanning delay
         setTimeout(() => {
             setIsProcessing(false);
-            setScannedLocation(mockTask.targetLocation); // Simulate a successful scan
-            AlertService.success('Thành công', 'Đã quét mã vị trí ' + mockTask.targetLocation);
+            setScannedLocation(targetLocation);
+            AlertService.success('Thành công', 'Đã quét mã vị trí ' + targetLocation);
         }, 800);
     };
 
     const handleConfirm = () => {
-        if (scannedLocation === mockTask.targetLocation) {
+        if (scannedLocation === targetLocation) {
             setIsVerified(true);
-            AlertService.success('Thành công', 'Đã xác nhận đúng vị trí ' + mockTask.targetLocation);
+            AlertService.success('Thành công', 'Đã xác nhận đúng vị trí ' + targetLocation);
         } else {
             AlertService.warning('Lưu ý', 'Vị trí quét không khớp. Vui lòng thử lại.');
             setIsVerified(false);
         }
     };
 
-    const handleComplete = () => {
+    const handleComplete = async () => {
         if (!isVerified) {
             AlertService.warning('Lưu ý', 'Vui lòng xác nhận đúng vị trí trước khi hoàn thành');
             return;
         }
-        setIsPicking(true);
-        // Simulate API call
-        setTimeout(() => {
-            setIsPicking(false);
-            AlertService.success('Thành công', 'Đã hoàn thành xếp hàng vào vị trí ' + mockTask.targetLocation, () => {
+        setIsCompleting(true);
+        try {
+            const updatedItems = items.map((item: InboundOrderItem) => ({
+                id: item.id,
+                productId: item.productId || 0,
+                expectedQuantity: item.expectedQuantity,
+                receivedQuantity: localQuantities[item.id] || item.receivedQuantity || 0,
+            }));
+
+            await updateItems.mutateAsync({
+                ticketId: order.id,
+                items: updatedItems,
+            });
+
+            AlertService.success('Thành công', 'Đã cập nhật putaway cho đơn ' + (order.referenceCode || `INB-${order.id}`), () => {
                 router.back();
             });
-        }, 1000);
+        } catch {
+            AlertService.error('Lỗi', 'Không thể cập nhật putaway. Vui lòng thử lại.');
+        } finally {
+            setIsCompleting(false);
+        }
     };
 
     return (
         <View style={styles.container}>
             <ScreenHeader
                 title="Xếp hàng (Putaway)"
-                subtitle={mockTask.orderNumber}
+                subtitle={order.referenceCode || `PUT-${order.id}`}
             />
 
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
                 <View style={styles.placeholderNotice}>
                     <Feather name="info" size={16} color="#854d0e" />
-                    <Text style={styles.placeholderNoticeText}>Tính năng này đang trong quá trình phát triển (Chưa có Backend hỗ trợ).</Text>
+                    <Text style={styles.placeholderNoticeText}>Đang dùng inbound ticket thật cho putaway. Khi backend có endpoint putaway riêng, app sẽ chuyển sang endpoint đó.</Text>
                 </View>
 
                 <Card style={styles.infoCard}>
                     <View style={styles.locationRow}>
                         <View style={styles.locationBox}>
                             <Text style={styles.locationLabel}>Từ khu vực</Text>
-                            <Text style={styles.locationValue}>{mockTask.location}</Text>
+                            <Text style={styles.locationValue}>{order.warehouse?.name || 'Kho'}</Text>
                         </View>
                         <Feather name="arrow-right" size={20} color={COLORS.textMuted} />
                         <View style={styles.locationBox}>
                             <Text style={styles.locationLabel}>Đến vị trí</Text>
-                            <Text style={[styles.locationValue, isVerified && { color: '#059669' }]}>{mockTask.targetLocation}</Text>
+                            <Text style={[styles.locationValue, isVerified && { color: '#059669' }]}>{targetLocation}</Text>
                         </View>
                     </View>
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Sản phẩm cần xếp ({mockTask.itemCount})</Text>
+                    <Text style={styles.sectionTitle}>Sản phẩm cần xếp ({items.length})</Text>
                 </View>
 
-                {mockTask.items.map(item => (
+                {items.map((item: InboundOrderItem) => (
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemInfo}>
-                            <Text style={styles.productName}>{item.productName}</Text>
-                            <Text style={styles.skuText}>SKU: {item.sku}</Text>
+                            <Text style={styles.productName}>{item.name || item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                            <Text style={styles.skuText}>SKU: {item.sku || item.product?.sku || 'N/A'}</Text>
                         </View>
                         <View style={styles.qtyContainer}>
-                            <Text style={styles.qtyValue}>{item.quantity}</Text>
+                            <Text style={styles.qtyValue}>{localQuantities[item.id] || item.receivedQuantity || item.expectedQuantity || 0}</Text>
                             <Text style={styles.qtyLabel}>món</Text>
                         </View>
                     </Card>
@@ -136,13 +181,13 @@ export default function PutawayDetailScreen() {
                 <TouchableOpacity
                     style={[
                         styles.completeBtn,
-                        (isPicking || !isVerified) && styles.disabledBtn
+                        (isCompleting || !isVerified) && styles.disabledBtn
                     ]}
                     onPress={handleComplete}
-                    disabled={isPicking || !isVerified}
+                    disabled={isCompleting || !isVerified}
                 >
                     <Text style={styles.completeBtnText}>
-                        {isPicking ? 'Đang xử lý...' : 'Xác nhận đã xếp hàng'}
+                        {isCompleting ? 'Đang xử lý...' : 'Xác nhận đã xếp hàng'}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -154,6 +199,28 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F9FAFB',
+    },
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    errorText: {
+        fontSize: 16,
+        color: COLORS.text,
+        marginTop: 12,
+        marginBottom: 12,
+    },
+    backButton: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+    },
+    backButtonText: {
+        color: '#fff',
+        fontWeight: '600',
     },
     header: {
         backgroundColor: '#fff',

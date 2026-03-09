@@ -30,6 +30,26 @@ export const getTasks = async (staffId: number, companyId: number): Promise<Task
             }));
 
             tasks.push(...inboundTasks);
+
+            // Tạo task putaway từ inbound tickets chưa hoàn tất.
+            // Khi backend có endpoint putaway riêng, có thể thay logic này bằng data trực tiếp.
+            const putawayTasks = inboundTickets
+                .filter(ticket => (ticket.status || '').toLowerCase() !== 'completed')
+                .map(ticket => ({
+                    id: `putaway-${ticket.id}`,
+                    title: `Xếp hàng: ${ticket.referenceCode || `PUT-${ticket.id}`}`,
+                    description: `Sắp xếp ${ticket.inboundOrderItems?.length || 0} mặt hàng vào vị trí lưu trữ`,
+                    type: TaskType.PUTAWAY,
+                    status: mapInboundStatus(ticket.status),
+                    priority: TaskPriority.MEDIUM,
+                    assignedTo: String(staffId),
+                    relatedOrderId: String(ticket.id),
+                    location: ticket.warehouse?.name,
+                    createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                    updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                }));
+
+            tasks.push(...putawayTasks);
         } catch (err) {
             console.warn('[getTasks] Failed to fetch inbound tasks:', err);
         }

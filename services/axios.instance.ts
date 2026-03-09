@@ -1,6 +1,8 @@
 import { useAuthStore } from '@/stores';
 import axios from 'axios';
 
+let refreshPromise: Promise<string | null> | null = null;
+
 // Create axios instance with base configuration
 export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://api.example.com',
@@ -24,12 +26,54 @@ api.interceptors.request.use(
   }
 );
 
+const refreshAccessToken = async (): Promise<string | null> => {
+  const { refreshToken, user, logout } = useAuthStore.getState();
+
+  if (!refreshToken) {
+    logout();
+    return null;
+  }
+
+  try {
+    const response = await axios.post(
+      `${api.defaults.baseURL}/api/Home/refresh`,
+      { refreshToken },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 120000,
+      }
+    );
+
+    const nextAccessToken = response.data?.accessToken ?? response.data?.AccessToken;
+    const nextRefreshToken =
+      response.data?.refreshToken ?? response.data?.RefreshToken ?? refreshToken;
+
+    if (!nextAccessToken) {
+      throw new Error('Refresh endpoint did not return access token');
+    }
+
+    useAuthStore.setState({
+      token: nextAccessToken,
+      refreshToken: nextRefreshToken,
+      user,
+    });
+
+    return nextAccessToken;
+  } catch (refreshError) {
+    console.error('[AUTH] Refresh token failed, logging out', refreshError);
+    logout();
+    return null;
+  }
+};
+
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
+  async (error) => {
     console.error(`[AXIOS ERROR] ${error.config?.url}`, {
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -37,20 +81,34 @@ api.interceptors.response.use(
       errorMessage: error.message
     });
 
-    // Only logout on 401 if it's an auth-related endpoint
-    if (error.response?.status === 401) {
-      const url = error.config?.url || '';
-      const isAuthEndpoint = url.includes('/Login') || url.includes('/auth/') || url.includes('/token');
+    const status = error.response?.status;
+    const originalRequest = error.config as (typeof error.config & { _retry?: boolean }) | undefined;
+    const url = originalRequest?.url || '';
+    const isAuthEndpoint =
+      url.includes('/Login') ||
+      url.includes('/logout') ||
+      url.includes('/refresh') ||
+      url.includes('/auth/') ||
+      url.includes('/token');
 
-      // Only auto-logout for auth endpoints, not regular API calls
-      // Regular 401s might be due to expired tokens that can be refreshed
-      if (isAuthEndpoint) {
-        console.log('[AUTH] Unauthorized on auth endpoint, logging out');
-        useAuthStore.getState().logout();
-      } else {
-        console.warn('[AUTH] Unauthorized on API call, but not logging out automatically');
+    if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
+      originalRequest._retry = true;
+
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const nextAccessToken = await refreshPromise;
+
+      if (nextAccessToken) {
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${nextAccessToken}`;
+        return api(originalRequest);
       }
     }
+
     return Promise.reject(error);
   }
 );

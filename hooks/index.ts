@@ -20,4 +20,7 @@ export * from './task.hooks';
 // Supplier hooks
 export * from './suppliers.hooks';
 
+// Warehouse hooks
+export * from './warehouse.hooks';
+
 
