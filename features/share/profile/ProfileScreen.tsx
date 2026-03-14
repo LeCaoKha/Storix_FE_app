@@ -60,6 +60,12 @@ export default function ProfileScreen() {
             onPress: () => router.push('/profile/edit' as any),
         },
         {
+            icon: 'map',
+            title: 'Sơ đồ kho',
+            subtitle: 'Xem sơ đồ mặt bằng kho',
+            onPress: () => router.push('/(staff-tabs)/warehouse' as any),
+        },
+        {
             icon: 'lock',
             title: 'Đổi mật khẩu',
             subtitle: 'Cập nhật mật khẩu',

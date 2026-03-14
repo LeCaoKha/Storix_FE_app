@@ -1,9 +1,11 @@
+import { ScreenHeader } from '@/components';
 import { PathInstructionsModal, ShelfDetailModal, WarehouseGridView, WarehouseLayout } from '@/components/staff';
 import { COLORS } from '@/constants/color';
 import { useWarehouses, useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { PathResult, Shelf, WarehouseZone } from '@/types/warehouse';
 import { findNearestNode, findShortestPath } from '@/utils/pathfinding';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -13,9 +15,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function WarehouseScreen() {
+  const router = useRouter();
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | undefined>();
   const [selectedShelf, setSelectedShelf] = useState<Shelf | null>(null);
   const [selectedZone, setSelectedZone] = useState<WarehouseZone | null>(null);
@@ -23,7 +25,7 @@ export default function WarehouseScreen() {
   const [currentPath, setCurrentPath] = useState<PathResult | null>(null);
   const [pathModalVisible, setPathModalVisible] = useState(false);
   const [currentLocation] = useState<{ x: number; y: number } | null>(null);
-  const [viewMode, setViewMode] = useState<'map' | 'grid'>('grid'); // Default to grid view
+  const [viewMode, setViewMode] = useState<'map' | 'grid'>('map');
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const {
@@ -32,7 +34,6 @@ export default function WarehouseScreen() {
     error: structureError,
   } = useWarehouseStructure(selectedWarehouseId);
 
-  // Auto-select first warehouse
   React.useEffect(() => {
     if (warehouses && warehouses.length > 0 && !selectedWarehouseId) {
       setSelectedWarehouseId(warehouses[0].id);
@@ -45,26 +46,21 @@ export default function WarehouseScreen() {
     setModalVisible(true);
   };
 
+  const handleZonePress = (zone: WarehouseZone) => {
+    setSelectedZone(zone);
+    setSelectedShelf(null);
+  };
+
   const handleFindPath = (shelf: Shelf) => {
     if (!structure) return;
-
-    // Giả sử staff đang ở điểm bắt đầu (node đầu tiên hoặc entrance)
-    // Trong thực tế, có thể dùng GPS hoặc cho user chọn vị trí hiện tại
     const startNode = currentLocation
       ? findNearestNode(structure.nodes, currentLocation.x, currentLocation.y)
       : structure.nodes?.[0];
 
-    if (!startNode) {
-      alert('Không tìm thấy điểm bắt đầu');
-      return;
-    }
+    if (!startNode) return;
 
-    // Tìm access node gần nhất của shelf
     const targetAccessNode = shelf.accessNodes?.[0];
-    if (!targetAccessNode) {
-      alert('Kệ hàng này không có điểm truy cập');
-      return;
-    }
+    if (!targetAccessNode) return;
 
     const endNode = findNearestNode(
       structure.nodes,
@@ -72,60 +68,50 @@ export default function WarehouseScreen() {
       targetAccessNode.y
     );
 
-    if (!endNode) {
-      alert('Không tìm thấy điểm đến');
-      return;
-    }
+    if (!endNode) return;
 
     const path = findShortestPath(structure.nodes, structure.edges, startNode.id, endNode.id);
 
     if (path) {
       setCurrentPath(path);
       setPathModalVisible(true);
-    } else {
-      alert('Không tìm thấy đường đi');
     }
   };
 
   if (warehousesLoading) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Đang tải danh sách kho...</Text>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <ScreenHeader title="Sơ đồ kho" showBackButton={true} />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Đang tải danh sách kho...</Text>
+        </View>
+      </View>
     );
   }
 
   if (!warehouses || warehouses.length === 0) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Feather name="inbox" size={64} color="#CCC" />
-        <Text style={styles.emptyText}>Chưa có kho nào</Text>
-        <Text style={styles.emptySubtext}>
-          Liên hệ quản lý để được cấp quyền truy cập kho
-        </Text>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <ScreenHeader title="Sơ đồ kho" showBackButton={true} />
+        <View style={styles.centered}>
+          <Feather name="inbox" size={64} color="#CCC" />
+          <Text style={styles.emptyText}>Chưa có kho nào</Text>
+        </View>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.headerWrap}>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={styles.headerIconWrap}>
-              <Feather name="map" size={20} color={COLORS.primary} />
-            </View>
-            <View>
-              <Text style={styles.headerTitle}>Sơ đồ kho</Text>
-              <Text style={styles.headerSubtitle}>Xem sơ đồ và tìm đường đi</Text>
-            </View>
-          </View>
-        </View>
+    <View style={styles.container}>
+      <ScreenHeader 
+        title="Sơ đồ kho" 
+        subtitle="Xem sơ đồ và tìm đường đi" 
+        showBackButton={true} 
+      />
 
-        {/* Warehouse selector */}
-        {warehouses.length > 1 && (
+      {warehouses.length > 1 && (
+        <View style={styles.selectorWrap}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -153,9 +139,9 @@ export default function WarehouseScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
-        )}
-      </View>
-      {/* Content */}
+        </View>
+      )}
+
       {structureLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.primary} />
@@ -165,11 +151,6 @@ export default function WarehouseScreen() {
         <View style={styles.centered}>
           <Feather name="alert-circle" size={64} color="#FF6B6B" />
           <Text style={styles.errorText}>Không thể tải sơ đồ kho</Text>
-          <Text style={styles.errorSubtext}>
-            {structureError instanceof Error
-              ? structureError.message
-              : 'Vui lòng thử lại sau'}
-          </Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => setSelectedWarehouseId(undefined)}
@@ -179,7 +160,6 @@ export default function WarehouseScreen() {
         </View>
       ) : structure ? (
         <>
-          {/* Info bar with view toggle */}
           <View style={styles.infoBar}>
             <View style={styles.infoItem}>
               <View style={styles.infoIconWrap}>
@@ -203,18 +183,7 @@ export default function WarehouseScreen() {
               </Text>
             </View>
             <View style={styles.infoDivider} />
-            {/* View Mode Toggle */}
             <View style={styles.viewToggle}>
-              <TouchableOpacity
-                style={[styles.viewButton, viewMode === 'grid' && styles.viewButtonActive]}
-                onPress={() => setViewMode('grid')}
-              >
-                <Feather 
-                  name="grid" 
-                  size={16} 
-                  color={viewMode === 'grid' ? '#FFFFFF' : '#64748B'} 
-                />
-              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.viewButton, viewMode === 'map' && styles.viewButtonActive]}
                 onPress={() => setViewMode('map')}
@@ -225,15 +194,25 @@ export default function WarehouseScreen() {
                   color={viewMode === 'map' ? '#FFFFFF' : '#64748B'} 
                 />
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewButton, viewMode === 'grid' && styles.viewButtonActive]}
+                onPress={() => setViewMode('grid')}
+              >
+                <Feather 
+                  name="grid" 
+                  size={16} 
+                  color={viewMode === 'grid' ? '#FFFFFF' : '#64748B'} 
+                />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Layout - conditional rendering based on viewMode */}
           {viewMode === 'map' ? (
             <WarehouseLayout
               structure={structure}
               highlightedPath={currentPath?.path}
               onShelfPress={handleShelfPress}
+              onZonePress={handleZonePress}
             />
           ) : (
             <WarehouseGridView
@@ -250,7 +229,6 @@ export default function WarehouseScreen() {
         </View>
       )}
 
-      {/* Shelf detail modal */}
       <ShelfDetailModal
         visible={modalVisible}
         shelf={selectedShelf}
@@ -263,7 +241,6 @@ export default function WarehouseScreen() {
         }}
       />
 
-      {/* Path instructions modal */}
       <PathInstructionsModal
         visible={pathModalVisible}
         pathResult={currentPath}
@@ -272,7 +249,7 @@ export default function WarehouseScreen() {
           setPathModalVisible(false);
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -287,47 +264,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  headerWrap: {
+  selectorWrap: {
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-    marginBottom: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 10,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: COLORS.slate800,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 2,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   warehouseSelector: {
     backgroundColor: '#fff',

@@ -17,3 +17,9 @@ export * from './scanning';
 
 // Supplier types
 export * from './supplier';
+
+// Stock count types
+export * from './stock-count';
+
+// Transfer types
+export * from './transfer';

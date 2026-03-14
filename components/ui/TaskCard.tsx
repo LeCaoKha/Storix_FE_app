@@ -58,6 +58,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       case 'count':
         router.push(`/(staff-tabs)/tasks/count/${task.id}` as any);
         break;
+      case 'transfer':
+        router.push(`/(staff-tabs)/tasks/transfer/${task.relatedOrderId || task.id}` as any);
+        break;
       default:
         console.log('No route for task type:', task.type);
     }

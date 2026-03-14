@@ -19,13 +19,22 @@ export default function TasksScreen() {
             case TaskType.OUTBOUND: return 'Xuất kho';
             case TaskType.INBOUND: return 'Nhập kho';
             case TaskType.PUTAWAY: return 'Xếp hàng';
-            default: return 'Khác';
+            case TaskType.INVENTORY_COUNT: return 'Kiểm kê';
+            case TaskType.TRANSFER: return 'Chuyển kho';
+            default: return type.charAt(0).toUpperCase() + type.slice(1);
         }
     };
 
     // Prepare filter options with counts - MUST be before early return
     const filterOptions = useMemo<FilterOption<'all' | TaskType>[]>(() => {
-        const filters: ('all' | TaskType)[] = ['all', TaskType.OUTBOUND, TaskType.INBOUND, TaskType.PUTAWAY];
+        const filters: ('all' | TaskType)[] = [
+            'all', 
+            TaskType.OUTBOUND, 
+            TaskType.INBOUND, 
+            TaskType.PUTAWAY, 
+            TaskType.INVENTORY_COUNT, 
+            TaskType.TRANSFER
+        ];
         return filters.map(filter => ({
             value: filter,
             label: getFilterLabel(filter),

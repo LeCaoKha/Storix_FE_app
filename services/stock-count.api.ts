@@ -1,50 +1,21 @@
+import {
+    StockCountItem,
+    StockCountTicket,
+    StockCountTicketDetail,
+    UpdateStockCountItemPayload,
+    WarehouseInventoryItem
+} from '@/types/stock-count';
 import { api } from './axios.instance';
-
-// ============== Common Types (Khớp với BE DTOs) ==============
-
-export interface StockCountTicket {
-    id: number;
-    warehouseId?: number;
-    name?: string;
-    type?: string;
-    status?: string;
-    createdAt?: string;
-    executedDay?: string;
-    finishedDay?: string;
-    itemCount: number;
-}
-
-export interface StockCountItem {
-    id: number;
-    productId?: number;
-    sku?: string;
-    name?: string;
-    systemQuantity: number;
-    countedQuantity?: number;
-    discrepancy?: number;
-    status?: string;
-    description?: string;
-}
-
-export interface StockCountTicketDetail extends StockCountTicket {
-    description?: string;
-    items: StockCountItem[];
-}
-
-export interface UpdateStockCountItemPayload {
-    countedQuantity: number;
-    description?: string;
-    status?: string;
-}
 
 // ============== API Functions ==============
 
 /**
- * Lấy danh sách phiếu kiểm kê của công ty
+ * Lấy danh sách phiếu kiểm kê của công ty/kho
+ * BE Route: GET /api/inventory-count-tickets?warehouseId=&status=
+ * Roles: 2, 3, 4
  */
 export const getStockCountTickets = async (_companyId: number, warehouseId?: number, status?: string) => {
-    // Sử dụng kebab-case để khớp với BE route: [Route("api/stock-count-tickets")]
-    const baseUrl = '/api/stock-count-tickets';
+    const baseUrl = '/api/inventory-count-tickets';
     const params = new URLSearchParams();
     if (warehouseId) params.append('warehouseId', warehouseId.toString());
     if (status) params.append('status', status);
@@ -58,16 +29,107 @@ export const getStockCountTickets = async (_companyId: number, warehouseId?: num
 
 /**
  * Lấy chi tiết phiếu kiểm kê theo ID
+ * BE Route: GET /api/inventory-count-tickets/{ticketId}
+ * Roles: 2, 3, 4
  */
 export const getStockCountTicketById = async (ticketId: number) => {
-    const res = await api.get(`/api/stock-count-tickets/${ticketId}`);
+    const res = await api.get(`/api/inventory-count-tickets/${ticketId}`);
     return res.data as StockCountTicketDetail;
 };
 
 /**
  * Cập nhật số lượng đếm thực tế của một item trong phiếu kiểm kê
+ * BE Route: PATCH /api/inventory-count-items/{itemId}
+ * Roles: 3, 4
  */
 export const updateStockCountItem = async (itemId: number, payload: UpdateStockCountItemPayload) => {
-    const res = await api.patch(`/api/stock-count-items/${itemId}`, payload);
+    const res = await api.patch(`/api/inventory-count-items/${itemId}`, payload);
     return res.data as StockCountItem;
+};
+
+/**
+ * Lấy danh sách tồn kho thực tế trong một kho (theo productIds tuỳ chọn)
+ * BE Route: GET /api/company-warehouses/{companyId}/warehouses/{warehouseId}/inventory
+ * Roles: 2, 3, 4
+ */
+export const getWarehouseInventory = async (
+    companyId: number,
+    warehouseId: number,
+    productIds?: number[]
+): Promise<WarehouseInventoryItem[]> => {
+    const params = new URLSearchParams();
+    if (productIds && productIds.length > 0) {
+        productIds.forEach(id => params.append('productIds', id.toString()));
+    }
+
+    const queryString = params.toString();
+    const url = queryString
+        ? `/api/company-warehouses/${companyId}/warehouses/${warehouseId}/inventory?${queryString}`
+        : `/api/company-warehouses/${companyId}/warehouses/${warehouseId}/inventory`;
+
+    const res = await api.get(url);
+    return res.data?.items ?? res.data ?? [];
+};
+
+/**
+ * Lấy thông tin tồn kho của một sản phẩm cụ thể trong kho
+ * BE Route: GET /api/company-warehouses/{companyId}/warehouses/{warehouseId}/inventory/{productId}
+ * Roles: 2, 3, 4
+ */
+export const getSingleInventoryItem = async (
+    companyId: number,
+    warehouseId: number,
+    productId: number
+): Promise<WarehouseInventoryItem | null> => {
+    try {
+        const res = await api.get(
+            `/api/company-warehouses/${companyId}/warehouses/${warehouseId}/inventory/${productId}`
+        );
+        return res.data?.item ?? res.data ?? null;
+    } catch (error: any) {
+        if (error.response?.status === 404) return null;
+        throw error;
+    }
+};
+
+/**
+ * Lấy tồn kho của nhiều sản phẩm cùng lúc (batch query)
+ * BE Route: GET /api/company-warehouses/{companyId}/warehouses/{warehouseId}/inventories?productIds=1&productIds=2...
+ * Roles: 2, 3, 4
+ */
+export const getMultipleInventoryItems = async (
+    companyId: number,
+    warehouseId: number,
+    productIds: number[]
+): Promise<{ requestedCount: number; foundCount: number; items: WarehouseInventoryItem[] }> => {
+    const params = new URLSearchParams();
+    productIds.forEach(id => params.append('productIds', id.toString()));
+
+    const res = await api.get(
+        `/api/company-warehouses/${companyId}/warehouses/${warehouseId}/inventories?${params.toString()}`
+    );
+    return res.data;
+};
+
+/**
+ * Rà soát tồn kho trước khi tạo phiếu kiểm kê (Manager only)
+ * BE Route: GET /api/inventory-count-tickets/warehouses/{warehouseId}/inventory-products
+ * Roles: 3
+ */
+export const listInventoryProducts = async (
+    warehouseId: number,
+    productIds?: number[]
+): Promise<WarehouseInventoryItem[]> => {
+    const params = new URLSearchParams();
+    if (productIds && productIds.length > 0) {
+        productIds.forEach(id => params.append('productIds', id.toString()));
+    }
+
+    const queryString = params.toString();
+    const url = queryString
+        ? `/api/inventory-count-tickets/warehouses/${warehouseId}/inventory-products?${queryString}`
+        : `/api/inventory-count-tickets/warehouses/${warehouseId}/inventory-products`;
+
+    const res = await api.get(url);
+    return res.data ?? [];
 };

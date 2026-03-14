@@ -1,3 +1,2 @@
-import TasksScreen from '@/features/staff/tasks/TasksScreen';
-
-export default TasksScreen;
+import StaffHomeScreen from '@/features/staff/home/StaffHomeScreen';
+export default StaffHomeScreen;

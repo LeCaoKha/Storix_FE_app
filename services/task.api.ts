@@ -1,11 +1,12 @@
 import { Task, TaskPriority, TaskStatus, TaskType } from '@/types/order';
 
+import { getStockCountTickets } from './stock-count.api';
 import { getInboundOrdersByStaff } from './inbound-order.api';
 import { getOutboundOrdersByStaff } from './outbound-order.api';
+import { getTransferOrders } from './transfer.api';
 
 /**
  * Lấy tất cả tasks của staff hiện tại
- * Sử dụng endpoint mới từ backend để lấy trực tiếp các order được gán cho staff
  */
 export const getTasks = async (staffId: number, companyId: number): Promise<Task[]> => {
     try {
@@ -32,7 +33,6 @@ export const getTasks = async (staffId: number, companyId: number): Promise<Task
             tasks.push(...inboundTasks);
 
             // Tạo task putaway từ inbound tickets chưa hoàn tất.
-            // Khi backend có endpoint putaway riêng, có thể thay logic này bằng data trực tiếp.
             const putawayTasks = inboundTickets
                 .filter(ticket => (ticket.status || '').toLowerCase() !== 'completed')
                 .map(ticket => ({
@@ -80,7 +80,61 @@ export const getTasks = async (staffId: number, companyId: number): Promise<Task
             console.warn('[getTasks] Failed to fetch outbound tasks:', err);
         }
 
+        // Fetch inventory count tasks assigned to this staff
+        // BE: GET /api/inventory-count-tickets?warehouseId=&status=
+        // Roles: 2, 3, 4 — Staff có thể xem danh sách phiếu kiểm kê
+        try {
+            const countTickets = await getStockCountTickets(companyId);
 
+            const countTasks = countTickets
+                .filter(ticket =>
+                    // Chỉ lấy các phiếu chưa hoàn tất hoặc đang trong trạng thái cần hành động
+                    !['completed', 'approved'].includes((ticket.status || '').toLowerCase())
+                )
+                .map(ticket => ({
+                    id: `inventory-count-${ticket.id}`,
+                    title: `Kiểm kê: ${ticket.name || `CNT-${ticket.id}`}`,
+                    description: `Đếm kiểm ${ticket.itemCount || 0} mặt hàng trong phiếu kiểm kê`,
+                    type: TaskType.INVENTORY_COUNT,
+                    status: mapCountStatus(ticket.status),
+                    priority: TaskPriority.MEDIUM,
+                    assignedTo: String(staffId),
+                    relatedOrderId: String(ticket.id),
+                    location: ticket.warehouseId ? `Kho #${ticket.warehouseId}` : undefined,
+                    createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                    updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
+                }));
+
+            tasks.push(...countTasks);
+        } catch (err) {
+            console.warn('[getTasks] Failed to fetch inventory count tasks:', err);
+        }
+
+        // Fetch warehouse transfer tasks
+        // BE: GET /api/warehouse-transfers?status=
+        try {
+            const transferOrders = await getTransferOrders({
+                status: 'Approved,Picking,Packed,Shipped'
+            });
+
+            const transferTasks = transferOrders.map(order => ({
+                id: `transfer-${order.id}`,
+                title: `Điều chuyển: ${order.referenceCode || `TRS-${order.id}`}`,
+                description: `Chuyển hàng từ ${order.sourceWarehouse?.name || 'Kho nguồn'} đến ${order.destinationWarehouse?.name || 'Kho đích'}`,
+                type: TaskType.TRANSFER,
+                status: mapTransferStatus(order.status),
+                priority: TaskPriority.MEDIUM,
+                assignedTo: String(staffId),
+                relatedOrderId: String(order.id),
+                location: order.sourceWarehouse?.name,
+                createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
+                updatedAt: order.createdAt ? new Date(order.createdAt) : new Date(),
+            }));
+
+            tasks.push(...transferTasks);
+        } catch (err) {
+            console.warn('[getTasks] Failed to fetch transfer tasks:', err);
+        }
 
         // Sort by created date (newest first)
         tasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -124,4 +178,36 @@ function mapOutboundStatus(status?: string): TaskStatus {
     }
 }
 
+function mapCountStatus(status?: string): TaskStatus {
+    // BE InventoryCountTicket statuses: Draft, InProgress, PendingApproval, Approved, Completed
+    switch (status?.toLowerCase()) {
+        case 'draft':
+            return TaskStatus.PENDING;
+        case 'inprogress':
+        case 'in_progress':
+        case 'pendingapproval':
+        case 'pending_approval':
+            return TaskStatus.IN_PROGRESS;
+        case 'approved':
+        case 'completed':
+            return TaskStatus.COMPLETED;
+        default:
+            return TaskStatus.PENDING;
+    }
+}
 
+function mapTransferStatus(status?: string): TaskStatus {
+    // BE Transfer statuses: Draft, Submitted, Approved, Picking, Packed, Shipped, Received, Cancelled
+    switch (status?.toLowerCase()) {
+        case 'approved':
+            return TaskStatus.PENDING;
+        case 'picking':
+        case 'packed':
+        case 'shipped':
+            return TaskStatus.IN_PROGRESS;
+        case 'received':
+            return TaskStatus.COMPLETED;
+        default:
+            return TaskStatus.PENDING;
+    }
+}

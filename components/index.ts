@@ -7,6 +7,7 @@ export { SafeAreaHeader } from './ui/SafeAreaHeader';
 export { ScreenHeader } from './ui/ScreenHeader';
 export { TabScreenHeader } from './ui/TabScreenHeader';
 export { TaskCard } from './ui/TaskCard';
+export { TransferCard } from './ui/TransferCard';
 
 // Requisition components
 export { RequisitionItemList } from './requisitions/ItemList';

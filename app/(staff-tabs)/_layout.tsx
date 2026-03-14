@@ -20,7 +20,14 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "Tasks",
+                    title: "Trang chủ",
+                    tabBarIcon: ({ color }) => <Feather name="home" size={28} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="tasks/index"
+                options={{
+                    title: "Nhiệm vụ",
                     tabBarIcon: ({ color }) => <Feather name="clipboard" size={28} color={color} />,
                 }}
             />
@@ -29,6 +36,7 @@ export default function StaffTabLayout() {
                 options={{
                     title: "Warehouse",
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                    href: null,
                 }}
             />
             <Tabs.Screen
@@ -75,6 +83,20 @@ export default function StaffTabLayout() {
             />
             <Tabs.Screen
                 name="tasks/putaway/[id]"
+                options={{
+                    href: null,
+                    tabBarStyle: { display: 'none' },
+                }}
+            />
+            <Tabs.Screen
+                name="tasks/transfer/[id]"
+                options={{
+                    href: null,
+                    tabBarStyle: { display: 'none' },
+                }}
+            />
+            <Tabs.Screen
+                name="tasks/transfer/receive/[id]"
                 options={{
                     href: null,
                     tabBarStyle: { display: 'none' },

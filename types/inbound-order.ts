@@ -21,6 +21,7 @@ export interface InboundOrderItem {
   // Direct fields from backend (not nested in product object)
   name?: string;
   sku?: string;
+  productName?: string;
   description?: string;
   typeId?: number;
   price?: number;
@@ -44,6 +45,8 @@ export interface InboundOrder {
   staffId?: number;
   referenceCode?: string;
   status?: string;
+  note?: string;
+  expectedArrivalDate?: string;
   createdAt?: string;
   inboundOrderItems: InboundOrderItem[];
   supplier?: {

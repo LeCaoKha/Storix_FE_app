@@ -168,6 +168,21 @@ export default function InboundDetailScreen() {
                     )}
                 </Card>
 
+                {/* Warehouse Location Shortcut */}
+                <TouchableOpacity
+                    style={styles.warehouseCard}
+                    onPress={() => router.push('/(staff-tabs)/warehouse')}
+                >
+                    <View style={styles.warehouseIconWrap}>
+                        <Feather name="map" size={18} color={COLORS.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.warehouseTitle}>Sơ đồ kho</Text>
+                        <Text style={styles.warehouseSubtitle}>Nhấn để xem vị trí trên sơ đồ</Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+                </TouchableOpacity>
+
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
                     <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} mặt hàng</Text>
@@ -215,7 +230,7 @@ export default function InboundDetailScreen() {
                             ) : (
                                 <View style={styles.qtyDisplay}>
                                     <Text style={[styles.qtyValue, isCompleted && { color: COLORS.success }]}>
-                                        {isCompleted 
+                                        {isCompleted
                                             ? (item.receivedQuantity || item.expectedQuantity || 0)
                                             : (item.receivedQuantity || 0)}
                                     </Text>
@@ -611,5 +626,40 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: COLORS.success,
+    },
+    warehouseCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        marginHorizontal: 16,
+        marginBottom: 16,
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: COLORS.borderLight,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    warehouseIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: COLORS.primary + '10',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    warehouseTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.slate800,
+    },
+    warehouseSubtitle: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        marginTop: 2,
     },
 });

@@ -124,6 +124,11 @@ export interface UpdateOutboundStatusPayload {
 
 export interface ConfirmOutboundPayload {
   performedBy: number;
+  allocations: {
+    productId: number;
+    binId: number;
+    quantity: number;
+  }[];
 }
 
 export interface InventoryAvailability {

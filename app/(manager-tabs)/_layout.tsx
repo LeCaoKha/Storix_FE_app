@@ -42,6 +42,14 @@ export default function ManagerTabLayout() {
                     tabBarIcon: ({ color }) => <Feather name="user" size={28} color={color} />,
                 }}
             />
+            <Tabs.Screen
+                name="transfers"
+                options={{
+                    href: '/(manager-tabs)/transfers', // Show this tab
+                    title: "Luân Chuyển",
+                    tabBarIcon: ({ color }) => <Feather name="repeat" size={28} color={color} />,
+                }}
+            />
 
             {/* Hide all other routes from tab bar */}
             <Tabs.Screen 
@@ -102,6 +110,28 @@ export default function ManagerTabLayout() {
             />
             <Tabs.Screen 
                 name="(orders-outbound)/create" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            {/* Transfers hidden screens */}
+            <Tabs.Screen 
+                name="transfers/index" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="transfers/[id]" 
+                options={{ 
+                    href: null,
+                    tabBarStyle: { display: 'none' }
+                }} 
+            />
+            <Tabs.Screen 
+                name="transfers/create" 
                 options={{ 
                     href: null,
                     tabBarStyle: { display: 'none' }

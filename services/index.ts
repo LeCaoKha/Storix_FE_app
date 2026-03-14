@@ -16,6 +16,9 @@ export * from './supplier.api';
 // Warehouse services
 export * from './warehouse.api';
 
+// Transfer services
+export * from './transfer.api';
+
 // Axios instance
 export { api } from './axios.instance';
 export { queryClient } from './queryClient';

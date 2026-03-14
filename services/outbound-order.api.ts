@@ -3,6 +3,7 @@ import type {
     InventoryAvailability,
     OutboundOrder,
     UpdateOutboundItemPayload,
+    ConfirmOutboundPayload,
 } from '@/types/outbound-order';
 import { api } from './axios.instance';
 
@@ -99,12 +100,10 @@ export const updateOutboundTicketStatus = async (
 };
 
 /**
- * Xác nhận hoàn thành phiếu xuất (Manager only)
+ * Xác nhận hoàn thành phiếu xuất (Manager only - hoặc Staff xác nhận vị trí lấy hàng)
  */
-export const confirmOutboundOrder = async (ticketId: number, performedBy: number) => {
-  const res = await api.post(`/api/InventoryOutbound/tickets/${ticketId}/confirm`, {
-    performedBy,
-  });
+export const confirmOutboundOrder = async (ticketId: number, payload: ConfirmOutboundPayload) => {
+  const res = await api.post(`/api/InventoryOutbound/tickets/${ticketId}/confirm`, payload);
   return res.data as OutboundOrder;
 };
 

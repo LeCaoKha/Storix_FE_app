@@ -30,6 +30,7 @@ interface WarehouseLayoutProps {
   highlightedShelf?: string;
   highlightedPath?: NavigationNode[];
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
+  onZonePress?: (zone: WarehouseZone) => void;
 }
 
 export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
@@ -37,6 +38,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   highlightedShelf,
   highlightedPath,
   onShelfPress,
+  onZonePress,
 }) => {
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -89,11 +91,11 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     }
 
     // Keep a bit of breathing space around the drawn content
-    const contentPadding = 20;
-    minX = Math.max(0, minX - contentPadding);
-    minY = Math.max(0, minY - contentPadding);
-    maxX = Math.min(structure.width, maxX + contentPadding);
-    maxY = Math.min(structure.height, maxY + contentPadding);
+    const contentPadding = 30;
+    minX = minX - contentPadding;
+    minY = minY - contentPadding;
+    maxX = maxX + contentPadding;
+    maxY = maxY + contentPadding;
 
     return {
       minX,
@@ -104,6 +106,12 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       height: Math.max(maxY - minY, 1),
     };
   }, [structure]);
+
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, NavigationNode>();
+    structure.nodes?.forEach(node => map.set(node.id, node));
+    return map;
+  }, [structure.nodes]);
 
   const onMapLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -126,7 +134,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
     scale.value = withSpring(initialScale);
     translateX.value = withSpring((viewport.width - scaledWidth) / 2 - contentBounds.minX * initialScale);
-    translateY.value = withSpring((availableHeight - scaledHeight) / 2 + 8 - contentBounds.minY * initialScale);
+    translateY.value = withSpring((availableHeight - scaledHeight) / 2 - contentBounds.minY * initialScale);
   };
 
   useEffect(() => {
@@ -156,34 +164,45 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   const doubleTapGesture = Gesture.Tap()
     .numberOfTaps(2)
     .onStart((event) => {
-        if (scale.value > 1.5) {
-            runOnJS(calculateInitialFit)();
-        } else {
-            scale.value = withSpring(2.5);
-            // Zoom into the tap position
-            translateX.value = withSpring(viewport.width / 2 - event.x * 2.5);
-            translateY.value = withSpring(viewport.height / 2 - event.y * 2.5);
-        }
+      if (scale.value > 1.5) {
+        runOnJS(calculateInitialFit)();
+      } else {
+        scale.value = withSpring(2.5);
+        // Zoom into the tap position
+        translateX.value = withSpring(viewport.width / 2 - event.x * 2.5);
+        translateY.value = withSpring(viewport.height / 2 - event.y * 2.5);
+      }
     });
 
   // Tap to select shelf (Hit testing)
   const singleTapGesture = Gesture.Tap()
     .onStart((event) => {
-        // Find if a shelf was tapped
-        // Coordinates need to be adjusted based on the current scale and translation
-        const mapX = (event.x - translateX.value) / scale.value;
-        const mapY = (event.y - translateY.value) / scale.value;
+      // Find if a shelf was tapped
+      // Coordinates need to be adjusted based on the current scale and translation
+      const mapX = (event.x - translateX.value) / scale.value;
+      const mapY = (event.y - translateY.value) / scale.value;
 
-        structure.zones?.forEach(zone => {
-            zone.shelves?.forEach(shelf => {
-                if (mapX >= shelf.x && mapX <= shelf.x + shelf.width &&
-                    mapY >= shelf.y && mapY <= shelf.y + shelf.height) {
-                    if (onShelfPress) {
-                        runOnJS(onShelfPress)(shelf, zone);
-                    }
-                }
-            });
+      let hitSomething = false;
+      structure.zones?.forEach(zone => {
+        zone.shelves?.forEach(shelf => {
+          if (mapX >= shelf.x && mapX <= shelf.x + shelf.width &&
+            mapY >= shelf.y && mapY <= shelf.y + shelf.height) {
+            hitSomething = true;
+            if (onShelfPress) {
+              runOnJS(onShelfPress)(shelf, zone);
+            }
+          }
         });
+      });
+
+      if (!hitSomething && onZonePress) {
+        structure.zones?.forEach(zone => {
+          if (mapX >= zone.x && mapX <= zone.x + zone.width &&
+            mapY >= zone.y && mapY <= zone.y + zone.height) {
+            runOnJS(onZonePress)(zone);
+          }
+        });
+      }
     });
 
   const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
@@ -211,10 +230,10 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   const renderShelf = (shelf: Shelf, zone: WarehouseZone) => {
     const isHighlighted = highlightedShelf === shelf.id;
     const gradientId = `gradient-${shelf.id}`;
-    
+
     const baseColor = isHighlighted ? COLORS.primary : '#E2E8F0';
     const faceColor = isHighlighted ? COLORS.primaryLight : '#F8FAFC';
-    
+
     return (
       <G key={shelf.id}>
         <Defs>
@@ -223,7 +242,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             <Stop offset="100%" stopColor={baseColor} stopOpacity="0.8" />
           </LinearGradient>
         </Defs>
-        
+
         {/* Rack Shadow */}
         <Rect
           x={shelf.x}
@@ -235,7 +254,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           fill="#000"
           opacity={0.08}
         />
-        
+
         {/* Rack Body */}
         <Rect
           x={shelf.x}
@@ -260,29 +279,29 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           fill={faceColor}
           opacity={0.6}
         />
-        
+
         {/* Label Badge */}
         <G pointerEvents="none">
-           <Rect
-              x={shelf.x + (shelf.width - 24) / 2}
-              y={shelf.y + (shelf.height - 14) / 2}
-              width={24}
-              height={14}
-              rx={7}
-              fill="#1E293B"
-              opacity={0.9}
-            />
-            <SvgText
-                x={shelf.x + shelf.width / 2}
-                y={shelf.y + shelf.height / 2 + 1}
-                fontSize={8}
-                fill="#FFFFFF"
-                fontWeight="800"
-                textAnchor="middle"
-                alignmentBaseline="middle"
-            >
-                {shelf.code}
-            </SvgText>
+          <Rect
+            x={shelf.x + (shelf.width - 24) / 2}
+            y={shelf.y + (shelf.height - 14) / 2}
+            width={24}
+            height={14}
+            rx={7}
+            fill="#1E293B"
+            opacity={0.9}
+          />
+          <SvgText
+            x={shelf.x + shelf.width / 2}
+            y={shelf.y + shelf.height / 2 + 1}
+            fontSize={8}
+            fill="#FFFFFF"
+            fontWeight="800"
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {shelf.code}
+          </SvgText>
         </G>
       </G>
     );
@@ -301,7 +320,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           fill={COLORS.primary}
           opacity={0.02}
         />
-        
+
         <Rect
           x={zone.x}
           y={zone.y}
@@ -315,30 +334,30 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           strokeDasharray="6,4"
           opacity={0.2}
         />
-        
+
         <G>
-            <Rect
-              x={zone.x + 12}
-              y={zone.y + 12}
-              width={Math.max(zone.code.length * 8, 45)}
-              height={22}
-              rx={11}
-              fill={COLORS.primary}
-              opacity={0.1}
-            />
-            <SvgText
-                x={zone.x + 12 + Math.max(zone.code.length * 8, 45) / 2}
-                y={zone.y + 23}
-                fontSize={10}
-                fill={COLORS.primary}
-                fontWeight="900"
-                textAnchor="middle"
-                alignmentBaseline="middle"
-            >
-                {zone.code}
-            </SvgText>
+          <Rect
+            x={zone.x + 12}
+            y={zone.y + 12}
+            width={Math.max(zone.code.length * 8 + 35, 65)}
+            height={24}
+            rx={12}
+            fill={COLORS.primary}
+            opacity={0.15}
+          />
+          <SvgText
+            x={zone.x + 12 + Math.max(zone.code.length * 8 + 35, 65) / 2}
+            y={zone.y + 24}
+            fontSize={11}
+            fill={COLORS.primary}
+            fontWeight="900"
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {zone.code.toLowerCase().includes('zone') ? zone.code : `Zone ${zone.code}`}
+          </SvgText>
         </G>
-        
+
         {zone.shelves?.map((shelf) => renderShelf(shelf, zone))}
       </G>
     );
@@ -349,20 +368,20 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
     const pathLines = [];
     for (let i = 0; i < highlightedPath.length - 1; i++) {
-        const start = highlightedPath[i];
-        const end = highlightedPath[i + 1];
-        pathLines.push(
-            <G key={`path-${i}`}>
-                <Line
-                    x1={start.x} y1={start.y} x2={end.x} y2={end.y}
-                    stroke={COLORS.secondary} strokeWidth={8} opacity={0.2} strokeLinecap="round"
-                />
-                <Line
-                    x1={start.x} y1={start.y} x2={end.x} y2={end.y}
-                    stroke={COLORS.secondary} strokeWidth={3} strokeLinecap="round"
-                />
-            </G>
-        );
+      const start = highlightedPath[i];
+      const end = highlightedPath[i + 1];
+      pathLines.push(
+        <G key={`path-${i}`}>
+          <Line
+            x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+            stroke={COLORS.secondary} strokeWidth={8} opacity={0.2} strokeLinecap="round"
+          />
+          <Line
+            x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+            stroke={COLORS.secondary} strokeWidth={3} strokeLinecap="round"
+          />
+        </G>
+      );
     }
     return <G>{pathLines}</G>;
   };
@@ -388,9 +407,21 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
               {structure.zones?.map(renderZone)}
               {renderPath()}
 
-              {showNodes && structure.nodes?.map((node) => (
-                <Circle key={node.id} cx={node.x} cy={node.y} r={2} fill={COLORS.info} opacity={0.4} />
-              ))}
+              {showNodes && (
+                <G>
+                  {/* Các điểm mốc (Nodes) */}
+                  {structure.nodes?.map((node) => (
+                    <Circle 
+                      key={`node-${node.id}`} 
+                      cx={node.x} 
+                      cy={node.y} 
+                      r={3.5} 
+                      fill={COLORS.info} 
+                      opacity={0.5} 
+                    />
+                  ))}
+                </G>
+              )}
             </Svg>
           </Animated.View>
         </Animated.View>
@@ -398,49 +429,49 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
       {/* Modern Floating UI */}
       <View style={styles.floatingControls}>
-          <TouchableOpacity 
-            style={styles.glassButton} 
-            onPress={handleZoomIn}
-            activeOpacity={0.7}
-          >
-              <Feather name="plus" size={22} color={COLORS.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.glassButton} 
-            onPress={handleZoomOut}
-            activeOpacity={0.7}
-          >
-              <Feather name="minus" size={22} color={COLORS.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.glassButton, { marginTop: 8 }]} 
-            onPress={calculateInitialFit}
-            activeOpacity={0.7}
-          >
-              <Feather name="maximize" size={20} color={COLORS.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.glassButton, showNodes && { backgroundColor: COLORS.primary }]} 
-            onPress={() => setShowNodes(!showNodes)}
-            activeOpacity={0.7}
-          >
-              <Feather name="navigation" size={20} color={showNodes ? '#FFF' : COLORS.textMuted} />
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.glassButton}
+          onPress={handleZoomIn}
+          activeOpacity={0.7}
+        >
+          <Feather name="plus" size={22} color={COLORS.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.glassButton}
+          onPress={handleZoomOut}
+          activeOpacity={0.7}
+        >
+          <Feather name="minus" size={22} color={COLORS.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.glassButton, { marginTop: 8 }]}
+          onPress={calculateInitialFit}
+          activeOpacity={0.7}
+        >
+          <Feather name="maximize" size={20} color={COLORS.textMuted} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.glassButton, showNodes && { backgroundColor: COLORS.primary }]}
+          onPress={() => setShowNodes(!showNodes)}
+          activeOpacity={0.7}
+        >
+          <Feather name="navigation" size={20} color={showNodes ? '#FFF' : COLORS.textMuted} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
-          <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.primary, opacity: 0.3 }]} />
-              <Text style={styles.legendLabel}>Khu vực</Text>
-          </View>
-          <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#E2E8F0', borderWidth: 1, borderColor: '#CBD5E1' }]} />
-              <Text style={styles.legendLabel}>Kệ hàng</Text>
-          </View>
-          <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.secondary }]} />
-              <Text style={styles.legendLabel}>Đường đi</Text>
-          </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: COLORS.primary, opacity: 0.3 }]} />
+          <Text style={styles.legendLabel}>Khu vực</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#E2E8F0', borderWidth: 1, borderColor: '#CBD5E1' }]} />
+          <Text style={styles.legendLabel}>Kệ hàng</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: COLORS.secondary }]} />
+          <Text style={styles.legendLabel}>Đường đi</Text>
+        </View>
       </View>
     </View>
   );
