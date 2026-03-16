@@ -1,10 +1,16 @@
 import { COLORS } from '@/constants/color';
+import { useAuthStore } from '@/stores/auth.store';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
 import React from "react";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 export default function ManagerTabLayout() {
+    const roleId = useAuthStore((state) => state.user?.roleId);
+    const canAccessTransfers = roleId === 3 || roleId === 4;
+    const insets = useSafeAreaInsets();
+
     return (
         <Tabs
             screenOptions={{
@@ -14,6 +20,9 @@ export default function ManagerTabLayout() {
                 tabBarStyle: {
                     backgroundColor: '#fff',
                     borderTopColor: COLORS.border,
+                    paddingTop: 8,
+                    paddingBottom: 8 + insets.bottom,
+                    height: 64 + insets.bottom,
                 },
             }}
         >
@@ -24,6 +33,14 @@ export default function ManagerTabLayout() {
                     href: '/(manager-tabs)/requisitions', // Show this tab
                     title: "Đề Xuất",
                     tabBarIcon: ({ color }) => <Feather name="file-text" size={28} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="transfers/index"
+                options={{
+                    href: canAccessTransfers ? '/(manager-tabs)/transfers' : null,
+                    title: "Luân Chuyển",
+                    tabBarIcon: ({ color }) => <Feather name="repeat" size={28} color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -40,14 +57,6 @@ export default function ManagerTabLayout() {
                     href: '/(manager-tabs)/profile', // Show this tab
                     title: "Profile",
                     tabBarIcon: ({ color }) => <Feather name="user" size={28} color={color} />,
-                }}
-            />
-            <Tabs.Screen
-                name="transfers"
-                options={{
-                    href: '/(manager-tabs)/transfers', // Show this tab
-                    title: "Luân Chuyển",
-                    tabBarIcon: ({ color }) => <Feather name="repeat" size={28} color={color} />,
                 }}
             />
 
@@ -116,13 +125,6 @@ export default function ManagerTabLayout() {
                 }} 
             />
             {/* Transfers hidden screens */}
-            <Tabs.Screen 
-                name="transfers/index" 
-                options={{ 
-                    href: null,
-                    tabBarStyle: { display: 'none' }
-                }} 
-            />
             <Tabs.Screen 
                 name="transfers/[id]" 
                 options={{ 

@@ -4,12 +4,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useRequisition } from '@/hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function RequisitionDetailScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(manager-tabs)/requisitions');
+    const insets = useSafeAreaInsets();
     const { id, type } = useLocalSearchParams<{ id: string; type: 'inbound' | 'outbound' }>();
     const { data: requisition, isLoading } = useRequisition(id!, type);
 
@@ -29,7 +34,7 @@ export default function RequisitionDetailScreen() {
                     <Text style={styles.errorTitle}>Không tìm thấy phiếu đề xuất</Text>
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={() => router.back()}
+                        onPress={goBack}
                     >
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
@@ -77,7 +82,7 @@ export default function RequisitionDetailScreen() {
                 }
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}>
                 {/* Status Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -267,13 +272,11 @@ export default function RequisitionDetailScreen() {
                         </Card>
                     </>
                 )}
-
-                <View style={{ height: 100 }} />
             </ScrollView>
 
             {/* Action Buttons */}
             {canCreateOrder && (
-                <View style={styles.actionBar}>
+                <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
                     <TouchableOpacity
                         style={styles.createOrderButton}
                         onPress={handleCreateOrder}

@@ -1,6 +1,7 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useOutboundOrder, useUpdateOutboundTicketItems } from '@/hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +11,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 export default function StaffOutboundDetailScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(staff-tabs)/tasks');
     const { id } = useLocalSearchParams<{ id: string }>();
     const { data: order, isLoading, error } = useOutboundOrder(id);
     const updateItems = useUpdateOutboundTicketItems();
@@ -63,7 +65,7 @@ export default function StaffOutboundDetailScreen() {
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -119,7 +121,7 @@ export default function StaffOutboundDetailScreen() {
             });
 
             AlertService.success('Thành công', allPicked ? 'Đã hoàn tất lấy hàng' : 'Đã cập nhật số lượng lấy hàng', () => {
-                router.back();
+                goBack();
             });
         } catch {
             AlertService.error('Lỗi', 'Không thể cập nhật số lượng');

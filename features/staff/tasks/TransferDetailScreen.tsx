@@ -1,27 +1,30 @@
 import { Button, Card, ScreenHeader } from '@/components';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import {
-    useTransferOrder,
-    useStartPickingTransfer,
-    useMarkPackedTransfer,
-    useShipTransfer
+    useMarkTransferPacked,
+    useShipTransfer,
+    useStartTransferPicking,
+    useTransferOrder
 } from '@/hooks/transfer.hooks';
 import { TransferOrderItem } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function StaffTransferDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const transferId = parseInt(id || '0', 10);
+    const insets = useSafeAreaInsets();
 
     const { data: transfer, isLoading } = useTransferOrder(transferId);
 
     // Mutations
-    const startPickingMutation = useStartPickingTransfer();
-    const markPackedMutation = useMarkPackedTransfer();
+    const startPickingMutation = useStartTransferPicking();
+    const markPackedMutation = useMarkTransferPacked();
     const shipMutation = useShipTransfer();
 
     if (isLoading) {
@@ -85,7 +88,7 @@ export default function StaffTransferDetailScreen() {
                 subtitle={transfer.referenceCode || `Phiếu #${transfer.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}>
                 {/* Header Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -143,12 +146,10 @@ export default function StaffTransferDetailScreen() {
                         </View>
                     ))}
                 </View>
-
-                <View style={{ height: 100 }} />
             </ScrollView>
 
             {/* Actions Footer */}
-            <View style={styles.actionBar}>
+            <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
                 {normalizedStatus === 'approved' && (
                     <Button 
                         title="Bắt đầu lấy hàng" 
@@ -170,7 +171,7 @@ export default function StaffTransferDetailScreen() {
                         loading={shipMutation.isPending} 
                     />
                 )}
-                {(normalizedStatus === 'shipped' || normalizedStatus === 'received_partial') && (
+                {(normalizedStatus === 'in_transit' || normalizedStatus === 'received_partial') && (
                     <Button 
                         title="Kiểm nhận hàng" 
                         onPress={handleReceive} 

@@ -1,6 +1,8 @@
 import { Card, ScreenHeader } from '@/components';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useUpdateInboundTicketItems } from '@/hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
@@ -8,9 +10,12 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PutawayDetailScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(staff-tabs)/tasks');
+    const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const user = useAuthStore((state) => state.user);
     const companyId = user?.companyId ?? 0;
@@ -53,7 +58,7 @@ export default function PutawayDetailScreen() {
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy đơn putaway</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -103,7 +108,7 @@ export default function PutawayDetailScreen() {
             });
 
             AlertService.success('Thành công', 'Đã cập nhật putaway cho đơn ' + (order.referenceCode || `INB-${order.id}`), () => {
-                router.back();
+                goBack();
             });
         } catch {
             AlertService.error('Lỗi', 'Không thể cập nhật putaway. Vui lòng thử lại.');
@@ -119,7 +124,7 @@ export default function PutawayDetailScreen() {
                 subtitle={order.referenceCode || `PUT-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}>
                 <View style={styles.placeholderNotice}>
                     <Feather name="info" size={16} color="#854d0e" />
                     <Text style={styles.placeholderNoticeText}>Đang dùng inbound ticket thật cho putaway. Khi backend có endpoint putaway riêng, app sẽ chuyển sang endpoint đó.</Text>
@@ -177,7 +182,7 @@ export default function PutawayDetailScreen() {
                 )}
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                 <TouchableOpacity
                     style={[
                         styles.completeBtn,

@@ -1,10 +1,12 @@
 import { Card, ScreenHeader } from '@/components';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundRequest, useInboundTicket } from '@/hooks';
 import {
     useCreateInboundTicket,
     useUpdateInboundRequestStatus,
 } from '@/hooks/inbound-orders.hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { exportInboundRequest, exportInboundTicket } from '@/services/inbound-order.api';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -21,6 +23,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Status config cho Request - match BE: Pending→Approved/Rejected→Transported
 type InboundRequestStatusKey = 'Pending' | 'Approved' | 'Rejected' | 'Transported';
@@ -52,9 +55,11 @@ const getTicketStatusConfig = (status?: string) => {
 
 export default function InboundOrderDetailScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(manager-tabs)/orders');
     const { id, type = 'request' } = useLocalSearchParams<{ id: string; type?: 'request' | 'ticket' }>();
     const { user } = useAuthStore();
     const [isProcessing, setIsProcessing] = useState(false);
+    const insets = useSafeAreaInsets();
 
     // Fetch data based on type
     const { data: request, isLoading: requestLoading, error: requestError } = useInboundRequest(
@@ -90,7 +95,7 @@ export default function InboundOrderDetailScreen() {
                 <View style={styles.errorContainer}>
                     <Feather name="alert-circle" size={64} color={COLORS.border} />
                     <Text style={styles.errorTitle}>Không tìm thấy đơn nhập kho</Text>
-                    <TouchableOpacity onPress={() => router.back()}>
+                    <TouchableOpacity onPress={goBack}>
                         <Text style={styles.backLink}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -119,7 +124,7 @@ export default function InboundOrderDetailScreen() {
                         status: 'Approved',
                     });
                     AlertService.success('Thành công', 'Yêu cầu đã được duyệt', () => {
-                        router.back();
+                        goBack();
                     });
                 } catch {
                     AlertService.error('Lỗi', 'Không thể duyệt yêu cầu. Vui lòng thử lại.');
@@ -144,7 +149,7 @@ export default function InboundOrderDetailScreen() {
                         status: 'Rejected',
                     });
                     AlertService.success('Thành công', 'Yêu cầu đã bị từ chối', () => {
-                        router.back();
+                        goBack();
                     });
                 } catch {
                     AlertService.error('Lỗi', 'Không thể từ chối yêu cầu. Vui lòng thử lại.');
@@ -195,7 +200,7 @@ export default function InboundOrderDetailScreen() {
                 subtitle={isRequest ? `REQ-${data.id}` : ((data as any).referenceCode || `INB-${data.id}`)}
             />
 
-            <ScrollView style={styles.content}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
                 {/* Status Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -326,7 +331,7 @@ export default function InboundOrderDetailScreen() {
 
             {/* Action Buttons */}
             {(canApproveReject || canCreateTicket) && (
-                <View style={styles.actionBar}>
+                <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                     {canApproveReject && (
                         <View style={styles.actionRow}>
                             <TouchableOpacity

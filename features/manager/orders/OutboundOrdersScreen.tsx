@@ -262,6 +262,7 @@ export default function OutboundOrdersScreen() {
                 searchPlaceholder="Tìm theo mã đơn, khách hàng..."
                 searchValue={searchQuery}
                 onSearchChange={setSearchQuery}
+                useTopSafeArea={false}
             >
                 {/* View Mode Toggle */}
                 <View style={styles.viewModeContainer}>
@@ -507,11 +508,12 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
     tabsScroll: {
-        maxHeight: 50,
+        marginHorizontal: -4,
     },
     tabsContainer: {
         paddingHorizontal: 20,
-        paddingBottom: 12,
+        paddingTop: 8,
+        paddingBottom: 8,
     },
     tab: {
         flexDirection: 'row',

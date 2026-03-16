@@ -15,12 +15,14 @@ import {
 
 import { SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
+import { useAppBack } from '@/hooks/useAppBack';
 import { useUpdateProfile } from '@/hooks/user.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function ChangePasswordScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(manager-tabs)/profile');
     const { user } = useAuthStore();
     const updateProfileMutation = useUpdateProfile();
 
@@ -54,7 +56,7 @@ export default function ChangePasswordScreen() {
             });
 
             AlertService.success('Thành công', 'Mật khẩu đã được thay đổi.', () => {
-                router.back();
+                goBack();
             });
         } catch (error: any) {
             console.error('[ChangePassword] Error:', error);
@@ -67,7 +69,7 @@ export default function ChangePasswordScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <SafeAreaHeader title="Đổi mật khẩu" onBack={() => router.back()} />
+            <SafeAreaHeader title="Đổi mật khẩu" onBack={goBack} />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>

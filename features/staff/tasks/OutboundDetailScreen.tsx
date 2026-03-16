@@ -1,6 +1,8 @@
 import { Card, ScreenHeader } from '@/components';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useOutboundTasksByStaff, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
@@ -8,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // BE Status Flow (Staff allowed transitions):
 // Created → Picking → QualityCheck → (IssueReported | Packing) → Packing → LoadHandover
@@ -40,6 +43,8 @@ const getNextAction = (status: TicketStatus): { label: string; nextStatus: Ticke
 export default function OutboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
+    const insets = useSafeAreaInsets();
+    const goBack = useAppBack('/(staff-tabs)/tasks');
     const user = useAuthStore((state) => state.user);
     const companyId = user?.companyId ?? 0;
     const staffId = user?.id ?? 0;
@@ -103,7 +108,7 @@ export default function OutboundDetailScreen() {
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -213,7 +218,7 @@ export default function OutboundDetailScreen() {
                 subtitle={order.note || `OUT-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}>
                 {/* Current Status Badge */}
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
@@ -315,7 +320,7 @@ export default function OutboundDetailScreen() {
                 ))}
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                 {/* Report Issue button - only during QualityCheck */}
                 {canReportIssue && (
                     <TouchableOpacity

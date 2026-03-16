@@ -1,2 +1,5 @@
-import StaffHomeScreen from '@/features/staff/home/StaffHomeScreen';
-export default StaffHomeScreen;
+import { Redirect } from 'expo-router';
+
+export default function Index() {
+    return <Redirect href="/(staff-tabs)/tasks" />;
+}

@@ -1,34 +1,47 @@
 import { Button, Card, ScreenHeader } from '@/components';
+import { AddTransferItemModal } from '@/components/manager/AddTransferItemModal';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
-import { 
-    useTransferOrder, 
-    useSubmitTransferOrder, 
-    useApproveTransferOrder, 
-    useRejectTransferOrder, 
-    useCancelTransferOrder 
+import {
+    useAddTransferOrderItem,
+    useApproveTransferOrder,
+    useCancelTransferOrder,
+    useCheckTransferAvailability,
+    useRejectTransferOrder,
+    useRemoveTransferOrderItem,
+    useSubmitTransferOrder,
+    useTransferOrder
 } from '@/hooks/transfer.hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
-import { TransferOrderItem } from '@/types/transfer';
+import { TransferAvailability, TransferOrderItem } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, TextInput } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TransferDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const transferId = parseInt(id || '0', 10);
+    const insets = useSafeAreaInsets();
+    const goBack = useAppBack('/(manager-tabs)/transfers');
 
     const { data: transfer, isLoading } = useTransferOrder(transferId);
+    const { data: availability = [], isLoading: isCheckingAvailability } = useCheckTransferAvailability(transferId);
     
     // Mutations
     const submitMutation = useSubmitTransferOrder();
     const approveMutation = useApproveTransferOrder();
     const rejectMutation = useRejectTransferOrder();
     const cancelMutation = useCancelTransferOrder();
+    const addItemMutation = useAddTransferOrderItem();
+    const removeItemMutation = useRemoveTransferOrderItem();
 
     const [reason, setReason] = useState('');
     const [showReasonInput, setShowReasonInput] = useState<'reject' | 'cancel' | null>(null);
+    const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
     if (isLoading) {
         return (
@@ -44,7 +57,7 @@ export default function TransferDetailScreen() {
                 <View style={styles.errorContainer}>
                     <Feather name="alert-circle" size={64} color={COLORS.border} />
                     <Text style={styles.errorTitle}>Không tìm thấy phiếu luân chuyển</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -56,10 +69,10 @@ export default function TransferDetailScreen() {
         switch (status.toLowerCase()) {
             case 'completed': return COLORS.success;
             case 'approved': return COLORS.primary;
-            case 'submitted': return COLORS.warning;
+            case 'pending_approval': return COLORS.warning;
             case 'picking': return '#F59E0B';
             case 'packed': return '#8B5CF6';
-            case 'shipped': return '#3B82F6';
+            case 'in_transit': return '#3B82F6';
             case 'draft': return COLORS.slate500;
             case 'cancelled':
             case 'rejected': return COLORS.danger;
@@ -69,9 +82,16 @@ export default function TransferDetailScreen() {
 
     const statusColor = getStatusColor(transfer.status);
     const normalizedStatus = transfer.status.toLowerCase();
+    const hasItems = (transfer.items || []).length > 0;
+    const availabilityIssues = availability.filter((item) => !item.isEnough);
 
     // Action Handlers
     const handleSubmit = () => {
+        if (!hasItems) {
+            AlertService.error('Lỗi', 'Cần thêm ít nhất 1 sản phẩm trước khi trình duyệt.');
+            return;
+        }
+
         submitMutation.mutate(transferId, {
             onSuccess: () => AlertService.success('Thành công', 'Đã trình duyệt phiếu luân chuyển.'),
             onError: (error: any) => AlertService.error('Lỗi', error.response?.data?.message || 'Không thể trình duyệt.')
@@ -79,6 +99,15 @@ export default function TransferDetailScreen() {
     };
 
     const handleApprove = () => {
+        if (availabilityIssues.length > 0) {
+            const firstIssue = availabilityIssues[0];
+            AlertService.error(
+                'Thiếu tồn kho',
+                `${firstIssue.productName || `Sản phẩm #${firstIssue.productId}`} chỉ còn ${firstIssue.availableQuantity}/${firstIssue.requiredQuantity}.`
+            );
+            return;
+        }
+
         approveMutation.mutate(transferId, {
             onSuccess: () => AlertService.success('Thành công', 'Đã phê duyệt phiếu luân chuyển.'),
             onError: (error: any) => AlertService.error('Lỗi', error.response?.data?.message || 'Không thể phê duyệt.')
@@ -111,6 +140,50 @@ export default function TransferDetailScreen() {
         });
     };
 
+    const handleAddItem = (productId: number, quantity: number) => {
+        addItemMutation.mutate({ id: transferId, payload: { productId, quantity } }, {
+            onSuccess: () => {
+                AlertService.success('Thành công', 'Đã thêm sản phẩm vào phiếu.');
+                setIsAddModalVisible(false);
+            },
+            onError: (error: any) => AlertService.error('Lỗi', error.response?.data?.message || 'Không thể thêm sản phẩm.')
+        });
+    };
+
+    const handleRemoveItem = (itemId: number) => {
+        Alert.alert('Xác nhận', 'Bạn có chắc chắn muốn xóa sản phẩm này khỏi phiếu?', [
+            { text: 'Hủy', style: 'cancel' },
+            { 
+                text: 'Xóa', 
+                style: 'destructive',
+                onPress: () => {
+                    removeItemMutation.mutate({ id: transferId, itemId }, {
+                        onSuccess: () => AlertService.success('Thành công', 'Đã xóa sản phẩm.'),
+                        onError: (error: any) => AlertService.error('Lỗi', error.response?.data?.message || 'Không thể xóa sản phẩm.')
+                    });
+                }
+            }
+        ]);
+    };
+
+    const renderAvailabilityItem = (item: TransferAvailability) => {
+        const enough = item.isEnough;
+
+        return (
+            <View key={`availability-${item.productId}`} style={styles.availabilityItem}>
+                <View style={styles.availabilityTextGroup}>
+                    <Text style={styles.availabilityName}>{item.productName || `Sản phẩm #${item.productId}`}</Text>
+                    <Text style={styles.availabilityMeta}>Cần {item.requiredQuantity} • Có thể xuất {item.availableQuantity}</Text>
+                </View>
+                <View style={[styles.availabilityBadge, enough ? styles.availabilityBadgeOk : styles.availabilityBadgeWarn]}>
+                    <Text style={[styles.availabilityBadgeText, enough ? styles.availabilityBadgeTextOk : styles.availabilityBadgeTextWarn]}>
+                        {enough ? 'Đủ' : 'Thiếu'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
     // Render Items
     const renderItem = (item: TransferOrderItem) => (
         <View key={item.id} style={styles.itemContainer}>
@@ -122,6 +195,11 @@ export default function TransferDetailScreen() {
                 <View style={styles.qtyBadge}>
                     <Text style={styles.quantityText}>{item.quantity}</Text>
                 </View>
+                {normalizedStatus === 'draft' && (
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleRemoveItem(item.id)}>
+                        <Feather name="trash-2" size={18} color={COLORS.danger} />
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -133,7 +211,7 @@ export default function TransferDetailScreen() {
                 subtitle={transfer.referenceCode || `Phiếu #${transfer.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}>
                 {/* Header Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -189,18 +267,57 @@ export default function TransferDetailScreen() {
                     </View>
                 </Card>
 
+                {normalizedStatus === 'pending_approval' && (
+                    <>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Kiểm tra tồn khả dụng</Text>
+                            <Text style={styles.itemCount}>{isCheckingAvailability ? 'Đang kiểm tra...' : `${availabilityIssues.length} sản phẩm thiếu`}</Text>
+                        </View>
+                        <Card style={styles.card}>
+                            {availability.length > 0 ? (
+                                availability.map(renderAvailabilityItem)
+                            ) : (
+                                <Text style={styles.emptyAvailabilityText}>Chưa có dữ liệu kiểm tra tồn.</Text>
+                            )}
+                        </Card>
+                    </>
+                )}
+
                 {/* Items */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.itemCount}>{(transfer.items || []).length} mặt hàng</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <Text style={styles.itemCount}>{(transfer.items || []).length} mặt hàng</Text>
+                        {normalizedStatus === 'draft' && (
+                            <TouchableOpacity onPress={() => setIsAddModalVisible(true)} style={styles.addBtnSmall}>
+                                <Feather name="plus" size={16} color={COLORS.primary} />
+                                <Text style={styles.addBtnTextSmall}>Thêm</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
                 <View style={styles.list}>
-                    {(transfer.items || []).map((item, index) => (
-                        <View key={item.id}>
-                            {renderItem(item)}
-                            {index < (transfer.items || []).length - 1 && <View style={styles.divider} />}
+                    {(transfer.items || []).length > 0 ? (
+                        (transfer.items || []).map((item, index) => (
+                            <View key={item.id}>
+                                {renderItem(item)}
+                                {index < (transfer.items || []).length - 1 && <View style={styles.divider} />}
+                            </View>
+                        ))
+                    ) : (
+                        <View style={styles.emptyItemsContainer}>
+                            <Feather name="package" size={32} color={COLORS.border} />
+                            <Text style={styles.emptyItemsText}>Chưa có sản phẩm nào được thêm vào phiếu.</Text>
+                            {normalizedStatus === 'draft' && (
+                                <Button 
+                                    title="Thêm sản phẩm ngay" 
+                                    variant="outline" 
+                                    onPress={() => setIsAddModalVisible(true)} 
+                                    style={{ marginTop: 12 }} 
+                                />
+                            )}
                         </View>
-                    ))}
+                    )}
                 </View>
 
                 {/* Reason Input Card (if rejecting or cancelling) */}
@@ -234,35 +351,33 @@ export default function TransferDetailScreen() {
                         </View>
                     </Card>
                 )}
-
-                <View style={{ height: 100 }} />
             </ScrollView>
 
             {/* Actions Footer */}
             {!showReasonInput && (
-                <View style={styles.actionBar}>
+                <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
                     {normalizedStatus === 'draft' && (
                         <View style={styles.actionRow}>
                             <TouchableOpacity style={[styles.actionButton, styles.cancelBtn]} onPress={() => setShowReasonInput('cancel')}>
                                 <Text style={styles.cancelBtnText}>Hủy phiếu</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.actionButton, styles.primaryBtn]} onPress={handleSubmit} disabled={submitMutation.isPending}>
+                            <TouchableOpacity style={[styles.actionButton, styles.primaryBtn, (!hasItems || submitMutation.isPending) && styles.actionButtonDisabled]} onPress={handleSubmit} disabled={!hasItems || submitMutation.isPending}>
                                 <Text style={styles.primaryBtnText}>{submitMutation.isPending ? 'Đang...' : 'Trình duyệt'}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
-                    {normalizedStatus === 'submitted' && (
+                    {normalizedStatus === 'pending_approval' && (
                         <View style={styles.actionRow}>
                             <TouchableOpacity style={[styles.actionButton, styles.rejectBtn]} onPress={() => setShowReasonInput('reject')}>
                                 <Text style={styles.rejectBtnText}>Từ chối</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.actionButton, styles.primaryBtn]} onPress={handleApprove} disabled={approveMutation.isPending}>
+                            <TouchableOpacity style={[styles.actionButton, styles.primaryBtn, (approveMutation.isPending || isCheckingAvailability || availabilityIssues.length > 0) && styles.actionButtonDisabled]} onPress={handleApprove} disabled={approveMutation.isPending || isCheckingAvailability || availabilityIssues.length > 0}>
                                 <Text style={styles.primaryBtnText}>{approveMutation.isPending ? 'Đang...' : 'Phê duyệt'}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
                     {/* Hủy khi đã duyệt, đang lấy hàng (picking) tùy logic, nhưng gen thường manager luôn được quyền Hủy */}
-                    {(normalizedStatus === 'approved' || normalizedStatus === 'picking' || normalizedStatus === 'packed' || normalizedStatus === 'shipped') && (
+                    {(normalizedStatus === 'approved' || normalizedStatus === 'picking' || normalizedStatus === 'packed' || normalizedStatus === 'in_transit') && (
                         <View style={styles.actionRow}>
                             <TouchableOpacity style={[styles.actionButton, styles.cancelBtn]} onPress={() => setShowReasonInput('cancel')}>
                                 <Text style={styles.cancelBtnText}>Hủy phiếu luân chuyển</Text>
@@ -271,6 +386,13 @@ export default function TransferDetailScreen() {
                     )}
                 </View>
             )}
+
+            <AddTransferItemModal
+                visible={isAddModalVisible}
+                onClose={() => setIsAddModalVisible(false)}
+                onAdd={handleAddItem}
+                isAdding={addItemMutation.isPending}
+            />
         </View>
     );
 }
@@ -375,6 +497,53 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: COLORS.textMuted,
     },
+    availabilityItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    availabilityTextGroup: {
+        flex: 1,
+        marginRight: 12,
+    },
+    availabilityName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.text,
+        marginBottom: 2,
+    },
+    availabilityMeta: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+    },
+    availabilityBadge: {
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+    },
+    availabilityBadgeOk: {
+        backgroundColor: `${COLORS.success}15`,
+    },
+    availabilityBadgeWarn: {
+        backgroundColor: `${COLORS.danger}15`,
+    },
+    availabilityBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    availabilityBadgeTextOk: {
+        color: COLORS.success,
+    },
+    availabilityBadgeTextWarn: {
+        color: COLORS.danger,
+    },
+    emptyAvailabilityText: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+    },
     detailRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -442,6 +611,37 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: COLORS.text,
     },
+    deleteBtn: {
+        marginLeft: 12,
+        padding: 8,
+        backgroundColor: COLORS.danger + '10',
+        borderRadius: 8,
+    },
+    addBtnSmall: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: COLORS.primary + '15',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    addBtnTextSmall: {
+        color: COLORS.primary,
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    emptyItemsContainer: {
+        padding: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyItemsText: {
+        color: COLORS.textMuted,
+        fontSize: 14,
+        marginTop: 12,
+        textAlign: 'center',
+    },
     divider: {
         height: 1,
         backgroundColor: COLORS.border,
@@ -487,6 +687,9 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    actionButtonDisabled: {
+        opacity: 0.5,
     },
     primaryBtn: {
         backgroundColor: COLORS.primary,

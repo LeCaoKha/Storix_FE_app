@@ -1,8 +1,9 @@
-import { Calendar, Card, ScreenHeader } from '@/components';
+import { Calendar, Card, ProductPickerModal, ScreenHeader } from '@/components';
+import { getBottomSafePadding, getTopSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useCreateOutboundRequisition, useCreateRequisition, useProfile } from '@/hooks';
-import { useProducts } from '@/hooks/product.hooks';
 import { useSuppliers } from '@/hooks/suppliers.hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { api } from '@/services/axios.instance';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -15,7 +16,6 @@ import React, { useEffect, useState } from 'react';
 import {
     Alert,
     FlatList,
-    Image,
     Modal,
     ScrollView,
     StyleSheet,
@@ -24,13 +24,15 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CreateRequisitionScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(manager-tabs)/requisitions');
+    const insets = useSafeAreaInsets();
     const { mutateAsync: createRequisition, isPending: loadingInbound } = useCreateRequisition();
     const { mutateAsync: createOutboundRequisition, isPending: loadingOutbound } = useCreateOutboundRequisition();
     const loading = loadingInbound || loadingOutbound;
-    const { data: products = [], isLoading: loadingProducts } = useProducts();
     const { data: suppliers = [], isLoading: loadingSuppliers } = useSuppliers();
     const user = useAuthStore((state) => state.user);
     const token = useAuthStore((state) => state.token);
@@ -56,7 +58,6 @@ export default function CreateRequisitionScreen() {
     const [showCalendar, setShowCalendar] = useState(false);
     const [showWarehousePicker, setShowWarehousePicker] = useState(false);
     const [showSupplierPicker, setShowSupplierPicker] = useState(false);
-    const [productSearch, setProductSearch] = useState('');
 
     // Load warehouses - chỉ chạy 1 lần khi component mount
     useEffect(() => {
@@ -145,11 +146,6 @@ export default function CreateRequisitionScreen() {
         }
     }, [suppliers, supplierId]);
 
-    const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-        (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase()))
-    );
-
     const handleAddProduct = (product: any) => {
         // Check if already added
         if (items.some(item => item.id === product.id)) {
@@ -168,7 +164,6 @@ export default function CreateRequisitionScreen() {
 
         setItems([...items, newItem]);
         setShowProductPicker(false);
-        setProductSearch('');
     };
 
     const handleRemoveItem = (id: number) => {
@@ -245,7 +240,7 @@ export default function CreateRequisitionScreen() {
                 };
                 await createRequisition(requestData);
                 AlertService.success('Thành công', 'Phiếu đề nghị nhập kho đã được tạo', () => {
-                    router.back();
+                    goBack();
                 });
             } else {
                 await createOutboundRequisition({
@@ -257,7 +252,7 @@ export default function CreateRequisitionScreen() {
                     })),
                 });
                 AlertService.success('Thành công', 'Phiếu đề nghị xuất kho đã được tạo', () => {
-                    router.back();
+                    goBack();
                 });
             }
         } catch (error: any) {
@@ -586,81 +581,13 @@ export default function CreateRequisitionScreen() {
                 <View style={{ height: 40 }} />
             </ScrollView>
 
-            {/* Product Picker Modal */}
-            <Modal
+            <ProductPickerModal
                 visible={showProductPicker}
-                animationType="slide"
-                onRequestClose={() => setShowProductPicker(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Chọn sản phẩm</Text>
-                        <TouchableOpacity onPress={() => setShowProductPicker(false)}>
-                            <Feather name="x" size={24} color={COLORS.text} />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.modalSearch}>
-                        <Feather name="search" size={18} color={COLORS.textMuted} />
-                        <TextInput
-                            style={styles.modalSearchInput}
-                            placeholder="Tìm kiếm sản phẩm, SKU..."
-                            value={productSearch}
-                            onChangeText={setProductSearch}
-                            placeholderTextColor={COLORS.textMuted}
-                        />
-                    </View>
-
-                    {loadingProducts ? (
-                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                            <Text>Đang tải sản phẩm...</Text>
-                        </View>
-                    ) : (
-                        <FlatList
-                            data={filteredProducts}
-                            keyExtractor={(item, index) => `product-${item.id}-${index}`}
-                            renderItem={({ item }) => {
-                                const latestPrice = getLatestPrice(item);
-                                return (
-                                    <TouchableOpacity
-                                        style={styles.productItem}
-                                        onPress={() => handleAddProduct(item)}
-                                    >
-                                        <View style={styles.productIcon}>
-                                            {item.image ? (
-                                                <Image
-                                                    source={{ uri: item.image }}
-                                                    style={styles.productImage}
-                                                    resizeMode="cover"
-                                                />
-                                            ) : (
-                                                <Feather name="package" size={20} color={COLORS.primary} />
-                                            )}
-                                        </View>
-                                        <View style={styles.productInfo}>
-                                            <Text style={styles.productName}>{item.name}</Text>
-                                            <Text style={styles.productSku}>SKU: {item.sku || 'N/A'}</Text>
-                                            <Text style={styles.productStock}>
-                                                Đơn vị: {item.unit || 'Cái'}
-                                            </Text>
-                                            {item.productPrices && item.productPrices.length > 0 && (
-                                                <View style={styles.priceRowModal}>
-                                                    <Feather name="tag" size={12} color="#22C55E" />
-                                                    <Text style={styles.productPriceText}>
-                                                        {formatVND(latestPrice)}
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                        <Feather name="plus-circle" size={24} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                );
-                            }}
-                            contentContainerStyle={styles.productList}
-                        />
-                    )}
-                </View>
-            </Modal>
+                onClose={() => setShowProductPicker(false)}
+                onSelect={handleAddProduct}
+                title="Chọn sản phẩm"
+                excludedProductIds={items.map((item) => item.id)}
+            />
 
             {/* Warehouse Picker Modal */}
             <Modal
@@ -669,7 +596,7 @@ export default function CreateRequisitionScreen() {
                 onRequestClose={() => setShowWarehousePicker(false)}
             >
                 <View style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
+                    <View style={[styles.modalHeader, { paddingTop: getTopSafePadding(insets.top, 12) }]}>
                         <Text style={styles.modalTitle}>Chọn kho</Text>
                         <TouchableOpacity onPress={() => setShowWarehousePicker(false)}>
                             <Feather name="x" size={24} color={COLORS.text} />
@@ -711,7 +638,7 @@ export default function CreateRequisitionScreen() {
                                     )}
                                 </TouchableOpacity>
                             )}
-                            contentContainerStyle={styles.listContainer}
+                            contentContainerStyle={[styles.listContainer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}
                         />
                     )}
                 </View>
@@ -724,7 +651,7 @@ export default function CreateRequisitionScreen() {
                 onRequestClose={() => setShowSupplierPicker(false)}
             >
                 <View style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
+                    <View style={[styles.modalHeader, { paddingTop: getTopSafePadding(insets.top, 12) }]}>
                         <Text style={styles.modalTitle}>Chọn nhà cung cấp</Text>
                         <TouchableOpacity onPress={() => setShowSupplierPicker(false)}>
                             <Feather name="x" size={24} color={COLORS.text} />
@@ -769,7 +696,7 @@ export default function CreateRequisitionScreen() {
                                     )}
                                 </TouchableOpacity>
                             )}
-                            contentContainerStyle={styles.listContainer}
+                            contentContainerStyle={[styles.listContainer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}
                         />
                     )}
                 </View>
@@ -787,7 +714,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#fff',
-        paddingTop: 50,
         paddingHorizontal: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
@@ -1089,7 +1015,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 50,
         paddingHorizontal: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,

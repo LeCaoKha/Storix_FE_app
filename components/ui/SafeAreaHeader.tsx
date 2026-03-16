@@ -1,6 +1,9 @@
+import { useAppBack } from '@/hooks/useAppBack';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getTopSafePadding } from './safeArea';
 
 interface SafeAreaHeaderProps {
   title?: string;
@@ -19,11 +22,14 @@ export const SafeAreaHeader: React.FC<SafeAreaHeaderProps> = ({
   backgroundColor,
   style,
 }) => {
+  const insets = useSafeAreaInsets();
+  const goBack = useAppBack();
+
   return (
-    <View style={[styles.header, backgroundColor ? { backgroundColor } : {}, style]}>
+    <View style={[styles.header, { paddingTop: getTopSafePadding(insets.top, 8) }, backgroundColor ? { backgroundColor } : {}, style]}>
       <View style={styles.content}>
         {showBackButton && (
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <TouchableOpacity style={styles.backButton} onPress={onBack || goBack}>
             <Ionicons name="arrow-back" size={24} color="#000" />
           </TouchableOpacity>
         )}
@@ -36,7 +42,6 @@ export const SafeAreaHeader: React.FC<SafeAreaHeaderProps> = ({
 const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
-    paddingTop: 44, // Safe area top
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E1E5E9',

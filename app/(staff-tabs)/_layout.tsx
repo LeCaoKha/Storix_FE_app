@@ -1,10 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
 import React from "react";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from "@/constants/color";
 
 export default function StaffTabLayout() {
+    const insets = useSafeAreaInsets();
+
     return (
         <Tabs
             screenOptions={{
@@ -14,14 +17,16 @@ export default function StaffTabLayout() {
                 tabBarStyle: {
                     backgroundColor: '#fff',
                     borderTopColor: COLORS.border,
+                    paddingTop: 8,
+                    paddingBottom: 8 + insets.bottom,
+                    height: 64 + insets.bottom,
                 }
             }}
         >
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "Trang chủ",
-                    tabBarIcon: ({ color }) => <Feather name="home" size={28} color={color} />,
+                    href: null,
                 }}
             />
             <Tabs.Screen

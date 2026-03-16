@@ -1,6 +1,8 @@
 import { Card, ScreenHeader } from '@/components';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useUpdateInboundTicketItems } from '@/hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
@@ -8,10 +10,13 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
+    const insets = useSafeAreaInsets();
+    const goBack = useAppBack('/(staff-tabs)/tasks');
     const user = useAuthStore((state) => state.user);
     const companyId = user?.companyId ?? 0;
     const staffId = user?.id ?? 0;
@@ -53,7 +58,7 @@ export default function InboundDetailScreen() {
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -136,7 +141,7 @@ export default function InboundDetailScreen() {
                     // ... call status update API if available
 
                     AlertService.success('Hoàn thành', 'Phiếu nhập kho đã được xác nhận hoàn tất. Hàng hóa đã được ghi nhận vào tồn kho.', () => {
-                        router.back();
+                        goBack();
                     });
                 } catch {
                     AlertService.error('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
@@ -154,7 +159,7 @@ export default function InboundDetailScreen() {
                 subtitle={order.referenceCode || `INB-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}>
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
@@ -245,14 +250,14 @@ export default function InboundDetailScreen() {
             </ScrollView>
 
             {isCompleted ? (
-                <View style={styles.footer}>
+                <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                     <View style={[styles.completedBanner, { flex: 1 }]}>
                         <Feather name="check-circle" size={20} color={COLORS.success} />
                         <Text style={styles.completedBannerText}>Đơn nhập kho đã hoàn tất</Text>
                     </View>
                 </View>
             ) : (
-                <View style={styles.footer}>
+                <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                     <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
                         <Feather name="alert-triangle" size={20} color={COLORS.danger} />
                         <Text style={styles.reportBtnText}>Báo lỗi</Text>

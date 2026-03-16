@@ -17,12 +17,14 @@ import {
 
 import { SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
+import { useAppBack } from '@/hooks/useAppBack';
 import { useProfile, useUpdateProfile } from '@/hooks/user.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function EditProfileScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(manager-tabs)/profile');
     const { user } = useAuthStore();
     const { data: profile, isLoading: isFetching } = useProfile(user?.id);
     const updateProfileMutation = useUpdateProfile();
@@ -98,7 +100,7 @@ export default function EditProfileScreen() {
             });
 
             AlertService.success('Thành công', 'Thông tin cá nhân đã được cập nhật.', () => {
-                router.back();
+                goBack();
             });
         } catch (error: any) {
             console.error('[EditProfile] Save error:', error);
@@ -119,7 +121,7 @@ export default function EditProfileScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <SafeAreaHeader title="Chỉnh sửa hồ sơ" onBack={() => router.back()} />
+            <SafeAreaHeader title="Chỉnh sửa hồ sơ" onBack={goBack} />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.avatarSection}>

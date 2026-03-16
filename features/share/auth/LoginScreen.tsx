@@ -9,6 +9,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, Touchable
 import { Button, Input } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useLogin } from '@/hooks/auth.hooks';
+import { getUserById, getUserProfile, mergeUserProfileIntoUser } from '@/services/user.api';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -35,7 +36,7 @@ export default function LoginScreen() {
                 if (user.roleId === 2 || user.roleId === 3) {
                     router.replace('/(manager-tabs)/requisitions' as any);
                 } else {
-                    router.replace('/(staff-tabs)' as any);
+                    router.replace('/(staff-tabs)/tasks' as any);
                 }
             }, 1);
             return () => clearTimeout(timeout);
@@ -56,32 +57,37 @@ export default function LoginScreen() {
 
             // Fetch complete user profile to get warehouse assignment
             try {
-                const { getUserProfile } = await import('@/services/user.api');
-                const userProfile = await getUserProfile(data.userId) as any;
+                const [userSummary, userProfile] = await Promise.allSettled([
+                    getUserById(data.userId),
+                    getUserProfile(data.userId),
+                ]);
 
-                // Backend trả về User entity thô, bóc tách assignment mới nhất
-                const latestAssignment = userProfile.warehouseAssignments?.sort((a: any, b: any) =>
-                    new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime()
-                )[0];
+                const mergedPayload = {
+                    ...(userSummary.status === 'fulfilled' ? userSummary.value : {}),
+                    ...(userProfile.status === 'fulfilled' ? userProfile.value : {}),
+                    WarehouseId: data.warehouseId,
+                    WarehouseName: data.warehouseName,
+                } as any;
 
-                console.log('User profile fetched (raw):', {
-                    hasAssignments: !!userProfile.warehouseAssignments?.length,
-                    warehouseId: latestAssignment?.warehouseId
-                });
-
-                // Save to store with extracted profile data
-                loginStore(data.accessToken, data.refreshToken, {
+                const mergedUser = mergeUserProfileIntoUser({
                     id: data.userId,
                     roleId: data.roleId,
                     companyId: data.companyId,
                     email: email,
-                    fullName: userProfile.fullName,
-                    phone: userProfile.phone,
-                    warehouseId: latestAssignment?.warehouseId,
-                    warehouseName: latestAssignment?.warehouse?.name,
-                    roleName: userProfile.role?.name,
-                    status: userProfile.status,
+                    warehouseId: data.warehouseId,
+                    warehouseName: data.warehouseName,
+                }, mergedPayload);
+
+                console.log('User profile fetched (raw):', {
+                    warehouseIdFromLogin: data.warehouseId,
+                    warehouseIdFromUserById: userSummary.status === 'fulfilled' ? (userSummary.value as any)?.warehouseId ?? (userSummary.value as any)?.WarehouseId : null,
+                    warehouseIdFromProfile: userProfile.status === 'fulfilled' ? (userProfile.value as any)?.warehouseId ?? (userProfile.value as any)?.WarehouseId : null,
+                    mergedWarehouseId: mergedUser.warehouseId,
+                    assignmentWarehouseIds: mergedUser.warehouseAssignments?.map((assignment) => assignment.warehouseId) || [],
                 });
+
+                // Save to store with extracted profile data
+                loginStore(data.accessToken, data.refreshToken, mergedUser);
             } catch (profileError) {
                 console.warn('Failed to fetch user profile, using basic info:', profileError);
                 // Fallback to basic info if profile fetch fails
@@ -90,6 +96,14 @@ export default function LoginScreen() {
                     roleId: data.roleId,
                     companyId: data.companyId,
                     email: email,
+                    warehouseId: data.warehouseId,
+                    warehouseName: data.warehouseName,
+                    warehouseAssignments: data.warehouseId
+                        ? [{
+                            warehouseId: data.warehouseId,
+                            warehouse: { id: data.warehouseId, name: data.warehouseName },
+                        }]
+                        : undefined,
                 });
             }
 
@@ -97,7 +111,8 @@ export default function LoginScreen() {
                 hasToken: !!useAuthStore.getState().token,
                 tokenLength: useAuthStore.getState().token?.length,
                 hasUser: !!useAuthStore.getState().user,
-                hasWarehouse: !!useAuthStore.getState().user?.warehouseId
+                hasWarehouse: !!useAuthStore.getState().user?.warehouseId,
+                assignmentWarehouseIds: useAuthStore.getState().user?.warehouseAssignments?.map((assignment) => assignment.warehouseId) || [],
             });
 
             // Small delay to ensure AsyncStorage write completes
@@ -109,7 +124,7 @@ export default function LoginScreen() {
                 router.replace('/(manager-tabs)/requisitions' as any);
             } else {
                 // 4: Staff or others
-                router.replace('/(staff-tabs)' as any);
+                router.replace('/(staff-tabs)/tasks' as any);
             }
         } catch (error) {
             console.error('Login failed:', error);

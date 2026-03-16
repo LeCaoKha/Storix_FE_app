@@ -114,7 +114,7 @@ export const getTasks = async (staffId: number, companyId: number): Promise<Task
         // BE: GET /api/warehouse-transfers?status=
         try {
             const transferOrders = await getTransferOrders({
-                status: 'Approved,Picking,Packed,Shipped'
+                status: 'APPROVED,PICKING,PACKED,IN_TRANSIT'
             });
 
             const transferTasks = transferOrders.map(order => ({
@@ -197,15 +197,17 @@ function mapCountStatus(status?: string): TaskStatus {
 }
 
 function mapTransferStatus(status?: string): TaskStatus {
-    // BE Transfer statuses: Draft, Submitted, Approved, Picking, Packed, Shipped, Received, Cancelled
+    // BE Transfer statuses: Draft, PendingApproval, Approved, Picking, Packed, InTransit, ReceivedFull, ReceivedPartial, Completed, Cancelled
     switch (status?.toLowerCase()) {
         case 'approved':
             return TaskStatus.PENDING;
         case 'picking':
         case 'packed':
-        case 'shipped':
+        case 'in_transit':
             return TaskStatus.IN_PROGRESS;
-        case 'received':
+        case 'completed':
+        case 'received_full':
+        case 'received_partial':
             return TaskStatus.COMPLETED;
         default:
             return TaskStatus.PENDING;

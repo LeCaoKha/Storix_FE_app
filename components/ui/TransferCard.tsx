@@ -17,10 +17,10 @@ export const TransferCard: React.FC<TransferCardProps> = ({
     switch (status.toLowerCase()) {
       case 'completed': return COLORS.success;
       case 'approved': return COLORS.primary;
-      case 'submitted': return COLORS.warning;
+      case 'pending_approval': return COLORS.warning;
       case 'picking': return '#F59E0B'; // Amber
       case 'packed': return '#8B5CF6'; // Purple
-      case 'shipped': return '#3B82F6'; // Blue
+      case 'in_transit': return '#3B82F6'; // Blue
       case 'draft': return COLORS.slate500;
       case 'cancelled':
       case 'rejected': return COLORS.danger;

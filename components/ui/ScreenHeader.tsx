@@ -1,8 +1,10 @@
 import { COLORS } from '@/constants/color';
+import { useAppBack } from '@/hooks/useAppBack';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import React from 'react';
 import { StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getTopSafePadding } from './safeArea';
 
 interface ScreenHeaderProps {
   title: string;
@@ -19,20 +21,21 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   showBackButton = true,
   rightButton,
 }) => {
-  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const goBack = useAppBack();
 
   const handleBack = () => {
     if (onBack) {
       onBack();
     } else {
-      router.back();
+      goBack();
     }
   };
 
   return (
     <>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: getTopSafePadding(insets.top, 12) }]}>
         {showBackButton && (
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Feather name="arrow-left" size={24} color={COLORS.text} />
@@ -53,7 +56,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    paddingTop: 60, // Safe area top + padding
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,

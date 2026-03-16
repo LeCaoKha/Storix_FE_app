@@ -1,12 +1,15 @@
 import { Card } from '@/components';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     // Data from web app
     const todayTasks = [
@@ -22,7 +25,7 @@ export default function HomeScreen() {
     };
 
     return (
-        <ScrollView style={styles.container}>
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: getBottomSafePadding(insets.bottom, 20) }}>
             <View style={styles.header}>
                 <View style={styles.headerRow}>
                     <View>
@@ -126,7 +129,6 @@ export default function HomeScreen() {
                 </View>
             </View>
 
-            <View style={{ height: 20 }} />
         </ScrollView>
     );
 };
@@ -139,7 +141,7 @@ const styles = StyleSheet.create({
     header: {
         padding: 20,
         backgroundColor: '#fff',
-        paddingTop: 60, // Safe area roughly
+        paddingTop: 20,
     },
     headerRow: {
         flexDirection: 'row',

@@ -1,15 +1,19 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useStockCountTicket, useUpdateStockCountItem } from '@/hooks/stock-count.hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { StockCountItem } from '@/services/stock-count.api';
 import { AlertService } from '@/stores/alert.store';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InventoryCountDetailScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(staff-tabs)/tasks');
+    const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const ticketId = parseInt(id || '0');
 
@@ -71,7 +75,7 @@ export default function InventoryCountDetailScreen() {
         }
 
         AlertService.success('Thành công', 'Đã lưu kết quả kiểm kê', () => {
-            router.back();
+            goBack();
         });
     };
 
@@ -89,7 +93,7 @@ export default function InventoryCountDetailScreen() {
             <View style={styles.errorContainer}>
                 <Feather name="alert-circle" size={48} color={COLORS.danger} />
                 <Text style={styles.errorText}>Không thể tải thông tin phiếu kiểm kê</Text>
-                <TouchableOpacity style={styles.retryBtn} onPress={() => router.back()}>
+                <TouchableOpacity style={styles.retryBtn} onPress={goBack}>
                     <Text style={styles.retryBtnText}>Quay lại</Text>
                 </TouchableOpacity>
             </View>
@@ -103,7 +107,7 @@ export default function InventoryCountDetailScreen() {
                 subtitle={ticket.name || `CNT-${ticket.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]} showsVerticalScrollIndicator={false}>
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <View style={styles.infoIconContainer}>

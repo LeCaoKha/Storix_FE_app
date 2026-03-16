@@ -1,48 +1,54 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
-    getTransferOrderById, 
-    getTransferOrders, 
-    markTransferPacked, 
-    receiveTransfer, 
-    shipTransfer, 
-    startTransferPicking,
+import {
+    addTransferOrderItem,
+    approveTransferOrder,
+    cancelTransferOrder,
     checkTransferAvailability,
     createTransferOrder,
-    updateTransferOrder,
-    addTransferOrderItem,
-    updateTransferOrderItem,
-    removeTransferOrderItem,
-    submitTransferOrder,
-    approveTransferOrder,
+    getTransferOrderById,
+    getTransferOrders,
+    markTransferPacked,
+    receiveTransfer,
     rejectTransferOrder,
-    cancelTransferOrder
+    removeTransferOrderItem,
+    shipTransfer,
+    startTransferPicking,
+    submitTransferOrder,
+    updateTransferOrder,
+    updateTransferOrderItem
 } from '@/services/transfer.api';
-import { 
-    ReceiveTransferPayload,
-    CreateTransferOrderRequest,
-    UpdateTransferOrderRequest,
+import { useAuthStore } from '@/stores/auth.store';
+import {
     AddTransferOrderItemRequest,
-    UpdateTransferOrderItemRequest,
+    CancelTransferOrderRequest,
+    CreateTransferOrderRequest,
+    ReceiveTransferPayload,
     RejectTransferOrderRequest,
-    CancelTransferOrderRequest
+    UpdateTransferOrderItemRequest,
+    UpdateTransferOrderRequest
 } from '@/types/transfer';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export const useTransferOrders = (params: { 
     sourceWarehouseId?: number; 
     destinationWarehouseId?: number; 
     status?: string; 
-}) => {
+}, enabled = true) => {
+    const companyId = useAuthStore((state) => state.user?.companyId);
+
     return useQuery({
-        queryKey: ['transfer-orders', params],
+        queryKey: ['transfer-orders', companyId, params],
         queryFn: () => getTransferOrders(params),
+        enabled: enabled && !!companyId,
     });
 };
 
 export const useTransferOrder = (id: number) => {
+    const companyId = useAuthStore((state) => state.user?.companyId);
+
     return useQuery({
-        queryKey: ['transfer-order', id],
+        queryKey: ['transfer-order', companyId, id],
         queryFn: () => getTransferOrderById(id),
-        enabled: !!id,
+        enabled: !!id && !!companyId,
     });
 };
 
@@ -50,8 +56,10 @@ export const useStartTransferPicking = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (id: number) => startTransferPicking(id),
-        onSuccess: (_, id) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
         },
     });
@@ -61,8 +69,10 @@ export const useMarkTransferPacked = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (id: number) => markTransferPacked(id),
-        onSuccess: (_, id) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
         },
     });
@@ -72,8 +82,10 @@ export const useShipTransfer = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (id: number) => shipTransfer(id),
-        onSuccess: (_, id) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
         },
     });
@@ -84,8 +96,10 @@ export const useReceiveTransfer = () => {
     return useMutation({
         mutationFn: ({ id, payload }: { id: number; payload: ReceiveTransferPayload }) => 
             receiveTransfer(id, payload),
-        onSuccess: (_, { id }) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
         },
     });
@@ -96,10 +110,12 @@ export const useReceiveTransfer = () => {
 // ==========================
 
 export const useCheckTransferAvailability = (id: number) => {
+    const companyId = useAuthStore((state) => state.user?.companyId);
+
     return useQuery({
-        queryKey: ['transfer-order-availability', id],
+        queryKey: ['transfer-order-availability', companyId, id],
         queryFn: () => checkTransferAvailability(id),
-        enabled: !!id,
+        enabled: !!id && !!companyId,
     });
 };
 
@@ -109,6 +125,7 @@ export const useCreateTransferOrder = () => {
         mutationFn: (payload: CreateTransferOrderRequest) => createTransferOrder(payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };
@@ -118,9 +135,10 @@ export const useUpdateTransferOrder = () => {
     return useMutation({
         mutationFn: ({ id, payload }: { id: number; payload: UpdateTransferOrderRequest }) => 
             updateTransferOrder(id, payload),
-        onSuccess: (_, { id }) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
             queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };
@@ -130,8 +148,10 @@ export const useAddTransferOrderItem = () => {
     return useMutation({
         mutationFn: ({ id, payload }: { id: number; payload: AddTransferOrderItemRequest }) => 
             addTransferOrderItem(id, payload),
-        onSuccess: (_, { id }) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };
@@ -141,8 +161,10 @@ export const useUpdateTransferOrderItem = () => {
     return useMutation({
         mutationFn: ({ id, itemId, payload }: { id: number; itemId: number; payload: UpdateTransferOrderItemRequest }) => 
             updateTransferOrderItem(id, itemId, payload),
-        onSuccess: (_, { id }) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };
@@ -152,8 +174,10 @@ export const useRemoveTransferOrderItem = () => {
     return useMutation({
         mutationFn: ({ id, itemId }: { id: number; itemId: number }) => 
             removeTransferOrderItem(id, itemId),
-        onSuccess: (_, { id }) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };
@@ -162,9 +186,10 @@ export const useSubmitTransferOrder = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (id: number) => submitTransferOrder(id),
-        onSuccess: (_, id) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
             queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };
@@ -173,9 +198,10 @@ export const useApproveTransferOrder = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (id: number) => approveTransferOrder(id),
-        onSuccess: (_, id) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
             queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };
@@ -185,9 +211,10 @@ export const useRejectTransferOrder = () => {
     return useMutation({
         mutationFn: ({ id, payload }: { id: number; payload: RejectTransferOrderRequest }) => 
             rejectTransferOrder(id, payload),
-        onSuccess: (_, { id }) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
             queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };
@@ -197,9 +224,10 @@ export const useCancelTransferOrder = () => {
     return useMutation({
         mutationFn: ({ id, payload }: { id: number; payload?: CancelTransferOrderRequest }) => 
             cancelTransferOrder(id, payload),
-        onSuccess: (_, { id }) => {
-            queryClient.invalidateQueries({ queryKey: ['transfer-order', id] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
             queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
         },
     });
 };

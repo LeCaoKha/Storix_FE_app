@@ -12,6 +12,14 @@ export interface TransferOrder {
     items?: TransferOrderItem[];
 }
 
+export interface TransferAvailability {
+    productId: number;
+    productName?: string;
+    requiredQuantity: number;
+    availableQuantity: number;
+    isEnough: boolean;
+}
+
 export interface TransferOrderItem {
     id: number;
     productId: number;

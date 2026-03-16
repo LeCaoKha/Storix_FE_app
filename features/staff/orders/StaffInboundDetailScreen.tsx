@@ -1,6 +1,7 @@
 import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +11,7 @@ import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 
 
 export default function StaffInboundDetailScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(staff-tabs)/tasks');
     const { id } = useLocalSearchParams<{ id: string }>();
     const { data: order, isLoading, error } = useInboundTicket(id);
     const updateItems = useUpdateInboundTicketItems();
@@ -46,7 +48,7 @@ export default function StaffInboundDetailScreen() {
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -95,7 +97,7 @@ export default function StaffInboundDetailScreen() {
             });
 
             AlertService.success('Thành công', allReceived ? 'Đã hoàn tất nhận hàng' : 'Đã lưu thông tin nhận hàng', () => {
-                router.back();
+                goBack();
             });
         } catch {
             AlertService.error('Lỗi', 'Không thể cập nhật số lượng');

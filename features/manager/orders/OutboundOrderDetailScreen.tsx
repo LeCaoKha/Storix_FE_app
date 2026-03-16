@@ -1,10 +1,12 @@
 import { Card, ScreenHeader } from '@/components';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useOutboundRequest, useOutboundTicket } from '@/hooks';
 import {
     useConfirmOutboundOrder,
     useUpdateOutboundRequestStatus,
 } from '@/hooks/outbound-orders.hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
@@ -19,6 +21,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Status config cho Request (chờ duyệt)
 type OutboundRequestStatusKey = 'Pending' | 'Approved' | 'Rejected';
@@ -50,9 +53,11 @@ const getTicketStatusConfig = (status?: string) => {
 
 export default function OutboundOrderDetailScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(manager-tabs)/orders');
     const { id, type = 'request' } = useLocalSearchParams<{ id: string; type?: 'request' | 'ticket' }>();
     const { user } = useAuthStore();
     const [isProcessing, setIsProcessing] = useState(false);
+    const insets = useSafeAreaInsets();
 
     // Export handler
     const handleExport = (format: 'csv' | 'excel') => {
@@ -93,7 +98,7 @@ export default function OutboundOrderDetailScreen() {
                 <View style={styles.errorContainer}>
                     <Feather name="alert-circle" size={64} color={COLORS.border} />
                     <Text style={styles.errorTitle}>Không tìm thấy đơn xuất kho</Text>
-                    <TouchableOpacity onPress={() => router.back()}>
+                    <TouchableOpacity onPress={goBack}>
                         <Text style={styles.backLink}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -123,7 +128,7 @@ export default function OutboundOrderDetailScreen() {
                         status: 'Approved',
                     });
                     AlertService.success('Thành công', 'Yêu cầu đã được duyệt', () => {
-                        router.back();
+                        goBack();
                     });
                 } catch {
                     AlertService.error('Lỗi', 'Không thể duyệt yêu cầu. Vui lòng thử lại.');
@@ -148,7 +153,7 @@ export default function OutboundOrderDetailScreen() {
                         status: 'Rejected',
                     });
                     AlertService.success('Thành công', 'Yêu cầu đã bị từ chối', () => {
-                        router.back();
+                        goBack();
                     });
                 } catch {
                     AlertService.error('Lỗi', 'Không thể từ chối yêu cầu. Vui lòng thử lại.');
@@ -180,7 +185,7 @@ export default function OutboundOrderDetailScreen() {
                         performedBy: user?.id ?? 0,
                     });
                     AlertService.success('Thành công', 'Đơn xuất kho đã hoàn tất', () => {
-                        router.back();
+                        goBack();
                     });
                 } catch {
                     AlertService.error('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
@@ -202,7 +207,7 @@ export default function OutboundOrderDetailScreen() {
                 subtitle={isRequest ? `REQ-${data.id}` : `OUT-${data.id}`}
             />
 
-            <ScrollView style={styles.content}>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
                 {/* Status Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -334,7 +339,7 @@ export default function OutboundOrderDetailScreen() {
 
             {/* Info for Manager: waiting for Admin approval */}
             {isRequest && data.status === 'Pending' && !isAdmin && (
-                <View style={styles.actionBar}>
+                <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                     <View style={[styles.actionButton, { backgroundColor: '#FFF9E6', borderWidth: 1, borderColor: '#F6C90E40' }]}>
                         <Feather name="clock" size={16} color="#B8860B" />
                         <Text style={{ color: '#B8860B', fontWeight: '600', fontSize: 14 }}>
@@ -346,7 +351,7 @@ export default function OutboundOrderDetailScreen() {
 
             {/* Action Buttons */}
             {(canApproveReject || canCreateTicket || canConfirmComplete) && (
-                <View style={styles.actionBar}>
+                <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                     {canApproveReject && (
                         <View style={styles.actionRow}>
                             <TouchableOpacity

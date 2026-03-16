@@ -1,24 +1,27 @@
 import { TabScreenHeader, TransferCard } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useTransferOrders } from '@/hooks/transfer.hooks';
+import { useAuthStore } from '@/stores/auth.store';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const TABS: { key: string; label: string }[] = [
     { key: 'all', label: 'Tất cả' },
-    { key: 'Draft', label: 'Bản nháp' },
-    { key: 'Submitted', label: 'Chờ duyệt' },
-    { key: 'Approved', label: 'Đã duyệt' },
-    { key: 'Picking', label: 'Đang lấy hàng' },
-    { key: 'Shipped', label: 'Đang giao' },
-    { key: 'Completed', label: 'Hoàn thành' },
+    { key: 'DRAFT', label: 'Bản nháp' },
+    { key: 'PENDING_APPROVAL', label: 'Chờ duyệt' },
+    { key: 'APPROVED', label: 'Đã duyệt' },
+    { key: 'PICKING', label: 'Đang lấy hàng' },
+    { key: 'IN_TRANSIT', label: 'Đang giao' },
+    { key: 'COMPLETED', label: 'Hoàn thành' },
 ];
 
 export default function TransferListScreen() {
     const router = useRouter();
-    const { data: transfers = [], isLoading } = useTransferOrders({});
+    const roleId = useAuthStore((state) => state.user?.roleId);
+    const canAccessTransfers = roleId === 3 || roleId === 4;
+    const { data: transfers = [], isLoading } = useTransferOrders({}, canAccessTransfers);
     const [activeTab, setActiveTab] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -100,7 +103,15 @@ export default function TransferListScreen() {
             </TabScreenHeader>
 
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-                {isLoading ? (
+                {!canAccessTransfers ? (
+                    <View style={styles.emptyState}>
+                        <Feather name="lock" size={64} color={COLORS.border} />
+                        <Text style={styles.emptyTitle}>Không có quyền truy cập</Text>
+                        <Text style={styles.emptyText}>
+                            Tài khoản hiện tại không có quyền sử dụng chức năng luân chuyển kho.
+                        </Text>
+                    </View>
+                ) : isLoading ? (
                     <View style={styles.loadingState}>
                         <ActivityIndicator size="large" color={COLORS.primary} />
                         <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
@@ -146,12 +157,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
     },
     tabsScroll: {
-        maxHeight: 50,
+        marginHorizontal: -4,
     },
     tabsContainer: {
         paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 12,
+        paddingTop: 8,
+        paddingBottom: 8,
     },
     tab: {
         flexDirection: 'row',

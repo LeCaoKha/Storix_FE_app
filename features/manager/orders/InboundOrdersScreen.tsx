@@ -243,6 +243,7 @@ export default function InboundOrdersScreen() {
                 searchPlaceholder="Tìm theo mã đơn, nhà cung cấp..."
                 searchValue={searchQuery}
                 onSearchChange={setSearchQuery}
+                useTopSafeArea={false}
             >
                 {/* View toggle: Requests vs Tickets */}
                 <View style={styles.viewToggle}>
@@ -390,10 +391,11 @@ const styles = StyleSheet.create({
         color: COLORS.primary,
     },
     tabsScroll: {
-        maxHeight: 50,
+        marginHorizontal: -4,
     },
     tabsContainer: {
-        paddingBottom: 4,
+        paddingTop: 8,
+        paddingBottom: 8,
     },
     tab: {
         flexDirection: 'row',

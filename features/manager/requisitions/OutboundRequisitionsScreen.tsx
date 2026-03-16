@@ -79,6 +79,7 @@ export default function OutboundRequisitionsScreen() {
                 searchPlaceholder="Tìm theo mã phiếu, SKU, mục đích..."
                 searchValue={searchQuery}
                 onSearchChange={setSearchQuery}
+                useTopSafeArea={false}
             >
                 {/* Tabs */}
                 <ScrollView
@@ -154,12 +155,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
     },
     tabsScroll: {
-        maxHeight: 50,
+        marginHorizontal: -4,
     },
     tabsContainer: {
         paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 12,
+        paddingTop: 8,
+        paddingBottom: 8,
     },
     tab: {
         flexDirection: 'row',

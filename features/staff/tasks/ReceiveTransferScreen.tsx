@@ -1,15 +1,20 @@
 import { Button, Card, ScreenHeader } from '@/components';
+import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
-import { useTransferOrder, useReceiveTransfer } from '@/hooks/transfer.hooks';
+import { useReceiveTransfer, useTransferOrder } from '@/hooks/transfer.hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { ReceiveTransferItemRequest, ReceiveTransferOrderRequest } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReceiveTransferScreen() {
     const router = useRouter();
+    const goBack = useAppBack('/(staff-tabs)/tasks');
+    const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const transferId = parseInt(id || '0', 10);
 
@@ -50,7 +55,7 @@ export default function ReceiveTransferScreen() {
                 <View style={styles.errorContainer}>
                     <Feather name="alert-circle" size={64} color={COLORS.border} />
                     <Text style={styles.errorTitle}>Lỗi tải dữ liệu</Text>
-                    <Button title="Quay lại" onPress={() => router.back()} />
+                    <Button title="Quay lại" onPress={goBack} />
                 </View>
             </View>
         );
@@ -80,7 +85,7 @@ export default function ReceiveTransferScreen() {
             {
                 onSuccess: () => {
                     AlertService.success('Thành công', 'Đã lưu thông tin nhận hàng.');
-                    router.back();
+                    goBack();
                 },
                 onError: (error: any) => {
                     AlertService.error('Lỗi', error.response?.data?.message || 'Không thể xác nhận.');
@@ -131,7 +136,7 @@ export default function ReceiveTransferScreen() {
                 subtitle={`Phiếu #${transfer.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}>
                 <Card style={styles.card}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={20} color={COLORS.primary} />
@@ -165,11 +170,9 @@ export default function ReceiveTransferScreen() {
                         numberOfLines={3}
                     />
                 </Card>
-
-                <View style={{ height: 100 }} />
             </ScrollView>
 
-            <View style={styles.actionBar}>
+            <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
                 <Button 
                     title="Xác nhận & Lưu" 
                     onPress={handleReceive} 
