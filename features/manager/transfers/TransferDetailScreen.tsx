@@ -10,7 +10,8 @@ import {
     useRejectTransferOrder,
     useRemoveTransferOrderItem,
     useSubmitTransferOrder,
-    useTransferOrder
+    useTransferOrder,
+    useUpdateTransferOrderItem
 } from '@/hooks/transfer.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
@@ -37,11 +38,13 @@ export default function TransferDetailScreen() {
     const rejectMutation = useRejectTransferOrder();
     const cancelMutation = useCancelTransferOrder();
     const addItemMutation = useAddTransferOrderItem();
+    const updateItemMutation = useUpdateTransferOrderItem();
     const removeItemMutation = useRemoveTransferOrderItem();
 
     const [reason, setReason] = useState('');
     const [showReasonInput, setShowReasonInput] = useState<'reject' | 'cancel' | null>(null);
     const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+    const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
 
     if (isLoading) {
         return (
@@ -82,6 +85,7 @@ export default function TransferDetailScreen() {
 
     const statusColor = getStatusColor(transfer.status);
     const normalizedStatus = transfer.status.toLowerCase();
+    const canEditTransfer = normalizedStatus === 'draft' || normalizedStatus === 'rejected';
     const hasItems = (transfer.items || []).length > 0;
     const availabilityIssues = availability.filter((item) => !item.isEnough);
 
@@ -150,6 +154,32 @@ export default function TransferDetailScreen() {
         });
     };
 
+    const handleUpdateItemQuantity = (item: TransferOrderItem, nextQuantity: number) => {
+        if (!canEditTransfer || !item.productId || nextQuantity <= 0) {
+            return;
+        }
+
+        setUpdatingItemId(item.id);
+        updateItemMutation.mutate(
+            {
+                id: transferId,
+                itemId: item.id,
+                payload: {
+                    productId: item.productId,
+                    quantity: nextQuantity,
+                },
+            },
+            {
+                onError: (error: any) => {
+                    AlertService.error('Lỗi', error.response?.data?.message || 'Không thể cập nhật số lượng.');
+                },
+                onSettled: () => {
+                    setUpdatingItemId(null);
+                },
+            }
+        );
+    };
+
     const handleRemoveItem = (itemId: number) => {
         Alert.alert('Xác nhận', 'Bạn có chắc chắn muốn xóa sản phẩm này khỏi phiếu?', [
             { text: 'Hủy', style: 'cancel' },
@@ -192,13 +222,33 @@ export default function TransferDetailScreen() {
                     <Text style={styles.productName} numberOfLines={1}>{item.productName || `Sản phẩm #${item.productId}`}</Text>
                     <Text style={styles.itemSku}>SKU: {item.sku || 'N/A'}</Text>
                 </View>
-                <View style={styles.qtyBadge}>
-                    <Text style={styles.quantityText}>{item.quantity}</Text>
-                </View>
-                {normalizedStatus === 'draft' && (
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleRemoveItem(item.id)}>
-                        <Feather name="trash-2" size={18} color={COLORS.danger} />
-                    </TouchableOpacity>
+                {canEditTransfer ? (
+                    <View style={styles.itemActionsWrap}>
+                        <View style={styles.qtyEditor}>
+                            <TouchableOpacity
+                                style={styles.qtyActionBtn}
+                                onPress={() => handleUpdateItemQuantity(item, Math.max(1, item.quantity - 1))}
+                                disabled={updatingItemId === item.id || item.quantity <= 1}
+                            >
+                                <Feather name="minus" size={14} color={COLORS.primary} />
+                            </TouchableOpacity>
+                            <Text style={styles.quantityText}>{item.quantity}</Text>
+                            <TouchableOpacity
+                                style={styles.qtyActionBtn}
+                                onPress={() => handleUpdateItemQuantity(item, item.quantity + 1)}
+                                disabled={updatingItemId === item.id}
+                            >
+                                <Feather name="plus" size={14} color={COLORS.primary} />
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleRemoveItem(item.id)}>
+                            <Feather name="trash-2" size={18} color={COLORS.danger} />
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View style={styles.qtyBadge}>
+                        <Text style={styles.quantityText}>{item.quantity}</Text>
+                    </View>
                 )}
             </View>
         </View>
@@ -288,7 +338,7 @@ export default function TransferDetailScreen() {
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         <Text style={styles.itemCount}>{(transfer.items || []).length} mặt hàng</Text>
-                        {normalizedStatus === 'draft' && (
+                        {canEditTransfer && (
                             <TouchableOpacity onPress={() => setIsAddModalVisible(true)} style={styles.addBtnSmall}>
                                 <Feather name="plus" size={16} color={COLORS.primary} />
                                 <Text style={styles.addBtnTextSmall}>Thêm</Text>
@@ -308,7 +358,7 @@ export default function TransferDetailScreen() {
                         <View style={styles.emptyItemsContainer}>
                             <Feather name="package" size={32} color={COLORS.border} />
                             <Text style={styles.emptyItemsText}>Chưa có sản phẩm nào được thêm vào phiếu.</Text>
-                            {normalizedStatus === 'draft' && (
+                            {canEditTransfer && (
                                 <Button 
                                     title="Thêm sản phẩm ngay" 
                                     variant="outline" 
@@ -363,6 +413,13 @@ export default function TransferDetailScreen() {
                             </TouchableOpacity>
                             <TouchableOpacity style={[styles.actionButton, styles.primaryBtn, (!hasItems || submitMutation.isPending) && styles.actionButtonDisabled]} onPress={handleSubmit} disabled={!hasItems || submitMutation.isPending}>
                                 <Text style={styles.primaryBtnText}>{submitMutation.isPending ? 'Đang...' : 'Trình duyệt'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                    {normalizedStatus === 'rejected' && (
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity style={[styles.actionButton, styles.primaryBtn, (!hasItems || submitMutation.isPending) && styles.actionButtonDisabled]} onPress={handleSubmit} disabled={!hasItems || submitMutation.isPending}>
+                                <Text style={styles.primaryBtnText}>{submitMutation.isPending ? 'Đang...' : 'Trình duyệt lại'}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -605,6 +662,28 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 8,
+    },
+    itemActionsWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    qtyEditor: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 8,
+        paddingHorizontal: 6,
+        paddingVertical: 4,
+        gap: 8,
+    },
+    qtyActionBtn: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     quantityText: {
         fontSize: 13,

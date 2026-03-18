@@ -5,6 +5,7 @@ import {
     ReceiveTransferPayload,
     RejectTransferOrderRequest,
     TransferAvailability, TransferOrder,
+    TransferQualityCheckPayload,
     UpdateTransferOrderItemRequest,
     UpdateTransferOrderRequest
 } from '@/types/transfer';
@@ -88,6 +89,14 @@ export const shipTransfer = async (id: number) => {
  */
 export const receiveTransfer = async (id: number, payload: ReceiveTransferPayload) => {
     const res = await api.post(`/api/warehouse-transfers/${id}/receive`, payload);
+    return res.data;
+};
+
+/**
+ * Staff: Kiểm tra chất lượng sau khi nhận hàng
+ */
+export const qualityCheckTransfer = async (id: number, payload: TransferQualityCheckPayload) => {
+    const res = await api.post(`/api/warehouse-transfers/${id}/quality-check`, payload);
     return res.data;
 };
 

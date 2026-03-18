@@ -7,6 +7,7 @@ import {
     getTransferOrderById,
     getTransferOrders,
     markTransferPacked,
+    qualityCheckTransfer,
     receiveTransfer,
     rejectTransferOrder,
     removeTransferOrderItem,
@@ -23,6 +24,7 @@ import {
     CreateTransferOrderRequest,
     ReceiveTransferPayload,
     RejectTransferOrderRequest,
+    TransferQualityCheckPayload,
     UpdateTransferOrderItemRequest,
     UpdateTransferOrderRequest
 } from '@/types/transfer';
@@ -96,6 +98,20 @@ export const useReceiveTransfer = () => {
     return useMutation({
         mutationFn: ({ id, payload }: { id: number; payload: ReceiveTransferPayload }) => 
             receiveTransfer(id, payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['transfer-order-availability'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        },
+    });
+};
+
+export const useQualityCheckTransfer = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, payload }: { id: number; payload: TransferQualityCheckPayload }) =>
+            qualityCheckTransfer(id, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['transfer-order'] });
             queryClient.invalidateQueries({ queryKey: ['transfer-orders'] });

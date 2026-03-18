@@ -28,21 +28,44 @@ export interface TransferOrderItem {
     quantity: number;
 }
 
-export interface ReceiveTransferPayload {
-    receivedBy: number;
+export interface ReceiveTransferItemRequest {
+    productId: number;
+    receivedQuantity: number;
+    damagedQuantity?: number;
+}
+
+export interface ReceiveTransferOrderRequest {
     note?: string;
-    items: { productId: number; receivedQuantity: number }[];
+    items: ReceiveTransferItemRequest[];
+}
+
+// Backward-compatible alias for existing hook/service signatures.
+export type ReceiveTransferPayload = ReceiveTransferOrderRequest;
+
+export interface TransferQualityCheckItemRequest {
+    productId: number;
+    okQuantity: number;
+    badQuantity: number;
+    note?: string;
+}
+
+export interface TransferQualityCheckPayload {
+    note?: string;
+    items: TransferQualityCheckItemRequest[];
 }
 
 // Manager Actions
 export interface CreateTransferOrderRequest {
     sourceWarehouseId: number;
     destinationWarehouseId: number;
+    carrierUserId?: number;
     submitAfterCreate?: boolean;
 }
 
 export interface UpdateTransferOrderRequest {
+    sourceWarehouseId?: number;
     destinationWarehouseId?: number;
+    carrierUserId?: number;
     referenceCode?: string;
 }
 
@@ -52,6 +75,7 @@ export interface AddTransferOrderItemRequest {
 }
 
 export interface UpdateTransferOrderItemRequest {
+    productId: number;
     quantity: number;
 }
 
