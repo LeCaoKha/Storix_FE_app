@@ -247,7 +247,7 @@ export default function OutboundDetailScreen() {
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
                     style={styles.warehouseCard}
-                    onPress={() => router.push('/(staff-tabs)/warehouse')}
+                    onPress={() => router.push('/(staff-tabs)/tasks/warehouse')}
                 >
                     <View style={styles.warehouseIconWrap}>
                         <Feather name="map" size={18} color={COLORS.primary} />

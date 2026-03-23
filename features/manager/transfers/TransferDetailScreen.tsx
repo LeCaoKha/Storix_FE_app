@@ -317,6 +317,22 @@ export default function TransferDetailScreen() {
                     </View>
                 </Card>
 
+                {/* Warehouse Location Shortcut */}
+                <TouchableOpacity
+                    style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}
+                    onPress={() => router.push('/(manager-tabs)/transfers/warehouse')}
+                >
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primary + '10', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                        <Feather name="map" size={18} color={COLORS.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.slate800 }}>Sơ đồ kho</Text>
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>Nhấn để xem vị trí trên sơ đồ</Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+                </TouchableOpacity>
+
+
                 {normalizedStatus === 'pending_approval' && (
                     <>
                         <View style={styles.sectionHeader}>

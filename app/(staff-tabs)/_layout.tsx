@@ -39,8 +39,15 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="warehouse"
                 options={{
-                    title: "Warehouse",
+                    title: "Sơ đồ kho",
+                    href: "/(staff-tabs)/warehouse",
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                }}
+            />
+            {/* Hide nested warehouse from tab bar but keep it in stack */}
+            <Tabs.Screen
+                name="tasks/warehouse"
+                options={{
                     href: null,
                 }}
             />

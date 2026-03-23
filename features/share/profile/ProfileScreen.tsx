@@ -63,7 +63,10 @@ export default function ProfileScreen() {
             icon: 'map',
             title: 'Sơ đồ kho',
             subtitle: 'Xem sơ đồ mặt bằng kho',
-            onPress: () => router.push('/(staff-tabs)/warehouse' as any),
+            onPress: () => {
+                const targetPath = user?.roleId === 4 ? '/(staff-tabs)/warehouse' : '/(manager-tabs)/warehouse';
+                router.push(targetPath as any);
+            },
         },
         {
             icon: 'lock',

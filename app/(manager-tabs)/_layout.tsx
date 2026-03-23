@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ManagerTabLayout() {
     const roleId = useAuthStore((state) => state.user?.roleId);
-    const canAccessTransfers = roleId === 3 || roleId === 4;
+    const canAccessTransfers = roleId === 2 || roleId === 3 || roleId === 4;
     const insets = useSafeAreaInsets();
 
     return (
@@ -41,6 +41,36 @@ export default function ManagerTabLayout() {
                     href: canAccessTransfers ? '/(manager-tabs)/transfers' : null,
                     title: "Luân Chuyển",
                     tabBarIcon: ({ color }) => <Feather name="repeat" size={28} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="warehouse"
+                options={{
+                    href: '/(manager-tabs)/warehouse',
+                    title: "Sơ đồ kho",
+                    tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                }}
+            />
+            {/* Hidden stack versions of warehouse for Back button support */}
+            <Tabs.Screen
+                name="transfers/warehouse"
+                options={{
+                    href: null,
+                    tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="requisitions/warehouse"
+                options={{
+                    href: null,
+                    tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="orders/warehouse"
+                options={{
+                    href: null,
+                    tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
                 }}
             />
             <Tabs.Screen

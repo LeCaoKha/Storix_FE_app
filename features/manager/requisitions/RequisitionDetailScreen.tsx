@@ -193,6 +193,23 @@ export default function RequisitionDetailScreen() {
                     ) : null}
                 </Card>
 
+                {/* Warehouse Location Shortcut */}
+                <TouchableOpacity
+                    onPress={() => router.push('/(manager-tabs)/requisitions/warehouse')}
+                >
+                    <Card style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
+                        <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primary + '10', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            <Feather name="map" size={18} color={COLORS.primary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.slate800 }}>Sơ đồ kho</Text>
+                            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>Nhấn để xem vị trí trên sơ đồ</Text>
+                        </View>
+                        <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+                    </Card>
+                </TouchableOpacity>
+
+
                 {/* Items */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>

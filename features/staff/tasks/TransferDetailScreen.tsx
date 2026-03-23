@@ -3,6 +3,7 @@ import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import {
     useMarkTransferPacked,
+    useQualityCheckTransfer,
     useShipTransfer,
     useStartTransferPicking,
     useTransferOrder
@@ -11,7 +12,7 @@ import { TransferOrderItem } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function StaffTransferDetailScreen() {
@@ -26,6 +27,7 @@ export default function StaffTransferDetailScreen() {
     const startPickingMutation = useStartTransferPicking();
     const markPackedMutation = useMarkTransferPacked();
     const shipMutation = useShipTransfer();
+    const qualityCheckMutation = useQualityCheckTransfer();
 
     if (isLoading) {
         return (
@@ -64,6 +66,32 @@ export default function StaffTransferDetailScreen() {
 
     const handleReceive = () => {
         router.push(`/(staff-tabs)/tasks/transfer/receive/${transferId}` as any);
+    };
+
+    const handleQualityCheck = () => {
+        if (!transfer?.items) return;
+
+        const qualityCheckItems = transfer.items.map(item => ({
+            productId: item.productId,
+            okQuantity: item.quantity,
+            badQuantity: 0,
+            note: 'Confirmed on mobile'
+        }));
+
+        qualityCheckMutation.mutate(
+            { 
+                id: transferId, 
+                payload: { 
+                    note: 'Staff confirmed quality check on mobile',
+                    items: qualityCheckItems
+                } 
+            },
+            {
+                onSuccess: () => {
+                    // Logic refresh query đã có trong hook
+                }
+            }
+        );
     };
 
     // Render Items
@@ -134,6 +162,22 @@ export default function StaffTransferDetailScreen() {
                     </View>
                 </Card>
 
+                {/* Warehouse Location Shortcut */}
+                <TouchableOpacity
+                    style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}
+                    onPress={() => router.push('/(staff-tabs)/tasks/warehouse')}
+                >
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primary + '10', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                        <Feather name="map" size={18} color={COLORS.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.slate800 }}>Sơ đồ kho</Text>
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>Nhấn để xem vị trí trên sơ đồ</Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+                </TouchableOpacity>
+
+
                 {/* Items */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Danh sách sản phẩm ({transfer.items?.length || 0})</Text>
@@ -175,6 +219,15 @@ export default function StaffTransferDetailScreen() {
                     <Button 
                         title="Kiểm nhận hàng" 
                         onPress={handleReceive} 
+                    />
+                )}
+                {(normalizedStatus === 'received' || normalizedStatus === 'received_partial') && (
+                    <Button 
+                        title="Xác nhận kiểm hàng" 
+                        onPress={handleQualityCheck}
+                        loading={qualityCheckMutation.isPending}
+                        variant="outline"
+                        style={{ marginTop: 8 }}
                     />
                 )}
                 {normalizedStatus === 'completed' && (
