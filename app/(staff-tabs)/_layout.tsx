@@ -40,7 +40,7 @@ export default function StaffTabLayout() {
                 name="warehouse"
                 options={{
                     title: "Sơ đồ kho",
-                    href: "/(staff-tabs)/warehouse",
+                    href: null,
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
                 }}
             />
@@ -49,6 +49,7 @@ export default function StaffTabLayout() {
                 name="tasks/warehouse"
                 options={{
                     href: null,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             <Tabs.Screen

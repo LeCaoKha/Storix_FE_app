@@ -46,7 +46,7 @@ export default function ManagerTabLayout() {
             <Tabs.Screen
                 name="warehouse"
                 options={{
-                    href: '/(manager-tabs)/warehouse',
+                    href: null,
                     title: "Sơ đồ kho",
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
                 }}
@@ -57,6 +57,7 @@ export default function ManagerTabLayout() {
                 options={{
                     href: null,
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             <Tabs.Screen
@@ -64,6 +65,7 @@ export default function ManagerTabLayout() {
                 options={{
                     href: null,
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             <Tabs.Screen
@@ -71,6 +73,7 @@ export default function ManagerTabLayout() {
                 options={{
                     href: null,
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             <Tabs.Screen

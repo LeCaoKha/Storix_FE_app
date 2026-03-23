@@ -27,7 +27,7 @@ export default function TransferDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const transferId = parseInt(id || '0', 10);
     const insets = useSafeAreaInsets();
-    const goBack = useAppBack('/(manager-tabs)/transfers');
+    const goBack = useAppBack();
 
     const { data: transfer, isLoading } = useTransferOrder(transferId);
     const { data: availability = [], isLoading: isCheckingAvailability } = useCheckTransferAvailability(transferId);
@@ -320,7 +320,7 @@ export default function TransferDetailScreen() {
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
                     style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}
-                    onPress={() => router.push('/(manager-tabs)/transfers/warehouse')}
+                    onPress={() => router.push('/warehouse-view')}
                 >
                     <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primary + '10', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
                         <Feather name="map" size={18} color={COLORS.primary} />

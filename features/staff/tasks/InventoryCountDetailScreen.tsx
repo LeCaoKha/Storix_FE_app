@@ -2,7 +2,7 @@ import { Card, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useStockCountTicket, useUpdateStockCountItem } from '@/hooks/stock-count.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
-import { StockCountItem } from '@/services/stock-count.api';
+import type { StockCountItem } from '@/types/stock-count';
 import { AlertService } from '@/stores/alert.store';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InventoryCountDetailScreen() {
     const router = useRouter();
-    const goBack = useAppBack('/(staff-tabs)/tasks');
+    const goBack = useAppBack();
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const ticketId = parseInt(id || '0');
@@ -143,7 +143,7 @@ export default function InventoryCountDetailScreen() {
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
                     style={styles.warehouseCard}
-                    onPress={() => router.push('/(staff-tabs)/tasks/warehouse')}
+                    onPress={() => router.push('/warehouse-view')}
                 >
                     <View style={styles.warehouseIconWrap}>
                         <Feather name="map" size={18} color={COLORS.primary} />
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#fff',
-        marginHorizontal: 16,
+        marginHorizontal: 0,
         marginBottom: 16,
         padding: 14,
         borderRadius: 16,

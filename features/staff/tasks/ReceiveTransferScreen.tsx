@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReceiveTransferScreen() {
     const router = useRouter();
-    const goBack = useAppBack('/(staff-tabs)/tasks');
+    const goBack = useAppBack();
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const transferId = parseInt(id || '0', 10);

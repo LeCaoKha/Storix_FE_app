@@ -27,14 +27,14 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
   onShelfPress,
 }) => {
   const [selectedZone, setSelectedZone] = useState<string | null>(
-    structure.zones?.[0]?.id || null
+    (structure.zones ?? [])[0]?.id || null
   );
 
-  const currentZone = structure.zones?.find((z) => z.id === selectedZone);
+  const currentZone = (structure.zones ?? []).find((z) => z.id === selectedZone);
 
   const renderBinGrid = (shelf: Shelf, zone: WarehouseZone) => {
     // Use actual data from API
-    const levels = shelf.levels || [];
+    const levels = shelf.levels ?? [];
     
     if (levels.length === 0) {
       return (
@@ -69,7 +69,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
           <Text style={styles.rackTitle}>{shelf.code}</Text>
           <View style={styles.rackStats}>
             <Text style={styles.rackStatsText}>
-              {levels.length}L · {levels.reduce((acc, level) => acc + level.bins.length, 0)}B
+              {levels.length}L · {levels.reduce((acc, level) => acc + (level.bins?.length ?? 0), 0)}B
             </Text>
           </View>
           <TouchableOpacity
@@ -91,7 +91,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
               
               {/* Bins in this level */}
               <View style={styles.binRow}>
-                {level.bins.map((bin) => {
+                {(level.bins ?? []).map((bin) => {
                   const isHighlighted = highlightedShelf === shelf.id;
 
                   return (
@@ -127,7 +127,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.zoneTabsContent}
           >
-            {structure.zones.map((zone) => (
+            {(structure.zones ?? []).map((zone) => (
               <TouchableOpacity
                 key={zone.id}
                 style={[
@@ -155,7 +155,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
         <View style={styles.legendItem}>
           <Feather name="package" size={14} color="#64748B" />
           <Text style={styles.legendText}>
-            {currentZone?.shelves?.reduce((acc, s) => acc + s.levels.length, 0) || 0} Levels
+            {currentZone?.shelves?.reduce((acc, s) => acc + (s.levels?.length ?? 0), 0) || 0} Levels
           </Text>
         </View>
         <View style={styles.legendDivider} />
@@ -163,7 +163,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
           <Feather name="grid" size={14} color="#64748B" />
           <Text style={styles.legendText}>
             {currentZone?.shelves?.reduce(
-              (acc, s) => acc + s.levels.reduce((sum, l) => sum + l.bins.length, 0),
+              (acc, s) => acc + (s.levels ?? []).reduce((sum, l) => sum + (l.bins?.length ?? 0), 0),
               0
             ) || 0}{' '}
             Bins

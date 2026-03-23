@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PutawayDetailScreen() {
     const router = useRouter();
-    const goBack = useAppBack('/(staff-tabs)/tasks');
+    const goBack = useAppBack();
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const user = useAuthStore((state) => state.user);
@@ -147,7 +147,7 @@ export default function PutawayDetailScreen() {
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
                     style={styles.warehouseCard}
-                    onPress={() => router.push('/(staff-tabs)/tasks/warehouse')}
+                    onPress={() => router.push('/warehouse-view')}
                 >
                     <View style={styles.warehouseIconWrap}>
                         <Feather name="map" size={18} color={COLORS.primary} />

@@ -74,14 +74,14 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       maxY = Math.max(maxY, y + r);
     };
 
-    structure.zones?.forEach((zone) => {
+    (structure.zones ?? []).forEach((zone) => {
       includeRect(zone.x, zone.y, zone.width, zone.height);
-      zone.shelves?.forEach((shelf) => {
+      (zone.shelves ?? []).forEach((shelf) => {
         includeRect(shelf.x, shelf.y, shelf.width, shelf.height);
       });
     });
 
-    structure.nodes?.forEach((node) => includePoint(node.x, node.y, node.radius ?? 2));
+    (structure.nodes ?? []).forEach((node) => includePoint(node.x, node.y, node.radius ?? 2));
 
     if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
       minX = 0;
@@ -109,7 +109,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, NavigationNode>();
-    structure.nodes?.forEach(node => map.set(node.id, node));
+    (structure.nodes ?? []).forEach(node => map.set(node.id, node));
     return map;
   }, [structure.nodes]);
 
@@ -183,8 +183,8 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       const mapY = (event.y - translateY.value) / scale.value;
 
       let hitSomething = false;
-      structure.zones?.forEach(zone => {
-        zone.shelves?.forEach(shelf => {
+      (structure.zones ?? []).forEach(zone => {
+        (zone.shelves ?? []).forEach(shelf => {
           if (mapX >= shelf.x && mapX <= shelf.x + shelf.width &&
             mapY >= shelf.y && mapY <= shelf.y + shelf.height) {
             hitSomething = true;
@@ -196,7 +196,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       });
 
       if (!hitSomething && onZonePress) {
-        structure.zones?.forEach(zone => {
+        (structure.zones ?? []).forEach(zone => {
           if (mapX >= zone.x && mapX <= zone.x + zone.width &&
             mapY >= zone.y && mapY <= zone.y + zone.height) {
             runOnJS(onZonePress)(zone);
@@ -339,14 +339,14 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           <Rect
             x={zone.x + 12}
             y={zone.y + 12}
-            width={Math.max(zone.code.length * 8 + 35, 65)}
+            width={Math.max((zone.code?.length ?? 0) * 8 + 35, 65)}
             height={24}
             rx={12}
             fill={COLORS.primary}
             opacity={0.15}
           />
           <SvgText
-            x={zone.x + 12 + Math.max(zone.code.length * 8 + 35, 65) / 2}
+            x={zone.x + 12 + Math.max((zone.code?.length ?? 0) * 8 + 35, 65) / 2}
             y={zone.y + 24}
             fontSize={11}
             fill={COLORS.primary}
@@ -354,11 +354,11 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             textAnchor="middle"
             alignmentBaseline="middle"
           >
-            {zone.code.toLowerCase().includes('zone') ? zone.code : `Zone ${zone.code}`}
+            {zone.code ? (zone.code.toLowerCase().includes('zone') ? zone.code : `Zone ${zone.code}`) : 'Khu vực'}
           </SvgText>
         </G>
 
-        {zone.shelves?.map((shelf) => renderShelf(shelf, zone))}
+        {(zone.shelves ?? []).map((shelf) => renderShelf(shelf, zone))}
       </G>
     );
   };
@@ -404,13 +404,13 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
               <Rect width="100%" height="100%" fill="url(#grid)" />
 
-              {structure.zones?.map(renderZone)}
+              {(structure.zones ?? []).map(renderZone)}
               {renderPath()}
 
               {showNodes && (
                 <G>
                   {/* Các điểm mốc (Nodes) */}
-                  {structure.nodes?.map((node) => (
+                  {(structure.nodes ?? []).map((node) => (
                     <Circle 
                       key={`node-${node.id}`} 
                       cx={node.x} 

@@ -195,7 +195,7 @@ export default function RequisitionDetailScreen() {
 
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
-                    onPress={() => router.push('/(manager-tabs)/requisitions/warehouse')}
+                    onPress={() => router.push('/warehouse-view')}
                 >
                     <Card style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
                         <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primary + '10', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>

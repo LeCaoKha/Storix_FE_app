@@ -16,7 +16,7 @@ export default function InboundDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
-    const goBack = useAppBack('/(staff-tabs)/tasks');
+    const goBack = useAppBack();
     const user = useAuthStore((state) => state.user);
     const companyId = user?.companyId ?? 0;
     const staffId = user?.id ?? 0;
@@ -176,7 +176,7 @@ export default function InboundDetailScreen() {
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
                     style={styles.warehouseCard}
-                    onPress={() => router.push('/(staff-tabs)/tasks/warehouse')}
+                    onPress={() => router.push('/warehouse-view')}
                 >
                     <View style={styles.warehouseIconWrap}>
                         <Feather name="map" size={18} color={COLORS.primary} />
@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#fff',
-        marginHorizontal: 16,
+        marginHorizontal: 0,
         marginBottom: 16,
         padding: 14,
         borderRadius: 16,
