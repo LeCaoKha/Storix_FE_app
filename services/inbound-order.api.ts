@@ -1,15 +1,15 @@
 import type {
-  CreateInboundRequestPayload,
-  InboundOrder,
-  UpdateInboundItemPayload
+    CreateInboundRequestPayload,
+    InboundItemStorageRecommendations,
+    InboundOrder,
+    UpdateInboundItemPayload
 } from '@/types/inbound-order';
 import { api } from './axios.instance';
 
 // Re-export types để tiện sử dụng
 export type {
-  CreateInboundRequestPayload, InboundOrder,
-  InboundOrderItem,
-  InboundRequest, UpdateInboundItemPayload, UpdateInboundRequestStatusPayload
+    CreateInboundRequestPayload, InboundItemStorageRecommendations, InboundOrder, InboundOrderItem,
+    InboundRequest, UpdateInboundItemPayload, UpdateInboundRequestStatusPayload
 } from '@/types/inbound-order';
 
 // ============== API Functions ==============
@@ -56,8 +56,21 @@ export const updateInboundTicketItems = async (
   ticketId: number,
   items: UpdateInboundItemPayload[]
 ) => {
-  const res = await api.put(`/api/InventoryInbound/tickets/${ticketId}/items`, items);
+  const res = await api.put(`/api/InventoryInbound/update-tickets/${ticketId}/items`, items);
   return res.data as InboundOrder;
+};
+
+/**
+ * Lấy gợi ý vị trí xếp hàng cho từng item trong phiếu nhập
+ */
+export const getInboundStorageRecommendations = async (inboundOrderId: number) => {
+  const res = await api.get(
+    `/api/InventoryInbound/get-inbound-orders/${inboundOrderId}/storage-recommendations`
+  );
+
+  if (!Array.isArray(res.data)) return [] as InboundItemStorageRecommendations[];
+
+  return res.data as InboundItemStorageRecommendations[];
 };
 
 /**

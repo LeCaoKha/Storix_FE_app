@@ -12,6 +12,8 @@ import {
 interface WarehouseGridViewProps {
   structure: WarehouseStructure;
   highlightedShelf?: string;
+  recommendedShelves?: string[];
+  highlightedBins?: string[];
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
 }
 
@@ -24,6 +26,8 @@ const BIN_COLORS = {
 export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
   structure,
   highlightedShelf,
+  recommendedShelves,
+  highlightedBins,
   onShelfPress,
 }) => {
   const [selectedZone, setSelectedZone] = useState<string | null>(
@@ -93,6 +97,8 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
               <View style={styles.binRow}>
                 {(level.bins ?? []).map((bin) => {
                   const isHighlighted = highlightedShelf === shelf.id;
+                  const isRecommendedShelf = (recommendedShelves ?? []).includes(shelf.id);
+                  const isRecommendedBin = (highlightedBins ?? []).some((code) => code === bin.code || code === bin.id);
 
                   return (
                     <TouchableOpacity
@@ -101,6 +107,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
                         styles.binSlot,
                         { backgroundColor: BIN_COLORS.default },
                         isHighlighted && styles.binSlotHighlighted,
+                        (isRecommendedShelf || isRecommendedBin) && styles.binSlotRecommended,
                       ]}
                       activeOpacity={0.7}
                       onPress={() => onShelfPress?.(shelf, zone)}
@@ -349,6 +356,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#3B82F6',
     backgroundColor: '#DBEAFE',
+  },
+  binSlotRecommended: {
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    backgroundColor: '#FEF3C7',
   },
   binCode: {
     fontSize: 11,

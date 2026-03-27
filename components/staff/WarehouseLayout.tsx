@@ -3,20 +3,20 @@ import { NavigationNode, Shelf, WarehouseStructure, WarehouseZone } from '@/type
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useMemo } from 'react';
 import {
-  Dimensions,
-  LayoutChangeEvent,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    LayoutChangeEvent,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Pattern, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
@@ -28,6 +28,7 @@ const FOOTER_HEIGHT = 72;
 interface WarehouseLayoutProps {
   structure: WarehouseStructure;
   highlightedShelf?: string;
+  recommendedShelves?: string[];
   highlightedPath?: NavigationNode[];
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
   onZonePress?: (zone: WarehouseZone) => void;
@@ -36,6 +37,7 @@ interface WarehouseLayoutProps {
 export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   structure,
   highlightedShelf,
+  recommendedShelves,
   highlightedPath,
   onShelfPress,
   onZonePress,
@@ -229,10 +231,19 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
   const renderShelf = (shelf: Shelf, zone: WarehouseZone) => {
     const isHighlighted = highlightedShelf === shelf.id;
+    const isRecommended = !isHighlighted && (recommendedShelves ?? []).includes(shelf.id);
     const gradientId = `gradient-${shelf.id}`;
 
-    const baseColor = isHighlighted ? COLORS.primary : '#E2E8F0';
-    const faceColor = isHighlighted ? COLORS.primaryLight : '#F8FAFC';
+    const baseColor = isHighlighted
+      ? COLORS.primary
+      : isRecommended
+        ? '#F59E0B'
+        : '#E2E8F0';
+    const faceColor = isHighlighted
+      ? COLORS.primaryLight
+      : isRecommended
+        ? '#FEF3C7'
+        : '#F8FAFC';
 
     return (
       <G key={shelf.id}>
@@ -264,7 +275,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           rx={2}
           ry={2}
           fill={`url(#${gradientId})`}
-          stroke={isHighlighted ? COLORS.primary : '#CBD5E1'}
+          stroke={isHighlighted ? COLORS.primary : isRecommended ? '#F59E0B' : '#CBD5E1'}
           strokeWidth={0.5}
         />
 

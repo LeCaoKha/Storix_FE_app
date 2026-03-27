@@ -1,6 +1,7 @@
 import {
   getInboundRequestById as apiGetInboundRequestById,
   getInboundTicketById as apiGetInboundTicketById,
+  getInboundStorageRecommendations,
   createInboundRequest,
   createInboundTicket,
   getAllInboundRequests,
@@ -9,6 +10,7 @@ import {
   updateInboundRequestStatus,
   updateInboundTicketItems,
   type InboundOrder as ApiInboundOrder,
+  type InboundItemStorageRecommendations,
   type CreateInboundRequestPayload,
   type UpdateInboundItemPayload,
 } from '@/services/inbound-order.api';
@@ -27,6 +29,7 @@ export const inboundOrderKeys = {
   tickets: () => [...inboundOrderKeys.all, 'tickets'] as const,
   ticketList: (filters: Record<string, unknown>) => [...inboundOrderKeys.tickets(), filters] as const,
   ticketDetail: (id: number) => [...inboundOrderKeys.tickets(), 'detail', id] as const,
+  ticketRecommendations: (id: number) => [...inboundOrderKeys.tickets(), 'recommendations', id] as const,
   // Legacy keys for backward compatibility
   lists: () => [...inboundOrderKeys.all, 'list'] as const,
   list: (filters: Record<string, unknown>) => [...inboundOrderKeys.lists(), filters] as const,
@@ -283,5 +286,28 @@ export const useUpdateInboundTicketItems = () => {
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.all });
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.detail(variables.ticketId) });
     },
+  });
+};
+
+const getTicketRecommendations = async (id: number): Promise<InboundItemStorageRecommendations[]> => {
+  try {
+    return await getInboundStorageRecommendations(id);
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return [];
+    }
+    console.error(`Error fetching inbound recommendations for ticket ${id}:`, error);
+    return [];
+  }
+};
+
+/**
+ * Hook lấy gợi ý vị trí xếp hàng cho từng item của phiếu nhập
+ */
+export const useInboundStorageRecommendations = (inboundOrderId: number | undefined) => {
+  return useQuery({
+    queryKey: inboundOrderKeys.ticketRecommendations(inboundOrderId ?? 0),
+    queryFn: () => getTicketRecommendations(inboundOrderId!),
+    enabled: !!inboundOrderId,
   });
 };

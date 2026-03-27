@@ -36,6 +36,25 @@ export interface InboundOrderItem {
   };
 }
 
+export interface StorageRecommendation {
+  id: number;
+  recommendationId?: number;
+  binId?: number;
+  binIdCode?: string;
+  path?: string;
+  distanceInfo?: number;
+  reason?: string;
+  createdAt?: string;
+}
+
+export interface InboundItemStorageRecommendations {
+  inboundOrderItemId: number;
+  productId?: number;
+  sku?: string;
+  name?: string;
+  storageRecommendations: StorageRecommendation[];
+}
+
 export interface InboundOrder {
   id: number;
   inboundRequestId?: number;
@@ -127,4 +146,8 @@ export interface UpdateInboundItemPayload {
   productId: number;
   expectedQuantity?: number;
   receivedQuantity?: number;
+  locations?: {
+    binId: string;
+    quantity: number;
+  }[];
 }

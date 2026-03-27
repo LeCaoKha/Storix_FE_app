@@ -1,11 +1,11 @@
 import { Card, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
-import { useInboundOrdersByStaff, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundOrdersByStaff, useInboundStorageRecommendations, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
-import type { InboundOrderItem } from '@/types/inbound-order';
+import type { InboundItemStorageRecommendations, InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -27,8 +27,47 @@ export default function InboundDetailScreen() {
     const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
     const order = useMemo(() => staffOrders?.find(t => t.id === numericId) ?? null, [staffOrders, numericId]);
     const error = !isLoading && !order;
+    const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(order?.id);
 
     const updateItems = useUpdateInboundTicketItems();
+    const recommendationByItemId = useMemo(() => {
+        const map = new Map<number, InboundItemStorageRecommendations>();
+        recommendationItems.forEach((item) => {
+            map.set(item.inboundOrderItemId, item);
+        });
+        return map;
+    }, [recommendationItems]);
+
+    const recommendedBinCodes = useMemo(() => {
+        const bins = recommendationItems
+            .flatMap((item) => item.storageRecommendations || [])
+            .map((recommendation) => recommendation.binIdCode)
+            .filter((binCode): binCode is string => !!binCode);
+        return Array.from(new Set(bins));
+    }, [recommendationItems]);
+
+    const openWarehouseForItem = (item: InboundOrderItem) => {
+        const bins = recommendationByItemId
+            .get(item.id)
+            ?.storageRecommendations
+            ?.map((recommendation) => recommendation.binIdCode)
+            .filter((binCode): binCode is string => !!binCode) || [];
+
+        if (bins.length === 0) {
+            AlertService.warning('Chưa có gợi ý', 'Sản phẩm này chưa có vị trí gợi ý từ hệ thống.');
+            return;
+        }
+
+        router.push({
+            pathname: '/warehouse-view',
+            params: {
+                warehouseId: String(order?.warehouse?.id || order?.warehouseId || ''),
+                inboundOrderId: String(order?.id || ''),
+                focusedBins: bins.join(','),
+                focusedItemName: item.name || item.product?.name || `SP #${item.productId}`,
+            },
+        } as any);
+    };
 
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [isSaving, setIsSaving] = useState(false);
@@ -90,12 +129,20 @@ export default function InboundDetailScreen() {
         setIsSaving(true);
         try {
             // Update items with received quantities
-            const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => ({
-                id: item.id,
-                productId: item.productId || 0,
-                expectedQuantity: item.expectedQuantity,
-                receivedQuantity: localQuantities[item.id] || item.receivedQuantity || 0,
-            }));
+            const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
+                const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
+                const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
+
+                return {
+                    id: item.id,
+                    productId: item.productId || 0,
+                    expectedQuantity: item.expectedQuantity,
+                    receivedQuantity: quantity,
+                    locations: topRecommendation?.binIdCode && quantity > 0
+                        ? [{ binId: topRecommendation.binIdCode, quantity }]
+                        : undefined,
+                };
+            });
 
             await updateItems.mutateAsync({
                 ticketId: order.id,
@@ -125,12 +172,20 @@ export default function InboundDetailScreen() {
                 setIsConfirming(true);
                 try {
                     // Update items with final quantities
-                    const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => ({
-                        id: item.id,
-                        productId: item.productId || 0,
-                        expectedQuantity: item.expectedQuantity,
-                        receivedQuantity: localQuantities[item.id] || item.receivedQuantity || 0,
-                    }));
+                    const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
+                        const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
+                        const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
+
+                        return {
+                            id: item.id,
+                            productId: item.productId || 0,
+                            expectedQuantity: item.expectedQuantity,
+                            receivedQuantity: quantity,
+                            locations: topRecommendation?.binIdCode && quantity > 0
+                                ? [{ binId: topRecommendation.binIdCode, quantity }]
+                                : undefined,
+                        };
+                    });
 
                     await updateItems.mutateAsync({
                         ticketId: order.id,
@@ -173,17 +228,53 @@ export default function InboundDetailScreen() {
                     )}
                 </Card>
 
+                <Card style={styles.recommendationCard}>
+                    <View style={styles.recommendationHeader}>
+                        <Feather name="map-pin" size={16} color={COLORS.primary} />
+                        <Text style={styles.recommendationTitle}>Gợi ý xếp hàng sau nhập kho</Text>
+                    </View>
+
+                    {recommendationsLoading ? (
+                        <Text style={styles.recommendationSubtle}>Đang tải gợi ý vị trí...</Text>
+                    ) : recommendedBinCodes.length === 0 ? (
+                        <Text style={styles.recommendationSubtle}>Chưa có gợi ý từ hệ thống. Staff có thể tự chọn vị trí xếp hàng.</Text>
+                    ) : (
+                        <>
+                            {order.inboundOrderItems.map((item: InboundOrderItem) => {
+                                const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
+                                if (!topRecommendation?.binIdCode) return null;
+
+                                return (
+                                    <View key={`inbound-recommendation-${item.id}`} style={styles.recommendationItem}>
+                                        <Text style={styles.recommendationProduct} numberOfLines={1}>
+                                            {item.name || item.product?.name || `SP #${item.productId}`}
+                                        </Text>
+                                        <Text style={styles.recommendationBin}>{topRecommendation.binIdCode}</Text>
+                                    </View>
+                                );
+                            })}
+                        </>
+                    )}
+                </Card>
+
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
                     style={styles.warehouseCard}
-                    onPress={() => router.push('/warehouse-view')}
+                    onPress={() => router.push({
+                        pathname: '/warehouse-view',
+                        params: {
+                            warehouseId: String(order.warehouse?.id || order.warehouseId || ''),
+                            inboundOrderId: String(order.id),
+                            recommendedBins: recommendedBinCodes.join(','),
+                        },
+                    } as any)}
                 >
                     <View style={styles.warehouseIconWrap}>
                         <Feather name="map" size={18} color={COLORS.primary} />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.warehouseTitle}>Sơ đồ kho</Text>
-                        <Text style={styles.warehouseSubtitle}>Nhấn để xem vị trí trên sơ đồ</Text>
+                        <Text style={styles.warehouseSubtitle}>Nhấn để xem vị trí đề xuất trên sơ đồ</Text>
                     </View>
                     <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
                 </TouchableOpacity>
@@ -243,6 +334,14 @@ export default function InboundDetailScreen() {
                                 </View>
                             )}
                         </View>
+
+                        <TouchableOpacity
+                            style={styles.itemActionButton}
+                            onPress={() => openWarehouseForItem(item)}
+                        >
+                            <Feather name="map-pin" size={14} color={COLORS.primary} />
+                            <Text style={styles.itemActionText}>Xem kệ cần xếp cho sản phẩm này</Text>
+                        </TouchableOpacity>
 
 
                     </Card>
@@ -429,6 +528,23 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.textMuted,
         marginLeft: 4,
+    },
+    itemActionButton: {
+        marginTop: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        borderRadius: 10,
+        paddingVertical: 10,
+        backgroundColor: COLORS.primary + '10',
+    },
+    itemActionText: {
+        fontSize: 12,
+        color: COLORS.primary,
+        fontWeight: '700',
     },
     businessLogicSection: {
         backgroundColor: '#F9FAFB',
@@ -666,5 +782,49 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: COLORS.textMuted,
         marginTop: 2,
+    },
+    recommendationCard: {
+        marginBottom: 12,
+        backgroundColor: '#fff',
+    },
+    recommendationHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 10,
+    },
+    recommendationTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.text,
+    },
+    recommendationSubtle: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        lineHeight: 18,
+    },
+    recommendationItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.borderLight,
+    },
+    recommendationProduct: {
+        flex: 1,
+        marginRight: 10,
+        fontSize: 13,
+        color: COLORS.text,
+        fontWeight: '600',
+    },
+    recommendationBin: {
+        fontSize: 12,
+        color: COLORS.primary,
+        fontWeight: '700',
+        backgroundColor: COLORS.primary + '12',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 999,
     },
 });
