@@ -3,13 +3,14 @@ import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useInboundStorageRecommendations, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundItemStorageRecommendations, InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PutawayDetailScreen() {
@@ -27,6 +28,24 @@ export default function PutawayDetailScreen() {
     const order = useMemo(() => staffOrders?.find((t) => t.id === numericId) ?? null, [staffOrders, numericId]);
     const error = !isLoading && !order;
     const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(order?.id);
+    
+    // Fetch warehouse structure to show bins context for putaway suggestions
+    const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
+    const { data: warehouseStructure, isLoading: warehouseLoading, error: warehouseError } = useWarehouseStructure(warehouseId);
+
+    const validBinCodes = useMemo(() => {
+        if (!warehouseStructure?.zones) return new Set<string>();
+
+        const bins = warehouseStructure.zones.flatMap((zone) =>
+            (zone.shelves || []).flatMap((shelf) =>
+                (shelf.levels || []).flatMap((level) =>
+                    (level.bins || []).flatMap((bin) => [bin.code, bin.id].filter(Boolean) as string[])
+                )
+            )
+        );
+
+        return new Set(bins.map((code) => code.trim()).filter(Boolean));
+    }, [warehouseStructure]);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [scannedLocation, setScannedLocation] = useState('');
@@ -34,6 +53,8 @@ export default function PutawayDetailScreen() {
     const [isCompleting, setIsCompleting] = useState(false);
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [placedItems, setPlacedItems] = useState<Record<number, boolean>>({});
+    const [selectedBinByItem, setSelectedBinByItem] = useState<Record<number, string>>({});
+    const [manualBinByItem, setManualBinByItem] = useState<Record<number, string>>({});
 
     useEffect(() => {
         if (order?.inboundOrderItems) {
@@ -47,6 +68,47 @@ export default function PutawayDetailScreen() {
             setPlacedItems(initialPlaced);
         }
     }, [order]);
+
+    const items = useMemo(() => order?.inboundOrderItems || [], [order]);
+
+    const recommendationByItemId = useMemo(() => {
+        const map = new Map<number, InboundItemStorageRecommendations>();
+        recommendationItems.forEach((item) => {
+            map.set(item.inboundOrderItemId, item);
+        });
+        return map;
+    }, [recommendationItems]);
+
+    const recommendedBinCodes = useMemo(() => {
+        const bins = recommendationItems
+            .flatMap((item) => item.storageRecommendations || [])
+            .map((recommendation) => recommendation.binIdCode)
+            .filter((binCode): binCode is string => !!binCode);
+        return Array.from(new Set(bins));
+    }, [recommendationItems]);
+
+    useEffect(() => {
+        if (!items.length) return;
+
+        setSelectedBinByItem((prev) => {
+            const next = { ...prev };
+
+            items.forEach((item) => {
+                if (next[item.id]) return;
+
+                const topRecommendation = recommendationByItemId
+                    .get(item.id)
+                    ?.storageRecommendations?.[0]
+                    ?.binIdCode;
+
+                if (topRecommendation) {
+                    next[item.id] = topRecommendation;
+                }
+            });
+
+            return next;
+        });
+    }, [items, recommendationByItemId]);
 
     if (isLoading) {
         return (
@@ -72,22 +134,6 @@ export default function PutawayDetailScreen() {
     }
 
     const targetLocation = `WH-${order.warehouse?.id || order.warehouseId || 'NA'}-INB-${order.id}`;
-    const items = order.inboundOrderItems || [];
-    const recommendationByItemId = useMemo(() => {
-        const map = new Map<number, InboundItemStorageRecommendations>();
-        recommendationItems.forEach((item) => {
-            map.set(item.inboundOrderItemId, item);
-        });
-        return map;
-    }, [recommendationItems]);
-
-    const recommendedBinCodes = useMemo(() => {
-        const bins = recommendationItems
-            .flatMap((item) => item.storageRecommendations || [])
-            .map((recommendation) => recommendation.binIdCode)
-            .filter((binCode): binCode is string => !!binCode);
-        return Array.from(new Set(bins));
-    }, [recommendationItems]);
 
     const openWarehouseWithRecommendations = () => {
         router.push({
@@ -127,6 +173,25 @@ export default function PutawayDetailScreen() {
         setPlacedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
     };
 
+    const resolvePlacementBin = (itemId: number) => {
+        const selected = selectedBinByItem[itemId]?.trim();
+        if (selected) return selected;
+
+        const manual = manualBinByItem[itemId]?.trim();
+        if (manual) return manual;
+
+        return undefined;
+    };
+
+    const pickSuggestedBin = (itemId: number, binIdCode?: string) => {
+        if (!binIdCode) return;
+        setSelectedBinByItem((prev) => ({ ...prev, [itemId]: binIdCode }));
+    };
+
+    const updateManualBin = (itemId: number, value: string) => {
+        setManualBinByItem((prev) => ({ ...prev, [itemId]: value }));
+    };
+
     const handleScanLocation = () => {
         setIsProcessing(true);
         setTimeout(() => {
@@ -158,19 +223,58 @@ export default function PutawayDetailScreen() {
             return;
         }
 
+        // Validate warehouse has zones/bins configured
+        if (!warehouseStructure?.zones || warehouseStructure.zones.length === 0) {
+            AlertService.warning(
+                'Kho chưa cấu hình',
+                'Kho này chưa được cấu hình zones và bins. Vui lòng liên hệ với quản trị viên để cấu hình sơ đồ kho trước.',
+            );
+            return;
+        }
+
+        const missingBinItems = items.filter((item) => {
+            const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
+            if (quantity <= 0) return false;
+            return !resolvePlacementBin(item.id);
+        });
+
+        const invalidBinItems = items.filter((item) => {
+            const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
+            if (quantity <= 0) return false;
+            const bin = resolvePlacementBin(item.id);
+            if (!bin) return false;
+            return !validBinCodes.has(bin);
+        });
+
+        if (invalidBinItems.length > 0) {
+            AlertService.warning(
+                'Sai vị trí kho',
+                `Bin ${resolvePlacementBin(invalidBinItems[0].id)} không thuộc kho hiện tại. Vui lòng chọn lại bin đúng trong sơ đồ kho.`,
+            );
+            return;
+        }
+
+        if (missingBinItems.length > 0) {
+            AlertService.warning(
+                'Thiếu vị trí xếp',
+                `Vui lòng chọn hoặc nhập vị trí cho ${missingBinItems[0].name || `SP #${missingBinItems[0].productId}`}.`,
+            );
+            return;
+        }
+
         setIsCompleting(true);
         try {
             const updatedItems = items.map((item: InboundOrderItem) => {
-                const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
                 const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
+                const placementBin = resolvePlacementBin(item.id);
 
                 return {
                 id: item.id,
                 productId: item.productId || 0,
                 expectedQuantity: item.expectedQuantity,
                 receivedQuantity: quantity,
-                locations: topRecommendation?.binIdCode && quantity > 0
-                    ? [{ binId: topRecommendation.binIdCode, quantity }]
+                locations: placementBin && quantity > 0
+                    ? [{ binId: placementBin, quantity }]
                     : undefined,
                 };
             });
@@ -202,6 +306,31 @@ export default function PutawayDetailScreen() {
                     <Feather name="info" size={16} color="#854d0e" />
                     <Text style={styles.placeholderNoticeText}>Đang dùng inbound ticket thật cho putaway. Khi backend có endpoint putaway riêng, app sẽ chuyển sang endpoint đó.</Text>
                 </View>
+
+                {warehouseLoading && (
+                    <View style={styles.placeholderNotice}>
+                        <Feather name="loader" size={16} color="#0891b2" />
+                        <Text style={styles.placeholderNoticeText}>Đang tải cấu trúc kho...</Text>
+                    </View>
+                )}
+
+                {warehouseError && (
+                    <View style={[styles.placeholderNotice, { backgroundColor: '#fee2e2' }]}>
+                        <Feather name="alert-circle" size={16} color="#dc2626" />
+                        <Text style={[styles.placeholderNoticeText, { color: '#991b1b' }]}>
+                            Lỗi tải cấu trúc kho. Vui lòng kiểm tra kết nối hoặc liên hệ quản trị viên.
+                        </Text>
+                    </View>
+                )}
+
+                {!warehouseLoading && !warehouseError && (!warehouseStructure?.zones || warehouseStructure.zones.length === 0) && (
+                    <View style={[styles.placeholderNotice, { backgroundColor: '#fef3c7' }]}>
+                        <Feather name="alert-triangle" size={16} color="#92400e" />
+                        <Text style={[styles.placeholderNoticeText, { color: '#78350f' }]}>
+                            ⚠️ Kho này chưa có zones/bins. Hãy liên hệ với quản trị viên để cấu hình sơ đồ kho trước khi xếp hàng.
+                        </Text>
+                    </View>
+                )}
 
                 <Card style={styles.infoCard}>
                     <View style={styles.locationRow}>
@@ -298,6 +427,45 @@ export default function PutawayDetailScreen() {
                                 <Feather name={placedItems[item.id] ? 'check-square' : 'square'} size={16} color={placedItems[item.id] ? '#059669' : COLORS.textMuted} />
                                 <Text style={[styles.itemCheckText, placedItems[item.id] && styles.itemCheckTextActive]}>Đã xếp xong</Text>
                             </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.binSection}>
+                            <Text style={styles.binSectionTitle}>Vị trí xếp hàng</Text>
+
+                            {(recommendationByItemId.get(item.id)?.storageRecommendations || []).length > 0 ? (
+                                <View style={styles.binChipWrap}>
+                                    {(recommendationByItemId.get(item.id)?.storageRecommendations || [])
+                                        .filter((recommendation) => !!recommendation.binIdCode)
+                                        .slice(0, 5)
+                                        .map((recommendation) => {
+                                            const bin = recommendation.binIdCode as string;
+                                            const isActive = resolvePlacementBin(item.id) === bin;
+
+                                            return (
+                                                <TouchableOpacity
+                                                    key={`bin-${item.id}-${bin}`}
+                                                    style={[styles.binChip, isActive && styles.binChipActive]}
+                                                    onPress={() => pickSuggestedBin(item.id, bin)}
+                                                >
+                                                    <Text style={[styles.binChipText, isActive && styles.binChipTextActive]}>{bin}</Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                </View>
+                            ) : (
+                                <Text style={styles.binHelpText}>Chưa có gợi ý tự động cho sản phẩm này.</Text>
+                            )}
+
+                            <TextInput
+                                style={styles.binInput}
+                                placeholder="Nhập mã Bin (vd: A1-B2-C03) nếu cần"
+                                value={manualBinByItem[item.id] || ''}
+                                onChangeText={(value) => updateManualBin(item.id, value)}
+                            />
+
+                            <Text style={styles.binChosenText}>
+                                Đang chọn: {resolvePlacementBin(item.id) || 'Chưa chọn vị trí'}
+                            </Text>
                         </View>
                     </Card>
                 ))}
@@ -628,26 +796,88 @@ const styles = StyleSheet.create({
     },
     recommendationBin: {
         fontSize: 12,
-        color: COLORS.primary,
+        color: COLORS.success,
         fontWeight: '700',
-        backgroundColor: COLORS.primary + '12',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        backgroundColor: COLORS.successLight,
+        paddingHorizontal: 12,
+        paddingVertical: 5,
         borderRadius: 999,
+        borderWidth: 1,
+        borderColor: COLORS.success + '20',
     },
     recommendationAction: {
         marginTop: 12,
-        height: 40,
-        borderRadius: 10,
-        backgroundColor: COLORS.primary,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: COLORS.success,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
         gap: 8,
+        shadowColor: COLORS.success,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 3,
     },
     recommendationActionText: {
-        fontSize: 13,
+        fontSize: 14,
         color: '#fff',
         fontWeight: '700',
+    },
+    binSection: {
+        marginTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.borderLight,
+        paddingTop: 10,
+        gap: 8,
+    },
+    binSectionTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.text,
+    },
+    binChipWrap: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    binChip: {
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        backgroundColor: COLORS.primary + '10',
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+    },
+    binChipActive: {
+        backgroundColor: COLORS.primary,
+    },
+    binChipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.primary,
+    },
+    binChipTextActive: {
+        color: '#fff',
+    },
+    binInput: {
+        height: 40,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        fontSize: 13,
+        color: COLORS.text,
+        backgroundColor: '#fff',
+    },
+    binHelpText: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+    },
+    binChosenText: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        fontWeight: '600',
     },
 });

@@ -74,14 +74,27 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    console.error(`[AXIOS ERROR] ${error.config?.url}`, {
-      status: error.response?.status,
+    const requestUrl = error.config?.url || '';
+    const status = error.response?.status;
+    const errorMessage = String(error.response?.data?.message || error.message || '');
+    const isWarehouseStructureSchemaMismatch =
+      requestUrl.includes('/api/get-warehouse-structure/') &&
+      status === 400 &&
+      /column\s+.*isvulnerable\s+does not exist/i.test(errorMessage);
+
+    const logPayload = {
+      status,
       statusText: error.response?.statusText,
       errorData: error.response?.data,
-      errorMessage: error.message
-    });
+      errorMessage: error.message,
+    };
 
-    const status = error.response?.status;
+    if (isWarehouseStructureSchemaMismatch) {
+      console.warn(`[AXIOS WARN] ${requestUrl}`, logPayload);
+    } else {
+      console.error(`[AXIOS ERROR] ${requestUrl}`, logPayload);
+    }
+
     const originalRequest = error.config as (typeof error.config & { _retry?: boolean }) | undefined;
     const url = originalRequest?.url || '';
     const isAuthEndpoint =

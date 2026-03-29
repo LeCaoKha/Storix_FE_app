@@ -26,7 +26,8 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
-                    href: null,
+                    title: "Trang chủ",
+                    tabBarIcon: ({ color }) => <Feather name="home" size={28} color={color} />,
                 }}
             />
             <Tabs.Screen
@@ -110,6 +111,13 @@ export default function StaffTabLayout() {
             />
             <Tabs.Screen
                 name="tasks/transfer/receive/[id]"
+                options={{
+                    href: null,
+                    tabBarStyle: { display: 'none' },
+                }}
+            />
+            <Tabs.Screen
+                name="tasks/transfer/quality/[id]"
                 options={{
                     href: null,
                     tabBarStyle: { display: 'none' },

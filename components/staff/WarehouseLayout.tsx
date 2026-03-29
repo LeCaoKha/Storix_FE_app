@@ -15,6 +15,7 @@ import Animated, {
     runOnJS,
     useAnimatedStyle,
     useSharedValue,
+    withRepeat,
     withSpring,
     withTiming,
 } from 'react-native-reanimated';
@@ -79,7 +80,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     (structure.zones ?? []).forEach((zone) => {
       includeRect(zone.x, zone.y, zone.width, zone.height);
       (zone.shelves ?? []).forEach((shelf) => {
-        includeRect(shelf.x, shelf.y, shelf.width, shelf.height);
+        includeRect(zone.x + shelf.x, zone.y + shelf.y, shelf.width, shelf.height);
       });
     });
 
@@ -187,8 +188,10 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       let hitSomething = false;
       (structure.zones ?? []).forEach(zone => {
         (zone.shelves ?? []).forEach(shelf => {
-          if (mapX >= shelf.x && mapX <= shelf.x + shelf.width &&
-            mapY >= shelf.y && mapY <= shelf.y + shelf.height) {
+          const absX = zone.x + shelf.x;
+          const absY = zone.y + shelf.y;
+          if (mapX >= absX && mapX <= absX + shelf.width &&
+            mapY >= absY && mapY <= absY + shelf.height) {
             hitSomething = true;
             if (onShelfPress) {
               runOnJS(onShelfPress)(shelf, zone);
@@ -229,24 +232,53 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     scale.value = withTiming(Math.max(scale.value - 0.3, 0.3));
   };
 
+  const pulse = useSharedValue(1);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1.2, { duration: 1000 }),
+      -1,
+      true
+    );
+  }, []);
+
   const renderShelf = (shelf: Shelf, zone: WarehouseZone) => {
     const isHighlighted = highlightedShelf === shelf.id;
-    const isRecommended = !isHighlighted && (recommendedShelves ?? []).includes(shelf.id);
+    const hasAnyRecommendations = (recommendedShelves?.length ?? 0) > 0;
+    const isRecommended = (recommendedShelves ?? []).includes(shelf.id);
+    const isDimmed = hasAnyRecommendations && !isRecommended && !isHighlighted;
+
     const gradientId = `gradient-${shelf.id}`;
 
     const baseColor = isHighlighted
       ? COLORS.primary
       : isRecommended
-        ? '#F59E0B'
-        : '#E2E8F0';
+        ? COLORS.success
+        : isDimmed 
+          ? COLORS.slate200
+          : '#E2E8F0';
+
     const faceColor = isHighlighted
       ? COLORS.primaryLight
       : isRecommended
-        ? '#FEF3C7'
-        : '#F8FAFC';
+        ? COLORS.successLight
+        : isDimmed
+          ? COLORS.slate50
+          : '#F8FAFC';
+
+    const strokeColor = isHighlighted 
+      ? COLORS.primary 
+      : isRecommended 
+        ? COLORS.success 
+        : isDimmed
+          ? COLORS.slate300 
+          : COLORS.slate400;
+
+    const absX = zone.x + shelf.x;
+    const absY = zone.y + shelf.y;
 
     return (
-      <G key={shelf.id}>
+      <G key={shelf.id} opacity={isDimmed ? 0.4 : 1}>
         <Defs>
           <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={baseColor} stopOpacity="1" />
@@ -254,60 +286,76 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           </LinearGradient>
         </Defs>
 
+        {/* Pulse Effect for Recommended */}
+        {isRecommended && (
+          <Rect
+            x={absX - 2}
+            y={absY - 2}
+            width={shelf.width + 4}
+            height={shelf.height + 4}
+            rx={5}
+            ry={5}
+            fill={COLORS.success}
+            opacity={0.15}
+          />
+        )}
+
         {/* Rack Shadow */}
-        <Rect
-          x={shelf.x}
-          y={shelf.y + 2}
-          width={shelf.width}
-          height={shelf.height}
-          rx={3}
-          ry={3}
-          fill="#000"
-          opacity={0.08}
-        />
+        {!isDimmed && (
+          <Rect
+            x={absX}
+            y={absY + 2}
+            width={shelf.width}
+            height={shelf.height}
+            rx={3}
+            ry={3}
+            fill="#000"
+            opacity={0.08}
+          />
+        )}
 
         {/* Rack Body */}
         <Rect
-          x={shelf.x}
-          y={shelf.y}
+          x={absX}
+          y={absY}
           width={shelf.width}
           height={shelf.height}
           rx={2}
           ry={2}
           fill={`url(#${gradientId})`}
-          stroke={isHighlighted ? COLORS.primary : isRecommended ? '#F59E0B' : '#CBD5E1'}
-          strokeWidth={0.5}
+          stroke={strokeColor}
+          strokeWidth={isRecommended || isHighlighted ? 1.2 : 0.5}
         />
 
         {/* Top Face */}
         <Rect
-          x={shelf.x + 1}
-          y={shelf.y + 1}
+          x={absX + 1}
+          y={absY + 1}
           width={shelf.width - 2}
           height={shelf.height - 4}
           rx={1}
           ry={1}
           fill={faceColor}
-          opacity={0.6}
+          opacity={0.7}
         />
 
         {/* Label Badge */}
         <G pointerEvents="none">
           <Rect
-            x={shelf.x + (shelf.width - 24) / 2}
-            y={shelf.y + (shelf.height - 14) / 2}
+            x={absX + (shelf.width - 24) / 2}
+            y={absY + (shelf.height - 14) / 2}
             width={24}
             height={14}
             rx={7}
-            fill="#1E293B"
-            opacity={0.9}
+            fill={isRecommended ? COLORS.successText : (isHighlighted ? COLORS.primary : "#1E293B")}
+            opacity={isDimmed ? 0.4 : 0.95}
           />
           <SvgText
-            x={shelf.x + shelf.width / 2}
-            y={shelf.y + shelf.height / 2 + 1}
+            x={absX + shelf.width / 2}
+            y={absY + shelf.height / 2 + 1}
             fontSize={8}
             fill="#FFFFFF"
-            fontWeight="800"
+            fontWeight="900"
             textAnchor="middle"
             alignmentBaseline="middle"
           >
@@ -474,6 +522,10 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: COLORS.primary, opacity: 0.3 }]} />
           <Text style={styles.legendLabel}>Khu vực</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: COLORS.success }]} />
+          <Text style={styles.legendLabel}>Vị trí gợi ý</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: '#E2E8F0', borderWidth: 1, borderColor: '#CBD5E1' }]} />

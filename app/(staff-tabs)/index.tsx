@@ -1,5 +1,6 @@
-import { Redirect } from 'expo-router';
+import React from 'react';
+import StaffHomeScreen from '@/features/staff/home/StaffHomeScreen';
 
 export default function Index() {
-    return <Redirect href="/(staff-tabs)/tasks" />;
+    return <StaffHomeScreen />;
 }

@@ -6,10 +6,11 @@ export const useTasks = () => {
     const { user } = useAuthStore();
     const staffId = user?.id ?? 0;
     const companyId = user?.companyId ?? 0;
+    const warehouseId = user?.warehouseId;
 
     return useQuery({
-        queryKey: ['tasks', staffId, companyId],
-        queryFn: () => getTasks(staffId, companyId),
+        queryKey: ['tasks', staffId, companyId, warehouseId],
+        queryFn: () => getTasks(staffId, companyId, warehouseId),
         enabled: !!staffId && !!companyId,
     });
 };

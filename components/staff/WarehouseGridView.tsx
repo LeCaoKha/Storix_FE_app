@@ -9,19 +9,15 @@ import {
     View,
 } from 'react-native';
 
+import { COLORS } from '@/constants/color';
+
 interface WarehouseGridViewProps {
   structure: WarehouseStructure;
   highlightedShelf?: string;
   recommendedShelves?: string[];
-  highlightedBins?: string[];
+  highlightedBins?: (string | number)[];
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
 }
-
-// Bin status colors - simplified since API doesn't provide inventory status
-const BIN_COLORS = {
-  default: '#E5E7EB',     // Light gray - default
-  highlighted: '#3B82F6', // Blue - when selected
-};
 
 export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
   structure,
@@ -37,18 +33,23 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
   const currentZone = (structure.zones ?? []).find((z) => z.id === selectedZone);
 
   const renderBinGrid = (shelf: Shelf, zone: WarehouseZone) => {
-    // Use actual data from API
     const levels = shelf.levels ?? [];
+    const isRecommendedShelf = (recommendedShelves ?? []).includes(shelf.id);
     
     if (levels.length === 0) {
       return (
-        <View style={styles.rackCard}>
+        <View style={[styles.rackCard, isRecommendedShelf && styles.rackCardRecommended]}>
           {/* Rack header */}
           <View style={styles.rackHeader}>
-            <View style={styles.rackIcon}>
-              <Feather name="layers" size={16} color="#475569" />
+            <View style={[styles.rackIcon, isRecommendedShelf && { backgroundColor: COLORS.successLight }]}>
+              <Feather name="layers" size={16} color={isRecommendedShelf ? COLORS.success : "#475569"} />
             </View>
             <Text style={styles.rackTitle}>{shelf.code}</Text>
+            {isRecommendedShelf && (
+              <View style={styles.shelfRecBadge}>
+                <Text style={styles.shelfRecBadgeText}>Gợi ý</Text>
+              </View>
+            )}
             <TouchableOpacity
               style={styles.infoButton}
               onPress={() => onShelfPress?.(shelf, zone)}
@@ -64,13 +65,18 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
     }
 
     return (
-      <View style={styles.rackCard}>
+      <View style={[styles.rackCard, isRecommendedShelf && styles.rackCardRecommended]}>
         {/* Rack header */}
         <View style={styles.rackHeader}>
-          <View style={styles.rackIcon}>
-            <Feather name="layers" size={16} color="#475569" />
+          <View style={[styles.rackIcon, isRecommendedShelf && { backgroundColor: COLORS.successLight }]}>
+            <Feather name="layers" size={16} color={isRecommendedShelf ? COLORS.success : "#475569"} />
           </View>
           <Text style={styles.rackTitle}>{shelf.code}</Text>
+          {isRecommendedShelf && (
+            <View style={styles.shelfRecBadge}>
+              <Text style={styles.shelfRecBadgeText}>Gợi ý</Text>
+            </View>
+          )}
           <View style={styles.rackStats}>
             <Text style={styles.rackStatsText}>
               {levels.length}L · {levels.reduce((acc, level) => acc + (level.bins?.length ?? 0), 0)}B
@@ -86,7 +92,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
 
         {/* Bin grid - using actual API data */}
         <View style={styles.binGrid}>
-          {levels.map((level, levelIndex) => (
+          {levels.map((level) => (
             <View key={level.id} style={styles.levelContainer}>
               {/* Level label */}
               <View style={styles.levelLabel}>
@@ -97,22 +103,36 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
               <View style={styles.binRow}>
                 {(level.bins ?? []).map((bin) => {
                   const isHighlighted = highlightedShelf === shelf.id;
-                  const isRecommendedShelf = (recommendedShelves ?? []).includes(shelf.id);
-                  const isRecommendedBin = (highlightedBins ?? []).some((code) => code === bin.code || code === bin.id);
+                  const isRecommendedBin = (highlightedBins ?? []).some((code) => 
+                    String(code) === bin.code || String(code) === bin.id
+                  );
+                  
+                  const hasAnyRecommendations = (recommendedShelves?.length ?? 0) > 0 || (highlightedBins?.length ?? 0) > 0;
+                  const isSuggested = isRecommendedShelf || isRecommendedBin;
+                  const isDimmed = hasAnyRecommendations && !isSuggested;
 
                   return (
                     <TouchableOpacity
                       key={bin.id}
                       style={[
                         styles.binSlot,
-                        { backgroundColor: BIN_COLORS.default },
-                        isHighlighted && styles.binSlotHighlighted,
-                        (isRecommendedShelf || isRecommendedBin) && styles.binSlotRecommended,
+                        isDimmed && styles.binSlotDimmed,
+                        isSuggested && styles.binSlotSuggested,
+                        isHighlighted && !isSuggested && styles.binSlotHighlighted,
                       ]}
                       activeOpacity={0.7}
                       onPress={() => onShelfPress?.(shelf, zone)}
                     >
-                      <Text style={styles.binCode}>{bin.code}</Text>
+                      <Text style={[
+                        styles.binCode,
+                        isSuggested && styles.binCodeSuggested,
+                        isDimmed && styles.binCodeDimmed
+                      ]}>
+                        {bin.code}
+                      </Text>
+                      {isRecommendedBin && (
+                        <View style={styles.binRecDot} />
+                      )}
                     </TouchableOpacity>
                   );
                 })}
@@ -268,21 +288,27 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   rackCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  rackCardRecommended: {
+    borderColor: COLORS.success,
+    borderWidth: 1.5,
+    backgroundColor: COLORS.success + '05',
   },
   rackHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
     gap: 10,
   },
   rackIcon: {
@@ -294,10 +320,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rackTitle: {
-    flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1E293B',
+  },
+  shelfRecBadge: {
+    backgroundColor: COLORS.success,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  shelfRecBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  binRecDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.success,
   },
   rackStats: {
     paddingHorizontal: 10,
@@ -350,22 +396,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
     minWidth: 50,
   },
   binSlotHighlighted: {
     borderWidth: 2,
-    borderColor: '#3B82F6',
-    backgroundColor: '#DBEAFE',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryLight,
   },
-  binSlotRecommended: {
+  binSlotSuggested: {
     borderWidth: 2,
-    borderColor: '#F59E0B',
-    backgroundColor: '#FEF3C7',
+    borderColor: COLORS.success,
+    backgroundColor: COLORS.successLight,
+  },
+  binSlotDimmed: {
+    opacity: 0.4,
+    backgroundColor: COLORS.slate50,
+    borderColor: COLORS.slate200,
   },
   binCode: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#475569',
+    color: COLORS.slate600,
+  },
+  binCodeSuggested: {
+    color: COLORS.successText,
+    fontWeight: '800',
+  },
+  binCodeDimmed: {
+    color: COLORS.slate400,
   },
   emptyRack: {
     paddingVertical: 20,

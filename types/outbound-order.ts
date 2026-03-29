@@ -25,6 +25,7 @@ export interface OutboundOrderItem {
   outboundOrderId?: number;
   productId?: number;
   quantity?: number;
+  receivedQuantity?: number;
   price?: number;
   // Flat fields from BE DTO (OutboundOrderItemDto)
   productName?: string;

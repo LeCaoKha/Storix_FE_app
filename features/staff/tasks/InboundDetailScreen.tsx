@@ -3,12 +3,13 @@ import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useInboundStorageRecommendations, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundItemStorageRecommendations, InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -46,6 +47,23 @@ export default function InboundDetailScreen() {
         return Array.from(new Set(bins));
     }, [recommendationItems]);
 
+    const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
+    const { data: warehouseStructure } = useWarehouseStructure(warehouseId);
+
+    const validBinCodes = useMemo(() => {
+        if (!warehouseStructure?.zones) return new Set<string>();
+
+        const bins = warehouseStructure.zones.flatMap((zone) =>
+            (zone.shelves || []).flatMap((shelf) =>
+                (shelf.levels || []).flatMap((level) =>
+                    (level.bins || []).flatMap((bin) => [bin.code, bin.id].filter(Boolean) as string[])
+                )
+            )
+        );
+
+        return new Set(bins.map((code) => code.trim()).filter(Boolean));
+    }, [warehouseStructure]);
+
     const openWarehouseForItem = (item: InboundOrderItem) => {
         const bins = recommendationByItemId
             .get(item.id)
@@ -72,6 +90,9 @@ export default function InboundDetailScreen() {
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Initialize receivedQuantity from existing data
     useEffect(() => {
@@ -79,8 +100,81 @@ export default function InboundDetailScreen() {
             setLocalQuantities(
                 order.inboundOrderItems.reduce((acc: Record<number, number>, item: InboundOrderItem) => ({ ...acc, [item.id]: item.receivedQuantity || 0 }), {})
             );
+            setHasUnsavedChanges(false);
         }
     }, [order]);
+
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+        };
+    }, []);
+
+    // Keep status flags before any early return to preserve hook call order.
+    const isCompleted = order?.status === 'Completed';
+    const isPartiallyCompleted = order?.status === 'Partially Completed';
+    const canEdit = !!order && !isCompleted;
+
+    useEffect(() => {
+        if (!order || !canEdit || !hasUnsavedChanges || isSaving || isConfirming) return;
+
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+        }
+
+        autoSaveTimerRef.current = setTimeout(async () => {
+            if (!order || isSaving || isConfirming) return;
+
+            setIsAutoSaving(true);
+            try {
+                const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
+                    const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
+                    const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
+                    const recommendedBin = topRecommendation?.binIdCode;
+                    const canUseRecommendationBin = !!recommendedBin && validBinCodes.has(recommendedBin);
+
+                    return {
+                        id: item.id,
+                        productId: item.productId || 0,
+                        expectedQuantity: item.expectedQuantity,
+                        receivedQuantity: quantity,
+                        locations: canUseRecommendationBin && quantity > 0
+                            ? [{ binId: recommendedBin as string, quantity }]
+                            : undefined,
+                    };
+                });
+
+                await updateItems.mutateAsync({
+                    ticketId: order.id,
+                    items: updatedItems,
+                });
+
+                setHasUnsavedChanges(false);
+            } catch {
+                // Keep unsaved flag so user can retry by manual save.
+            } finally {
+                setIsAutoSaving(false);
+            }
+        }, 800);
+
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+        };
+    }, [
+        canEdit,
+        hasUnsavedChanges,
+        isConfirming,
+        isSaving,
+        localQuantities,
+        order,
+        recommendationByItemId,
+        updateItems,
+        validBinCodes,
+    ]);
 
     if (isLoading) {
         return (
@@ -105,11 +199,6 @@ export default function InboundDetailScreen() {
         );
     }
 
-    // Kiểm tra trạng thái đơn - nếu đã hoàn thành thì không cho sửa
-    const isCompleted = order?.status === 'Completed';
-    const isPartiallyCompleted = order?.status === 'Partially Completed';
-    const canEdit = !isCompleted; // Cho sửa khi Waiting for payment hoặc Partially Completed
-
     const handleUpdateQty = (itemId: number, increment: boolean) => {
         if (!canEdit) return;
         setLocalQuantities(prev => {
@@ -120,6 +209,7 @@ export default function InboundDetailScreen() {
                 : Math.max(current - 1, 0);
             return { ...prev, [itemId]: newValue };
         });
+        setHasUnsavedChanges(true);
     };
 
 
@@ -132,14 +222,16 @@ export default function InboundDetailScreen() {
             const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
                 const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
                 const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
+                const recommendedBin = topRecommendation?.binIdCode;
+                const canUseRecommendationBin = !!recommendedBin && validBinCodes.has(recommendedBin);
 
                 return {
                     id: item.id,
                     productId: item.productId || 0,
                     expectedQuantity: item.expectedQuantity,
                     receivedQuantity: quantity,
-                    locations: topRecommendation?.binIdCode && quantity > 0
-                        ? [{ binId: topRecommendation.binIdCode, quantity }]
+                    locations: canUseRecommendationBin && quantity > 0
+                        ? [{ binId: recommendedBin as string, quantity }]
                         : undefined,
                 };
             });
@@ -175,14 +267,16 @@ export default function InboundDetailScreen() {
                     const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
                         const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
                         const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
+                        const recommendedBin = topRecommendation?.binIdCode;
+                        const canUseRecommendationBin = !!recommendedBin && validBinCodes.has(recommendedBin);
 
                         return {
                             id: item.id,
                             productId: item.productId || 0,
                             expectedQuantity: item.expectedQuantity,
                             receivedQuantity: quantity,
-                            locations: topRecommendation?.binIdCode && quantity > 0
-                                ? [{ binId: topRecommendation.binIdCode, quantity }]
+                            locations: canUseRecommendationBin && quantity > 0
+                                ? [{ binId: recommendedBin as string, quantity }]
                                 : undefined,
                         };
                     });
@@ -364,12 +458,12 @@ export default function InboundDetailScreen() {
 
                     {!allItemsReceived ? (
                         <TouchableOpacity
-                            style={[styles.saveBtn, isSaving && styles.disabledBtn]}
+                            style={[styles.saveBtn, (isSaving || isAutoSaving) && styles.disabledBtn]}
                             onPress={handleSave}
-                            disabled={isSaving}
+                            disabled={isSaving || isAutoSaving}
                         >
                             <Text style={styles.saveBtnText}>
-                                {isSaving ? 'Đang lưu...' : 'Lưu tiến độ'}
+                                {isSaving ? 'Đang lưu...' : isAutoSaving ? 'Tự động lưu...' : 'Lưu tiến độ'}
                             </Text>
                         </TouchableOpacity>
                     ) : (

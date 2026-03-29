@@ -134,8 +134,33 @@ export const getWarehouseStructure = async (
   companyId: number,
   warehouseId: number
 ): Promise<WarehouseStructure> => {
-  const response = await api.get<WarehouseStructure>(
-    `/api/get-warehouse-structure/${companyId}/${warehouseId}`
-  );
-  return response.data;
+  try {
+    const response = await api.get<WarehouseStructure>(
+      `/api/get-warehouse-structure/${companyId}/${warehouseId}`
+    );
+    return response.data;
+  } catch (error: any) {
+    const status = error?.response?.status;
+    const message = String(error?.response?.data?.message || '');
+
+    // Graceful fallback for known backend schema mismatch cases.
+    if (status === 400 && /column\s+.*isvulnerable\s+does not exist/i.test(message)) {
+      console.warn('[getWarehouseStructure] fallback empty structure due to schema mismatch', {
+        companyId,
+        warehouseId,
+        status,
+        message,
+      });
+
+      return {
+        width: 1,
+        height: 1,
+        zones: [],
+        nodes: [],
+        edges: [],
+      };
+    }
+
+    throw error;
+  }
 };

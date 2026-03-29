@@ -1,9 +1,12 @@
 import { ScreenHeader } from '@/components';
 import { PathInstructionsModal, ShelfDetailModal, WarehouseGridView, WarehouseLayout } from '@/components/staff';
 import { COLORS } from '@/constants/color';
-import { useInboundStorageRecommendations } from '@/hooks';
+import { useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
+import { useOutboundTicket, useUpdateOutboundTicketItems } from '@/hooks/outbound-orders.hooks';
 import { useWarehouses, useWarehouseStructure } from '@/hooks/warehouse.hooks';
+import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { ShelfActionItem } from '@/components/staff/ShelfDetailModal';
 import { PathResult, Shelf, WarehouseZone } from '@/types/warehouse';
 import { findNearestNode, findShortestPath } from '@/utils/pathfinding';
 import { Feather } from '@expo/vector-icons';
@@ -22,17 +25,22 @@ export default function WarehouseDiagramScreen() {
   const params = useLocalSearchParams<{
     warehouseId?: string;
     inboundOrderId?: string;
+    outboundOrderId?: string;
     recommendedBins?: string;
     focusedBins?: string;
     focusedItemName?: string;
   }>();
   const initialWarehouseId = params.warehouseId ? Number(params.warehouseId) : undefined;
   const inboundOrderId = params.inboundOrderId ? Number(params.inboundOrderId) : undefined;
+  const outboundOrderId = params.outboundOrderId ? Number(params.outboundOrderId) : undefined;
+  const isPicking = !!outboundOrderId;
+  const operationId = inboundOrderId || outboundOrderId;
+
   const routeBins = useMemo(
     () => (params.recommendedBins ? params.recommendedBins.split(',').map((code) => code.trim()).filter(Boolean) : []),
     [params.recommendedBins]
   );
-  const focusedBins = useMemo(
+  const focusedBinsArray = useMemo(
     () => (params.focusedBins ? params.focusedBins.split(',').map((code) => code.trim()).filter(Boolean) : []),
     [params.focusedBins]
   );
@@ -51,11 +59,18 @@ export default function WarehouseDiagramScreen() {
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(inboundOrderId);
+  const { data: inboundTicket } = useInboundTicket(inboundOrderId);
+  const { data: outboundOrder } = useOutboundTicket(outboundOrderId);
+  
   const {
     data: structure,
     isLoading: structureLoading,
     error: structureError,
   } = useWarehouseStructure(selectedWarehouseId);
+
+  const updateInboundItems = useUpdateInboundTicketItems();
+  const updateOutboundItems = useUpdateOutboundTicketItems();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const recommendedBins = useMemo(() => {
     const binsFromApi = recommendationItems
@@ -66,7 +81,7 @@ export default function WarehouseDiagramScreen() {
     return Array.from(new Set([...routeBins, ...binsFromApi]));
   }, [recommendationItems, routeBins]);
 
-  const effectiveHighlightedBins = focusedBins.length > 0 ? focusedBins : recommendedBins;
+  const effectiveHighlightedBins = focusedBinsArray.length > 0 ? focusedBinsArray : recommendedBins;
 
   const recommendationPreview = useMemo(() => {
     return recommendationItems
@@ -92,7 +107,7 @@ export default function WarehouseDiagramScreen() {
     for (const zone of structure.zones ?? []) {
       for (const shelf of zone.shelves ?? []) {
         const hasRecommendedBin = (shelf.levels ?? []).some((level) =>
-          (level.bins ?? []).some((bin) => effectiveHighlightedBins.some((code) => code === bin.code || code === bin.id))
+          (level.bins ?? []).some((bin) => effectiveHighlightedBins.some((code) => String(code) === bin.code || String(code) === bin.id))
         );
 
         if (hasRecommendedBin) {
@@ -108,7 +123,7 @@ export default function WarehouseDiagramScreen() {
     return { shelfIds: Array.from(shelfIds), firstShelf, firstZone };
   }, [effectiveHighlightedBins, structure]);
 
-  const recommendedShelvesForRender = focusedBins.length > 0 ? [] : recommendationResolution.shelfIds;
+  const recommendedShelvesForRender = recommendationResolution.shelfIds;
 
   const activeHighlightedShelf = selectedShelf?.id || recommendationResolution.firstShelf?.id;
 
@@ -168,6 +183,151 @@ export default function WarehouseDiagramScreen() {
     setSelectedZone(recommendationResolution.firstZone);
     handleFindPath(recommendationResolution.firstShelf);
   };
+
+  const handleConfirmOperationAtShelf = async (actionItems: ShelfActionItem[]) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    try {
+      if (!isPicking && inboundOrderId) {
+        // Inbound: Update receivedQuantity to match expectedQuantity for these items
+        const itemsToUpdate = actionItems.map(item => ({
+          id: item.id,
+          productId: item.productId,
+          receivedQuantity: (item.currentQuantity || 0) + (item.targetQuantity || 0),
+          locations: [
+            {
+              binId: String(item.binId),
+              quantity: item.targetQuantity || 0
+            }
+          ]
+        }));
+
+        await updateInboundItems.mutateAsync({
+          ticketId: inboundOrderId,
+          items: itemsToUpdate as any,
+        });
+
+        AlertService.success('Thành công', `Đã xác nhận xếp ${actionItems.length} mặt hàng vào kệ ${selectedShelf?.code}`);
+      } else if (isPicking && outboundOrderId) {
+        // Outbound: Update quantity to match target for these items
+        const itemsToUpdate = actionItems.map(item => ({
+          id: item.id,
+          productId: item.productId,
+          receivedQuantity: (item.currentQuantity || 0) + (item.targetQuantity || 0),
+          locations: [
+            {
+              binId: String(item.binId),
+              quantity: item.targetQuantity || 0
+            }
+          ]
+        }));
+
+        await updateOutboundItems.mutateAsync({
+          ticketId: outboundOrderId,
+          items: itemsToUpdate as any,
+        });
+
+        AlertService.success('Thành công', `Đã xác nhận nhặt ${actionItems.length} mặt hàng từ kệ ${selectedShelf?.code}`);
+      }
+      setModalVisible(false);
+    } catch {
+      AlertService.error('Lỗi', 'Không thể cập nhật trạng thái mặt hàng');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateShelf = (shelf: Shelf) => {
+    AlertService.info('Thông tin', `Cập nhật thông tin kệ ${shelf.code}. Tính năng này sẽ sớm được hoàn thiện.`);
+  };
+
+  // Compute items available for the currently selected shelf
+  const availableItemsForModal = useMemo(() => {
+    if (!selectedShelf) return [];
+    
+    const shelfBinCodes = (selectedShelf.levels ?? []).flatMap(l => (l.bins ?? []).map(b => b.code));
+    const firstBin = selectedShelf.levels?.[0]?.bins?.[0];
+    
+    if (!isPicking) {
+      // Inbound: Filter from recommendationItems
+      const recommended = recommendationItems
+        .filter(item => (item.storageRecommendations ?? []).some(r => shelfBinCodes.includes(r.binIdCode || '')))
+        .map(item => {
+          const matchedRec = item.storageRecommendations!.find(r => shelfBinCodes.includes(r.binIdCode || ''));
+          // Find quantities from ticket items
+          const ticketItem = inboundTicket?.inboundOrderItems?.find(ti => ti.id === item.inboundOrderItemId);
+          
+          return {
+            id: item.inboundOrderItemId,
+            productId: item.productId || 0,
+            name: item.name || '',
+            sku: item.sku,
+            // For recommended items, we target the recommended quantity
+            targetQuantity: matchedRec?.distanceInfo || (ticketItem?.expectedQuantity ?? 0) - (ticketItem?.receivedQuantity ?? 0),
+            currentQuantity: ticketItem?.receivedQuantity || 0,
+            binCode: matchedRec?.binIdCode || '',
+            binId: matchedRec?.binId || matchedRec?.binIdCode || '',
+            isRecommended: true,
+          };
+        });
+
+      if (recommended.length > 0) return recommended;
+
+      // Manual fallback: allow placing all remaining quantity of pending items
+      return (inboundTicket?.inboundOrderItems || [])
+        .filter(item => (item.expectedQuantity ?? 0) > (item.receivedQuantity ?? 0))
+        .map(item => ({
+          id: item.id,
+          productId: item.productId || item.product?.id || 0,
+          name: item.productName || item.product?.name || item.name || `SP #${item.productId}`,
+          sku: item.sku || item.product?.sku,
+          targetQuantity: (item.expectedQuantity || 0) - (item.receivedQuantity || 0),
+          currentQuantity: item.receivedQuantity || 0,
+          binCode: firstBin?.code || selectedShelf.code,
+          binId: firstBin?.id || firstBin?.code || selectedShelf.id,
+          isRecommended: false,
+        }));
+    } else {
+      // Outbound: Filter from outboundOrder items
+      const orderItems = outboundOrder?.items || outboundOrder?.outboundOrderItems || [];
+      const recommended = orderItems
+        .filter(item => effectiveHighlightedBins.some(code => shelfBinCodes.includes(String(code))))
+        .map(item => {
+          const binCode = shelfBinCodes.find(code => effectiveHighlightedBins.includes(String(code))) || shelfBinCodes[0];
+          const bin = (selectedShelf.levels ?? []).flatMap(l => l.bins ?? []).find(b => b.code === binCode);
+          
+          return {
+            id: item.id,
+            productId: item.productId || item.product?.id || 0,
+            name: item.productName || item.product?.name || item.name || `SP #${item.productId}`,
+            sku: item.sku || item.product?.sku,
+            targetQuantity: (item.quantity || 0) - (item.receivedQuantity || 0),
+            currentQuantity: item.receivedQuantity || 0,
+            binCode: binCode,
+            binId: bin?.id || bin?.code || binCode,
+            isRecommended: true,
+          };
+        });
+
+      if (recommended.length > 0) return recommended;
+
+      // Manual fallback
+      return orderItems
+        .filter(item => (item.quantity || 0) > (item.receivedQuantity || 0))
+        .map(item => ({
+          id: item.id,
+          productId: item.productId || item.product?.id || 0,
+          name: item.productName || item.product?.name || item.name || `SP #${item.productId}`,
+          sku: item.sku || item.product?.sku,
+          targetQuantity: (item.quantity ?? 0) - (item.receivedQuantity ?? 0),
+          currentQuantity: item.receivedQuantity || 0,
+          binCode: firstBin?.code || selectedShelf.code,
+          binId: firstBin?.id || firstBin?.code || selectedShelf.id,
+          isRecommended: false,
+        }));
+    }
+  }, [selectedShelf, isPicking, recommendationItems, inboundTicket, outboundOrder, effectiveHighlightedBins]);
 
   if (warehousesLoading) {
     return (
@@ -251,19 +411,19 @@ export default function WarehouseDiagramScreen() {
         </View>
       ) : structure ? (
         <>
-          {!!inboundOrderId && (
-            <View style={styles.recommendationPanel}>
+          {!!operationId && (
+            <View style={[styles.recommendationPanel, isPicking && styles.pickingPanel]}>
               <View style={styles.recommendationPanelHeader}>
-                <Feather name="map-pin" size={14} color={COLORS.primary} />
-                <Text style={styles.recommendationPanelTitle}>
-                  {focusedItemName ? `Kệ cần xếp: ${focusedItemName}` : 'Gợi ý vị trí xếp hàng'}
+                <Feather name={isPicking ? "shopping-cart" : "map-pin"} size={14} color={isPicking ? COLORS.primary : COLORS.success} />
+                <Text style={[styles.recommendationPanelTitle, !isPicking && { color: COLORS.successText }]}>
+                  {focusedItemName ? `${isPicking ? 'Vị trí nhặt' : 'Kệ cần xếp'}: ${focusedItemName}` : (isPicking ? 'Gợi ý vị trí lấy hàng' : 'Gợi ý vị trí xếp hàng')}
                 </Text>
               </View>
 
               {recommendationsLoading ? (
-                <Text style={styles.recommendationPanelSubtle}>Đang tải gợi ý từ phiếu nhập...</Text>
+                <Text style={styles.recommendationPanelSubtle}>Đang tải gợi ý từ phiếu...</Text>
               ) : effectiveHighlightedBins.length === 0 ? (
-                <Text style={styles.recommendationPanelSubtle}>Chưa có gợi ý từ hệ thống cho phiếu nhập này.</Text>
+                <Text style={styles.recommendationPanelSubtle}>Chưa có gợi ý từ hệ thống cho phiếu này.</Text>
               ) : (
                 <>
                   {recommendationPreview.length > 0 ? (
@@ -272,17 +432,17 @@ export default function WarehouseDiagramScreen() {
                         <Text style={styles.recommendationItemName} numberOfLines={1}>
                           {entry.itemName || `Mặt hàng ${index + 1}`}
                         </Text>
-                        <Text style={styles.recommendationChip}>{entry.binIdCode}</Text>
+                        <Text style={[styles.recommendationChip, !isPicking && styles.successChip]}>{entry.binIdCode}</Text>
                       </View>
                     ))
                   ) : (
                     <Text style={styles.recommendationPanelSubtle}>
-                      Tìm thấy {effectiveHighlightedBins.length} vị trí đề xuất trong sơ đồ.
+                      Tìm thấy {effectiveHighlightedBins.length} vị trí {isPicking ? 'lấy hàng' : 'đề xuất'} trong sơ đồ.
                     </Text>
                   )}
 
                   {recommendationResolution.firstShelf && (
-                    <TouchableOpacity style={styles.recommendationCta} onPress={handleFindPathToRecommended}>
+                    <TouchableOpacity style={[styles.recommendationCta, !isPicking && { backgroundColor: COLORS.success }]} onPress={handleFindPathToRecommended}>
                       <Feather name="navigation" size={14} color="#fff" />
                       <Text style={styles.recommendationCtaText}>Tìm đường đến vị trí gợi ý</Text>
                     </TouchableOpacity>
@@ -370,6 +530,11 @@ export default function WarehouseDiagramScreen() {
         shelf={selectedShelf}
         zone={selectedZone}
         onFindPath={isStaff ? handleFindPath : undefined}
+        recommendedItems={availableItemsForModal}
+        onConfirmOperation={handleConfirmOperationAtShelf}
+        onUpdateShelf={handleUpdateShelf}
+        operationType={isPicking ? 'outbound' : 'inbound'}
+        isProcessing={isProcessing}
         onClose={() => {
           setModalVisible(false);
           setSelectedShelf(null);
@@ -504,8 +669,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: COLORS.borderLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.success + '20',
+  },
+  pickingPanel: {
+    borderColor: COLORS.primary + '20',
   },
   recommendationPanelHeader: {
     flexDirection: 'row',
@@ -540,14 +708,19 @@ const styles = StyleSheet.create({
   },
   recommendationChip: {
     fontSize: 11,
-    color: '#92400E',
-    backgroundColor: '#FEF3C7',
+    color: COLORS.primary,
+    backgroundColor: COLORS.primaryLight,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: COLORS.primary + '20',
     borderRadius: 999,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 2,
     fontWeight: '700',
+  },
+  successChip: {
+    color: COLORS.successText,
+    backgroundColor: COLORS.successLight,
+    borderColor: COLORS.success + '20',
   },
   recommendationCta: {
     marginTop: 10,
