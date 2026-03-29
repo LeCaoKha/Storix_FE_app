@@ -247,14 +247,26 @@ export default function OutboundDetailScreen() {
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
                     style={styles.warehouseCard}
-                    onPress={() => router.push('/warehouse-view')}
+                    onPress={() => {
+                        const allBins: string[] = [];
+                        // Collect bins if the data structure supports it (e.g. from allocations)
+                        // If not, it just opens the map
+                        router.push({
+                            pathname: '/warehouse-view',
+                            params: {
+                                warehouseId: String(order.warehouse?.id || order.warehouseId || ''),
+                                outboundOrderId: String(order.id),
+                                focusedBins: allBins.join(','),
+                            },
+                        } as any);
+                    }}
                 >
                     <View style={styles.warehouseIconWrap}>
                         <Feather name="map" size={18} color={COLORS.primary} />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.warehouseTitle}>Sơ đồ kho</Text>
-                        <Text style={styles.warehouseSubtitle}>Nhấn để xem vị trí trên sơ đồ</Text>
+                        <Text style={styles.warehouseSubtitle}>Nhấn để xem vị trí và tìm đường đi</Text>
                     </View>
                     <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
                 </TouchableOpacity>

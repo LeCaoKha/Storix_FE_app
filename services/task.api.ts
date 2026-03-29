@@ -1,14 +1,14 @@
 import { Task, TaskPriority, TaskStatus, TaskType } from '@/types/order';
 
-import { getStockCountTickets } from './stock-count.api';
 import { getInboundOrdersByStaff } from './inbound-order.api';
 import { getOutboundOrdersByStaff } from './outbound-order.api';
+import { getStockCountTickets } from './stock-count.api';
 import { getTransferOrders } from './transfer.api';
 
 /**
  * Lấy tất cả tasks của staff hiện tại
  */
-export const getTasks = async (staffId: number, companyId: number): Promise<Task[]> => {
+export const getTasks = async (staffId: number, companyId: number, currentWarehouseId?: number): Promise<Task[]> => {
     try {
         const tasks: Task[] = [];
 
@@ -111,13 +111,31 @@ export const getTasks = async (staffId: number, companyId: number): Promise<Task
         }
 
         // Fetch warehouse transfer tasks
-        // BE: GET /api/warehouse-transfers?status=
+        // BE transfer status filter currently expects exact value, so fetch and filter on client.
         try {
-            const transferOrders = await getTransferOrders({
-                status: 'APPROVED,PICKING,PACKED,IN_TRANSIT,RECEIVED,RECEIVED_PARTIAL'
-            });
+            const transferOrders = await getTransferOrders({});
 
-            const transferTasks = transferOrders.map(order => ({
+            const activeTransferStatuses = new Set([
+                'approved',
+                'picking',
+                'packed',
+                'in_transit',
+                'completed',
+                'quality_checked',
+                'quality_issue',
+                // Keep compatibility for legacy rows.
+                'received_full',
+                'received_partial',
+                'received',
+            ]);
+
+            const transferTasks = transferOrders
+                .filter(order => activeTransferStatuses.has((order.status || '').toLowerCase()))
+                .filter(order => {
+                    if (!currentWarehouseId) return true;
+                    return order.sourceWarehouseId === currentWarehouseId || order.destinationWarehouseId === currentWarehouseId;
+                })
+                .map(order => ({
                 id: `transfer-${order.id}`,
                 title: `Điều chuyển: ${order.referenceCode || `TRS-${order.id}`}`,
                 description: `Chuyển hàng từ ${order.sourceWarehouse?.name || 'Kho nguồn'} đến ${order.destinationWarehouse?.name || 'Kho đích'}`,
@@ -129,7 +147,7 @@ export const getTasks = async (staffId: number, companyId: number): Promise<Task
                 location: order.sourceWarehouse?.name,
                 createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
                 updatedAt: order.createdAt ? new Date(order.createdAt) : new Date(),
-            }));
+                }));
 
             tasks.push(...transferTasks);
         } catch (err) {
@@ -197,18 +215,23 @@ function mapCountStatus(status?: string): TaskStatus {
 }
 
 function mapTransferStatus(status?: string): TaskStatus {
-    // BE Transfer statuses: Draft, PendingApproval, Approved, Picking, Packed, InTransit, ReceivedFull, ReceivedPartial, Completed, Cancelled
+    // BE Transfer statuses: Draft, PendingApproval, Approved, Picking, Packed, InTransit, Completed, QualityChecked, QualityIssue, Cancelled
     switch (status?.toLowerCase()) {
         case 'approved':
             return TaskStatus.PENDING;
         case 'picking':
         case 'packed':
         case 'in_transit':
+        case 'completed':
         case 'received':
+        case 'received_full':
         case 'received_partial':
             return TaskStatus.IN_PROGRESS;
-        case 'completed':
+        case 'quality_checked':
+        case 'quality_issue':
             return TaskStatus.COMPLETED;
+        case 'cancelled':
+            return TaskStatus.CANCELLED;
         default:
             return TaskStatus.PENDING;
     }

@@ -58,6 +58,7 @@ export default function CreateRequisitionScreen() {
     const [showCalendar, setShowCalendar] = useState(false);
     const [showWarehousePicker, setShowWarehousePicker] = useState(false);
     const [showSupplierPicker, setShowSupplierPicker] = useState(false);
+    const isOutboundCreationSupported = user?.roleId === 4;
 
     // Load warehouses - chỉ chạy 1 lần khi component mount
     useEffect(() => {
@@ -185,6 +186,16 @@ export default function CreateRequisitionScreen() {
 
         if (!warehouseId) {
             AlertService.error('Lỗi', 'Vui lòng chọn kho');
+            return;
+        }
+
+        // Backend currently allows create-outbound-request for staff role only.
+        // Prevent managers/admins from entering a failing flow.
+        if (type === 'outbound' && !isOutboundCreationSupported) {
+            AlertService.warning(
+                'Chưa hỗ trợ trên tài khoản này',
+                'Backend hiện chỉ cho tài khoản Staff tạo đề nghị xuất kho. Vui lòng dùng tài khoản Staff hoặc liên hệ BE để mở quyền cho Manager/Admin.'
+            );
             return;
         }
 
@@ -318,9 +329,19 @@ export default function CreateRequisitionScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.typeCard,
-                                type === 'outbound' && styles.typeCardActive
+                                type === 'outbound' && styles.typeCardActive,
+                                !isOutboundCreationSupported && { opacity: 0.6 }
                             ]}
-                            onPress={() => setType('outbound')}
+                            onPress={() => {
+                                if (!isOutboundCreationSupported) {
+                                    AlertService.info(
+                                        'Chưa hỗ trợ',
+                                        'Role hiện tại chưa được backend cho phép tạo đề nghị xuất kho.'
+                                    );
+                                    return;
+                                }
+                                setType('outbound');
+                            }}
                         >
                             <View style={[styles.typeCardIcon, type === 'outbound' && styles.typeCardIconActive]}>
                                 <Feather

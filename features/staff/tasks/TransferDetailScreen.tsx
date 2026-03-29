@@ -3,7 +3,6 @@ import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import {
     useMarkTransferPacked,
-    useQualityCheckTransfer,
     useShipTransfer,
     useStartTransferPicking,
     useTransferOrder
@@ -27,7 +26,6 @@ export default function StaffTransferDetailScreen() {
     const startPickingMutation = useStartTransferPicking();
     const markPackedMutation = useMarkTransferPacked();
     const shipMutation = useShipTransfer();
-    const qualityCheckMutation = useQualityCheckTransfer();
 
     if (isLoading) {
         return (
@@ -69,29 +67,7 @@ export default function StaffTransferDetailScreen() {
     };
 
     const handleQualityCheck = () => {
-        if (!transfer?.items) return;
-
-        const qualityCheckItems = transfer.items.map(item => ({
-            productId: item.productId,
-            okQuantity: item.quantity,
-            badQuantity: 0,
-            note: 'Confirmed on mobile'
-        }));
-
-        qualityCheckMutation.mutate(
-            { 
-                id: transferId, 
-                payload: { 
-                    note: 'Staff confirmed quality check on mobile',
-                    items: qualityCheckItems
-                } 
-            },
-            {
-                onSuccess: () => {
-                    // Logic refresh query đã có trong hook
-                }
-            }
-        );
+        router.push(`/(staff-tabs)/tasks/transfer/quality/${transferId}` as any);
     };
 
     // Render Items
@@ -215,25 +191,24 @@ export default function StaffTransferDetailScreen() {
                         loading={shipMutation.isPending} 
                     />
                 )}
-                {(normalizedStatus === 'in_transit' || normalizedStatus === 'received_partial') && (
+                {normalizedStatus === 'in_transit' && (
                     <Button 
                         title="Kiểm nhận hàng" 
                         onPress={handleReceive} 
                     />
                 )}
-                {(normalizedStatus === 'received' || normalizedStatus === 'received_partial') && (
+                {normalizedStatus === 'completed' && (
                     <Button 
                         title="Xác nhận kiểm hàng" 
                         onPress={handleQualityCheck}
-                        loading={qualityCheckMutation.isPending}
                         variant="outline"
                         style={{ marginTop: 8 }}
                     />
                 )}
-                {normalizedStatus === 'completed' && (
+                {(normalizedStatus === 'quality_checked' || normalizedStatus === 'quality_issue') && (
                     <View style={styles.completedNotice}>
                         <Feather name="check-circle" size={20} color={COLORS.success} />
-                        <Text style={styles.completedText}>Phiếu luân chuyển này đã hoàn tất.</Text>
+                        <Text style={styles.completedText}>Phiếu luân chuyển đã hoàn tất kiểm hàng.</Text>
                     </View>
                 )}
             </View>

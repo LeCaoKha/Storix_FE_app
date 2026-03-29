@@ -3,7 +3,6 @@ import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useOutboundRequest, useOutboundTicket } from '@/hooks';
 import {
-    useConfirmOutboundOrder,
     useUpdateOutboundRequestStatus,
 } from '@/hooks/outbound-orders.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
@@ -74,7 +73,6 @@ export default function OutboundOrderDetailScreen() {
 
     // Mutations
     const updateRequestStatus = useUpdateOutboundRequestStatus();
-    const confirmOrder = useConfirmOutboundOrder();
 
     const isLoading = requestLoading || ticketLoading;
     const error = requestError || ticketError;
@@ -112,7 +110,6 @@ export default function OutboundOrderDetailScreen() {
     const isAdmin = user?.roleId === 2;
     const canApproveReject = isRequest && data.status === 'Pending' && isAdmin;
     const canCreateTicket = isRequest && data.status === 'Approved';
-    const canConfirmComplete = !isRequest && data.status === 'LoadHandover';
 
     // Handle approve request
     const handleApprove = () => {
@@ -170,30 +167,6 @@ export default function OutboundOrderDetailScreen() {
             pathname: '/(manager-tabs)/(orders-outbound)/create',
             params: { requisitionId: data.id }
         } as any);
-    };
-
-    // Handle confirm complete
-    const handleConfirmComplete = () => {
-        AlertService.confirm(
-            'Xác nhận hoàn tất',
-            'Xác nhận đơn xuất kho đã hoàn tất?',
-            async () => {
-                try {
-                    setIsProcessing(true);
-                    await confirmOrder.mutateAsync({
-                        ticketId: data.id,
-                        performedBy: user?.id ?? 0,
-                    });
-                    AlertService.success('Thành công', 'Đơn xuất kho đã hoàn tất', () => {
-                        goBack();
-                    });
-                } catch {
-                    AlertService.error('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
-                } finally {
-                    setIsProcessing(false);
-                }
-            }
-        );
     };
 
     // Get items - support both DTO format (items) and raw entity format (outboundOrderItems)
@@ -367,7 +340,7 @@ export default function OutboundOrderDetailScreen() {
             )}
 
             {/* Action Buttons */}
-            {(canApproveReject || canCreateTicket || canConfirmComplete) && (
+            {(canApproveReject || canCreateTicket) && (
                 <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                     {canApproveReject && (
                         <View style={styles.actionRow}>
@@ -415,22 +388,6 @@ export default function OutboundOrderDetailScreen() {
                                 <>
                                     <Feather name="file-plus" size={18} color="#fff" />
                                     <Text style={styles.actionButtonText}>Tạo phiếu xuất kho</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
-                    )}
-                    {canConfirmComplete && (
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.approveButton, styles.fullWidth]}
-                            onPress={handleConfirmComplete}
-                            disabled={isProcessing}
-                        >
-                            {isProcessing ? (
-                                <ActivityIndicator size="small" color="#fff" />
-                            ) : (
-                                <>
-                                    <Feather name="check-circle" size={18} color="#fff" />
-                                    <Text style={styles.actionButtonText}>Xác nhận hoàn tất</Text>
                                 </>
                             )}
                         </TouchableOpacity>
