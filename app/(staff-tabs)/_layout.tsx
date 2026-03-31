@@ -4,6 +4,7 @@ import React from "react";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from "@/constants/color";
+import { useRefreshStore } from "@/stores/refresh.store";
 
 export default function StaffTabLayout() {
     const insets = useSafeAreaInsets();
@@ -29,6 +30,13 @@ export default function StaffTabLayout() {
                     title: "Trang chủ",
                     tabBarIcon: ({ color }) => <Feather name="home" size={28} color={color} />,
                 }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
             />
             <Tabs.Screen
                 name="tasks/index"
@@ -36,6 +44,13 @@ export default function StaffTabLayout() {
                     title: "Nhiệm vụ",
                     tabBarIcon: ({ color }) => <Feather name="clipboard" size={28} color={color} />,
                 }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
             />
             <Tabs.Screen
                 name="warehouse"
@@ -67,11 +82,34 @@ export default function StaffTabLayout() {
                 }}
             />
             <Tabs.Screen
+                name="notifications"
+                options={{
+                    title: "Thông báo",
+                    tabBarIcon: ({ color }) => <Feather name="bell" size={28} color={color} />,
+                    tabBarBadge: 2, // Example badge
+                    tabBarBadgeStyle: { backgroundColor: COLORS.danger, color: '#fff', fontSize: 10 },
+                }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
+            />
+            <Tabs.Screen
                 name="profile"
                 options={{
                     title: "Profile",
                     tabBarIcon: ({ color }) => <Feather name="user" size={28} color={color} />,
                 }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
             />
             {/* Hide nested task routes from tab bar */}
             <Tabs.Screen

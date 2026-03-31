@@ -1,4 +1,4 @@
-import { TabScreenHeader } from '@/components';
+import { RefreshContainer, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundTickets } from '@/hooks';
 import { Feather } from '@expo/vector-icons';
@@ -17,7 +17,7 @@ const TABS: { key: TabType; label: string }[] = [
 
 export default function StaffOrdersListScreen() {
     const router = useRouter();
-    const { data: tickets = [], isLoading } = useInboundTickets();
+    const { data: tickets = [], isLoading, refetch } = useInboundTickets();
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -65,6 +65,10 @@ export default function StaffOrdersListScreen() {
 
     const handleTicketPress = (id: number) => {
         router.push(`/(staff-tabs)/orders/${id}` as any);
+    };
+
+    const handleRefresh = async () => {
+        await refetch();
     };
 
     const getStatusBadgeStyle = (status: string) => {
@@ -128,7 +132,11 @@ export default function StaffOrdersListScreen() {
                 </ScrollView>
             </TabScreenHeader>
             
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={styles.contentContainer}
+                onRefresh={handleRefresh}
+            >
                 {filteredTickets.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Feather name="package" size={64} color={COLORS.border} />
@@ -199,7 +207,7 @@ export default function StaffOrdersListScreen() {
                 )}
 
                 <View style={{ height: 20 }} />
-            </ScrollView>
+            </RefreshContainer>
         </View>
     );
 }

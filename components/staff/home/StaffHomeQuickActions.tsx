@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, useWindowDimensions } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/color';
 
@@ -14,36 +13,28 @@ export const StaffHomeQuickActions: React.FC = () => {
       id: 'scan',
       title: 'Quét mã',
       subtitle: 'SKU/Vị trí',
-      icon: 'barcode',
       color: COLORS.primary,
-      bgColor: COLORS.primaryLight,
       onPress: () => router.push('/(staff-tabs)/tasks'),
     },
     {
       id: 'inventory',
       title: 'Kiểm kho',
       subtitle: 'Tra cứu SKU',
-      icon: 'cube',
       color: COLORS.success,
-      bgColor: COLORS.successLight,
       onPress: () => router.push('/(staff-tabs)/warehouse'),
     },
     {
       id: 'transfer',
       title: 'Điều chuyển',
       subtitle: 'Nội bộ kho',
-      icon: 'swap-horizontal',
       color: COLORS.warning,
-      bgColor: COLORS.warningLight,
       onPress: () => router.push('/(staff-tabs)/tasks'),
     },
     {
       id: 'report',
       title: 'Báo cáo',
       subtitle: 'Lỗi/Hỏng',
-      icon: 'alert-circle',
       color: COLORS.danger,
-      bgColor: COLORS.dangerLight,
       onPress: () => {},
     },
   ];
@@ -53,13 +44,10 @@ export const StaffHomeQuickActions: React.FC = () => {
       {actions.map((action) => (
         <TouchableOpacity
           key={action.id}
-          style={[styles.actionCard, { width: itemWidth }]}
+          style={[styles.actionCard, { width: itemWidth, borderLeftColor: action.color }]}
           onPress={action.onPress}
           activeOpacity={0.7}
         >
-          <View style={[styles.iconContainer, { backgroundColor: action.bgColor }]}>
-            <Ionicons name={action.icon as any} size={24} color={action.color} />
-          </View>
           <View style={styles.textContainer}>
             <Text style={styles.actionTitle}>{action.title}</Text>
             <Text style={styles.actionSubtitle} numberOfLines={1}>{action.subtitle}</Text>
@@ -78,38 +66,29 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     borderWidth: 1,
     borderColor: '#F1F5F9',
+    borderLeftWidth: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 2,
-  },
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    elevation: 1,
   },
   textContainer: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   actionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.slate900,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1E293B',
   },
   actionSubtitle: {
     fontSize: 12,
-    color: COLORS.textMuted,
+    color: '#64748B',
     fontWeight: '500',
   },
 });

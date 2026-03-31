@@ -1,4 +1,4 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useInboundStorageRecommendations, useUpdateInboundTicketItems } from '@/hooks';
@@ -10,7 +10,7 @@ import type { InboundItemStorageRecommendations, InboundOrderItem } from '@/type
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InboundDetailScreen() {
@@ -24,11 +24,11 @@ export default function InboundDetailScreen() {
 
     // Dùng endpoint staff-specific (filter theo Warehouse.CompanyId — đúng)
     // thay vì GET /tickets/{companyId}/{id} (filter theo CreatedByNavigation.CompanyId — sai, gây 404)
-    const { data: staffOrders, isLoading } = useInboundOrdersByStaff(companyId, staffId);
+    const { data: staffOrders, isLoading, refetch: refetchOrders } = useInboundOrdersByStaff(companyId, staffId);
     const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
     const order = useMemo(() => staffOrders?.find(t => t.id === numericId) ?? null, [staffOrders, numericId]);
     const error = !isLoading && !order;
-    const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(order?.id);
+    const { data: recommendationItems = [], isLoading: recommendationsLoading, refetch: refetchRecs } = useInboundStorageRecommendations(order?.id);
 
     const updateItems = useUpdateInboundTicketItems();
     const recommendationByItemId = useMemo(() => {
@@ -48,7 +48,7 @@ export default function InboundDetailScreen() {
     }, [recommendationItems]);
 
     const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
-    const { data: warehouseStructure } = useWarehouseStructure(warehouseId);
+    const { data: warehouseStructure, refetch: refetchStructure } = useWarehouseStructure(warehouseId);
 
     const validBinCodes = useMemo(() => {
         if (!warehouseStructure?.zones) return new Set<string>();
@@ -82,6 +82,7 @@ export default function InboundDetailScreen() {
                 warehouseId: String(order?.warehouse?.id || order?.warehouseId || ''),
                 inboundOrderId: String(order?.id || ''),
                 focusedBins: bins.join(','),
+                focusedItemId: String(item.id),
                 focusedItemName: item.name || item.product?.name || `SP #${item.productId}`,
             },
         } as any);
@@ -301,6 +302,14 @@ export default function InboundDetailScreen() {
         );
     };
 
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchOrders(),
+            refetchRecs(),
+            refetchStructure()
+        ]);
+    };
+
     return (
         <View style={styles.container}>
             <ScreenHeader
@@ -308,7 +317,11 @@ export default function InboundDetailScreen() {
                 subtitle={order.referenceCode || `INB-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={handleRefresh}
+            >
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
@@ -440,7 +453,7 @@ export default function InboundDetailScreen() {
 
                     </Card>
                 ))}
-            </ScrollView>
+            </RefreshContainer>
 
             {isCompleted ? (
                 <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>

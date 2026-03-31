@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { COLORS } from '@/constants/color';
@@ -28,9 +27,6 @@ export const StaffHomeWarehouseSnapshot: React.FC<StaffHomeWarehouseSnapshotProp
   if (!structure) {
     return (
       <View style={[styles.card, styles.center]}>
-        <View style={styles.emptyIconContainer}>
-          <Ionicons name="map" size={32} color={COLORS.textSubtle} />
-        </View>
         <Text style={styles.emptyText}>Chưa có sơ đồ kho</Text>
       </View>
     );
@@ -39,14 +35,14 @@ export const StaffHomeWarehouseSnapshot: React.FC<StaffHomeWarehouseSnapshotProp
   const zoneCount = structure.zones?.length ?? 0;
   const nodeCount = structure.nodes?.length ?? 0;
 
-  // Generate a mock grid visual based on zones
+  // Generate a schematic grid visual
   const renderGrid = () => {
     return (
       <View style={styles.gridContainer}>
         {[...Array(6)].map((_, row) => (
           <View key={row} style={styles.gridRow}>
             {[...Array(10)].map((_, col) => {
-              const isActive = (row + col) % 3 === 0; // Simple pattern for visual
+              const isActive = (row + col) % 3 === 0; 
               return (
                 <View 
                   key={col} 
@@ -84,15 +80,10 @@ export const StaffHomeWarehouseSnapshot: React.FC<StaffHomeWarehouseSnapshotProp
             </View>
           </View>
         </View>
-
-        <View style={styles.mapIcon}>
-          <Ionicons name="map" size={20} color="#FFFFFF" />
-        </View>
       </View>
 
       <View style={styles.footer}>
           <Text style={styles.footerText}>Xem sơ đồ chi tiết</Text>
-          <Ionicons name="arrow-forward" size={16} color={COLORS.primary} />
       </View>
     </TouchableOpacity>
   );
@@ -131,13 +122,13 @@ const styles = StyleSheet.create({
   },
   gridCell: {
     flex: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#CBD5E1', // Cleaner gray
     borderRadius: 2,
-    opacity: 0.5,
+    opacity: 0.3,
   },
   activeCell: {
     backgroundColor: COLORS.primary,
-    opacity: 0.3,
+    opacity: 0.2, // Subtle schematic look
   },
   overlay: {
     position: 'absolute',
@@ -145,58 +136,47 @@ const styles = StyleSheet.create({
     left: 16,
   },
   statGroup: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 12,
     gap: 6,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.slate700,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#334155', // COLORS.slate700
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
   },
-  mapIcon: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   footer: {
     padding: 16,
-    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
   footerText: {
     color: COLORS.primary,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800', // Bolder "Link" look
   },
   center: {
     height: 160,
@@ -204,18 +184,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
   },
-  emptyIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   emptyText: {
-    color: COLORS.textMuted,
+    color: '#94A3B8',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

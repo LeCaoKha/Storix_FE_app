@@ -1,4 +1,4 @@
-import { RequisitionCard, TabScreenHeader } from '@/components';
+import { RefreshContainer, RequisitionCard, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useRequisitions } from '@/hooks';
 import { useAuthStore } from '@/stores/auth.store';
@@ -21,7 +21,7 @@ const TABS: { key: TabType; label: string }[] = [
 export default function RequisitionsScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
-    const { data: requisitions = [], isLoading } = useRequisitions(user?.companyId);
+    const { data: requisitions = [], isLoading, refetch } = useRequisitions(user?.companyId);
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -57,6 +57,10 @@ export default function RequisitionsScreen() {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
     }, [requisitions, searchQuery, activeTab, searchRequisitionsLocal]);
+
+    const handleRefresh = async () => {
+        await refetch();
+    };
 
     if (isLoading) {
         return (
@@ -118,7 +122,11 @@ export default function RequisitionsScreen() {
                     })}
                 </ScrollView>
             </TabScreenHeader>
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={styles.contentContainer}
+                onRefresh={handleRefresh}
+            >
                 {filteredRequisitions.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Feather name="inbox" size={64} color={COLORS.border} />
@@ -149,7 +157,7 @@ export default function RequisitionsScreen() {
                 )}
 
                 <View style={{ height: 20 }} />
-            </ScrollView>
+            </RefreshContainer>
         </View>
     );
 }

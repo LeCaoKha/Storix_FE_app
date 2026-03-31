@@ -1,4 +1,4 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useOutboundOrder, useUpdateOutboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
@@ -7,13 +7,17 @@ import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function StaffOutboundDetailScreen() {
     const router = useRouter();
     const goBack = useAppBack('/(staff-tabs)/tasks');
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: order, isLoading, error } = useOutboundOrder(id);
+    const { data: order, isLoading, error, refetch } = useOutboundOrder(id);
+
+    const handleRefresh = async () => {
+        await refetch();
+    };
     const updateItems = useUpdateOutboundTicketItems();
 
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
@@ -137,7 +141,11 @@ export default function StaffOutboundDetailScreen() {
                 subtitle={order.note || `OUT-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={styles.scrollContent}
+                onRefresh={handleRefresh}
+            >
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="user" size={16} color={COLORS.textMuted} />
@@ -225,7 +233,7 @@ export default function StaffOutboundDetailScreen() {
                         </Card>
                     );
                 })}
-            </ScrollView>
+            </RefreshContainer>
 
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.reportBtn}>

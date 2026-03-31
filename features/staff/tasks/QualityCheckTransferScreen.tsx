@@ -1,4 +1,4 @@
-import { Button, Card, ScreenHeader } from '@/components';
+import { Button, Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useQualityCheckTransfer, useTransferOrder } from '@/hooks/transfer.hooks';
@@ -8,7 +8,7 @@ import { TransferQualityCheckItemRequest, TransferQualityCheckPayload } from '@/
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type QualityRow = {
@@ -26,7 +26,11 @@ export default function QualityCheckTransferScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const transferId = parseInt(id || '0', 10);
 
-  const { data: transfer, isLoading } = useTransferOrder(transferId);
+  const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
+
+  const handleRefresh = async () => {
+    await refetch();
+  };
   const qualityMutation = useQualityCheckTransfer();
 
   const [note, setNote] = useState('');
@@ -154,9 +158,10 @@ export default function QualityCheckTransferScreen() {
         subtitle={transfer.referenceCode || `Phieu #${transfer.id}`}
       />
 
-      <ScrollView
-        style={styles.content}
+      <RefreshContainer 
+        style={styles.content} 
         contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}
+        onRefresh={handleRefresh}
       >
         <Card style={styles.card}>
           <View style={styles.infoRow}>
@@ -216,7 +221,7 @@ export default function QualityCheckTransferScreen() {
             onChangeText={setNote}
           />
         </Card>
-      </ScrollView>
+      </RefreshContainer>
 
       <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
         <Button

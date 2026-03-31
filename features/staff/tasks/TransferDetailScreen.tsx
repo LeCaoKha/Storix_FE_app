@@ -1,4 +1,4 @@
-import { Button, Card, ScreenHeader } from '@/components';
+import { Button, Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import {
@@ -11,7 +11,7 @@ import { TransferOrderItem } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function StaffTransferDetailScreen() {
@@ -20,7 +20,11 @@ export default function StaffTransferDetailScreen() {
     const transferId = parseInt(id || '0', 10);
     const insets = useSafeAreaInsets();
 
-    const { data: transfer, isLoading } = useTransferOrder(transferId);
+    const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
+
+    const handleRefresh = async () => {
+        await refetch();
+    };
 
     // Mutations
     const startPickingMutation = useStartTransferPicking();
@@ -92,7 +96,11 @@ export default function StaffTransferDetailScreen() {
                 subtitle={transfer.referenceCode || `Phiếu #${transfer.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={handleRefresh}
+            >
                 {/* Header Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -166,7 +174,7 @@ export default function StaffTransferDetailScreen() {
                         </View>
                     ))}
                 </View>
-            </ScrollView>
+            </RefreshContainer>
 
             {/* Actions Footer */}
             <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>

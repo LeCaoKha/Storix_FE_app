@@ -1,4 +1,4 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useStockCountTicket, useUpdateStockCountItem } from '@/hooks/stock-count.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
@@ -7,7 +7,7 @@ import { AlertService } from '@/stores/alert.store';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InventoryCountDetailScreen() {
@@ -17,7 +17,7 @@ export default function InventoryCountDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const ticketId = parseInt(id || '0');
 
-    const { data: ticket, isLoading, error } = useStockCountTicket(ticketId);
+    const { data: ticket, isLoading, error, refetch } = useStockCountTicket(ticketId);
     const updateItem = useUpdateStockCountItem();
 
     const [counts, setCounts] = useState<Record<number, string>>({});
@@ -79,6 +79,10 @@ export default function InventoryCountDetailScreen() {
         });
     };
 
+    const handleRefresh = async () => {
+        await refetch();
+    };
+
     if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
@@ -107,7 +111,12 @@ export default function InventoryCountDetailScreen() {
                 subtitle={ticket.name || `CNT-${ticket.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]} 
+                showsVerticalScrollIndicator={false}
+                onRefresh={handleRefresh}
+            >
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <View style={styles.infoIconContainer}>
@@ -244,7 +253,7 @@ export default function InventoryCountDetailScreen() {
                     );
                 })}
                 <View style={{ height: 40 }} />
-            </ScrollView>
+            </RefreshContainer>
 
             <View style={styles.footer}>
                 <TouchableOpacity

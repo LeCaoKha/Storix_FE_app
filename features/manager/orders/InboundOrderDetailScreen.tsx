@@ -1,4 +1,4 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundRequest, useInboundTicket } from '@/hooks';
@@ -17,7 +17,6 @@ import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Linking,
-    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -62,12 +61,17 @@ export default function InboundOrderDetailScreen() {
     const insets = useSafeAreaInsets();
 
     // Fetch data based on type
-    const { data: request, isLoading: requestLoading, error: requestError } = useInboundRequest(
+    const { data: request, isLoading: requestLoading, error: requestError, refetch: refetchRequest } = useInboundRequest(
         type === 'request' ? id : undefined
     );
-    const { data: ticket, isLoading: ticketLoading, error: ticketError } = useInboundTicket(
+    const { data: ticket, isLoading: ticketLoading, error: ticketError, refetch: refetchTicket } = useInboundTicket(
         type === 'ticket' ? id : undefined
     );
+
+    const handleRefresh = async () => {
+        if (type === 'request') await refetchRequest();
+        else await refetchTicket();
+    };
 
     // Mutations
     const updateRequestStatus = useUpdateInboundRequestStatus();
@@ -200,7 +204,11 @@ export default function InboundOrderDetailScreen() {
                 subtitle={isRequest ? `REQ-${data.id}` : ((data as any).referenceCode || `INB-${data.id}`)}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
+                onRefresh={handleRefresh}
+            >
                 {/* Status Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -342,9 +350,7 @@ export default function InboundOrderDetailScreen() {
                         </View>
                     ))}
                 </Card>
-
-                <View style={{ height: 120 }} />
-            </ScrollView>
+            </RefreshContainer>
 
             {/* Action Buttons */}
             {(canApproveReject || canCreateTicket) && (

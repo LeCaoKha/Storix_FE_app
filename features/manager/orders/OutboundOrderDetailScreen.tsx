@@ -1,4 +1,4 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useOutboundRequest, useOutboundTicket } from '@/hooks';
@@ -14,7 +14,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -64,12 +63,17 @@ export default function OutboundOrderDetailScreen() {
     };
 
     // Fetch data based on type
-    const { data: request, isLoading: requestLoading, error: requestError } = useOutboundRequest(
+    const { data: request, isLoading: requestLoading, error: requestError, refetch: refetchRequest } = useOutboundRequest(
         type === 'request' ? id : undefined
     );
-    const { data: ticket, isLoading: ticketLoading, error: ticketError } = useOutboundTicket(
+    const { data: ticket, isLoading: ticketLoading, error: ticketError, refetch: refetchTicket } = useOutboundTicket(
         type === 'ticket' ? id : undefined
     );
+
+    const handleRefresh = async () => {
+        if (type === 'request') await refetchRequest();
+        else await refetchTicket();
+    };
 
     // Mutations
     const updateRequestStatus = useUpdateOutboundRequestStatus();
@@ -180,7 +184,11 @@ export default function OutboundOrderDetailScreen() {
                 subtitle={isRequest ? `REQ-${data.id}` : `OUT-${data.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
+                onRefresh={handleRefresh}
+            >
                 {/* Status Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -325,7 +333,7 @@ export default function OutboundOrderDetailScreen() {
                 )}
 
                 <View style={{ height: 120 }} />
-            </ScrollView>
+            </RefreshContainer>
 
             {/* Info for Manager: waiting for Admin approval */}
             {isRequest && data.status === 'Pending' && !isAdmin && (

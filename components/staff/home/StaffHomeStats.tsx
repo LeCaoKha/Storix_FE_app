@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/color';
 
@@ -20,22 +19,12 @@ export const StaffHomeStats: React.FC<StaffHomeStatsProps> = ({ inboundCount, ou
   return (
     <View style={styles.container}>
       <TouchableOpacity 
-        style={styles.card} 
+        style={[styles.card, { borderLeftColor: COLORS.primary }]} 
         onPress={handleNavigateToTasks}
         activeOpacity={0.8}
       >
-        <View style={styles.cardHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: COLORS.primaryLight }]}>
-            <Ionicons name="download" size={24} color={COLORS.primary} />
-          </View>
-          <View style={styles.trendBadge}>
-            <Ionicons name="trending-up" size={10} color={COLORS.success} />
-            <Text style={styles.trendText}>+12%</Text>
-          </View>
-        </View>
-        
         <View style={styles.cardBody}>
-          <Text style={styles.label}>Nhập kho</Text>
+          <Text style={styles.label}>Chờ nhập kho</Text>
           {loading ? (
             <ActivityIndicator size="small" color={COLORS.primary} style={styles.loader} />
           ) : (
@@ -48,22 +37,12 @@ export const StaffHomeStats: React.FC<StaffHomeStatsProps> = ({ inboundCount, ou
       </TouchableOpacity>
 
       <TouchableOpacity 
-        style={styles.card} 
+        style={[styles.card, { borderLeftColor: COLORS.warning }]} 
         onPress={handleNavigateToTasks}
         activeOpacity={0.8}
       >
-        <View style={styles.cardHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: COLORS.warningLight }]}>
-            <Ionicons name="share" size={24} color={COLORS.warning} />
-          </View>
-          <View style={[styles.trendBadge, { backgroundColor: '#F0FDF4' }]}>
-            <Ionicons name="trending-up" size={10} color={COLORS.success} />
-            <Text style={styles.trendText}>+5%</Text>
-          </View>
-        </View>
-        
         <View style={styles.cardBody}>
-          <Text style={styles.label}>Xuất kho</Text>
+          <Text style={styles.label}>Chờ xuất kho</Text>
           {loading ? (
             <ActivityIndicator size="small" color={COLORS.warning} style={styles.loader} />
           ) : (
@@ -81,74 +60,51 @@ export const StaffHomeStats: React.FC<StaffHomeStatsProps> = ({ inboundCount, ou
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 12,
   },
   card: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#F1F5F9',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  trendBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    gap: 2,
-  },
-  trendText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.success,
+    borderLeftWidth: 4, // Add a subtle accent bar
   },
   cardBody: {
     gap: 4,
   },
   label: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#64748B', // COLORS.slate500
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    marginTop: 4,
   },
   value: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
-    color: COLORS.slate900,
+    color: '#0F172A', // COLORS.slate900
   },
   unit: {
-    fontSize: 13,
-    color: COLORS.textSubtle,
-    fontWeight: '500',
-    marginLeft: 2,
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginLeft: 4,
   },
   loader: {
     alignSelf: 'flex-start',
-    marginTop: 8,
+    marginTop: 12,
   }
 });

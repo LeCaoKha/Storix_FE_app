@@ -1,4 +1,4 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
@@ -7,13 +7,17 @@ import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function StaffInboundDetailScreen() {
     const router = useRouter();
     const goBack = useAppBack('/(staff-tabs)/tasks');
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: order, isLoading, error } = useInboundTicket(id);
+    const { data: order, isLoading, error, refetch } = useInboundTicket(id);
+
+    const handleRefresh = async () => {
+        await refetch();
+    };
     const updateItems = useUpdateInboundTicketItems();
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [localItemData, setLocalItemData] = useState<Record<number, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});
@@ -113,7 +117,11 @@ export default function StaffInboundDetailScreen() {
                 subtitle={order.referenceCode || `INB-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={styles.scrollContent}
+                onRefresh={handleRefresh}
+            >
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
@@ -218,7 +226,7 @@ export default function StaffInboundDetailScreen() {
                         </TouchableOpacity>
                     </Card>
                 ))}
-            </ScrollView>
+            </RefreshContainer>
 
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.reportBtn}>
