@@ -1,8 +1,8 @@
-import { Card, RequisitionItemList, ScreenHeader, StatusBadge } from '@/components';
+import { Card, RefreshContainer, RequisitionItemList, ScreenHeader, StatusBadge } from '@/components';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
@@ -16,7 +16,11 @@ export default function RequisitionDetailScreen() {
     const goBack = useAppBack('/(manager-tabs)/requisitions');
     const insets = useSafeAreaInsets();
     const { id, type } = useLocalSearchParams<{ id: string; type: 'inbound' | 'outbound' }>();
-    const { data: requisition, isLoading } = useRequisition(id!, type);
+    const { data: requisition, isLoading, refetch } = useRequisition(id!, type);
+
+    const handleRefresh = async () => {
+        await refetch();
+    };
 
     if (isLoading) {
         return (
@@ -82,7 +86,11 @@ export default function RequisitionDetailScreen() {
                 }
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={handleRefresh}
+            >
                 {/* Status Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -289,7 +297,7 @@ export default function RequisitionDetailScreen() {
                         </Card>
                     </>
                 )}
-            </ScrollView>
+            </RefreshContainer>
 
             {/* Action Buttons */}
             {canCreateOrder && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View, Text, SafeAreaView } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 import { useAuthStore } from '@/stores';
 import { useInboundOrdersByStaff } from '@/hooks/inbound-orders.hooks';
 import { useOutboundTasksByStaff } from '@/hooks/outbound-orders.hooks';
@@ -7,13 +7,14 @@ import { StaffHomeHeader } from '@/components/staff/home/StaffHomeHeader';
 import { StaffHomeStats } from '@/components/staff/home/StaffHomeStats';
 import { StaffHomeQuickActions } from '@/components/staff/home/StaffHomeQuickActions';
 import { StaffHomeWarehouseSnapshot } from '@/components/staff/home/StaffHomeWarehouseSnapshot';
+import { RefreshContainer } from '@/components';
 
 export default function StaffHomeScreen() {
   const user = useAuthStore((state) => state.user);
   
   // Fetch tasks to get counts
-  const { data: inboundTasks, isLoading: loadingInbound } = useInboundOrdersByStaff(user?.companyId ?? 0, user?.id ?? 0);
-  const { data: outboundTasks, isLoading: loadingOutbound } = useOutboundTasksByStaff(user?.companyId ?? 0, user?.id ?? 0);
+  const { data: inboundTasks, isLoading: loadingInbound, refetch: refetchInbound } = useInboundOrdersByStaff(user?.companyId ?? 0, user?.id ?? 0);
+  const { data: outboundTasks, isLoading: loadingOutbound, refetch: refetchOutbound } = useOutboundTasksByStaff(user?.companyId ?? 0, user?.id ?? 0);
 
   const stats = {
     inboundCount: inboundTasks?.length ?? 0,
@@ -21,12 +22,20 @@ export default function StaffHomeScreen() {
     loading: loadingInbound || loadingOutbound,
   };
 
+  const handleRefresh = async () => {
+    await Promise.all([
+      refetchInbound(),
+      refetchOutbound()
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView 
+      <RefreshContainer 
         style={styles.container} 
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        onRefresh={handleRefresh}
       >
         <StaffHomeHeader 
           userName={user?.fullName || 'Nhân viên'} 
@@ -48,7 +57,7 @@ export default function StaffHomeScreen() {
           <Text style={styles.sectionTitle}>Sơ đồ kho hiện tại</Text>
         </View>
         <StaffHomeWarehouseSnapshot warehouseId={user?.warehouseId} />
-      </ScrollView>
+      </RefreshContainer>
     </SafeAreaView>
   );
 }

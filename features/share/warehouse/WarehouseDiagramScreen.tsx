@@ -1,12 +1,12 @@
-import { ScreenHeader } from '@/components';
+import { RefreshContainer, ScreenHeader } from '@/components';
 import { PathInstructionsModal, ShelfDetailModal, WarehouseGridView, WarehouseLayout } from '@/components/staff';
+import { ShelfActionItem } from '@/components/staff/ShelfDetailModal';
 import { COLORS } from '@/constants/color';
-import { useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useOutboundTicket, useUpdateOutboundTicketItems } from '@/hooks/outbound-orders.hooks';
 import { useWarehouses, useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
-import { ShelfActionItem } from '@/components/staff/ShelfDetailModal';
 import { PathResult, Shelf, WarehouseZone } from '@/types/warehouse';
 import { findNearestNode, findShortestPath } from '@/utils/pathfinding';
 import { Feather } from '@expo/vector-icons';
@@ -28,6 +28,7 @@ export default function WarehouseDiagramScreen() {
     outboundOrderId?: string;
     recommendedBins?: string;
     focusedBins?: string;
+    focusedItemId?: string;
     focusedItemName?: string;
   }>();
   const initialWarehouseId = params.warehouseId ? Number(params.warehouseId) : undefined;
@@ -44,6 +45,7 @@ export default function WarehouseDiagramScreen() {
     () => (params.focusedBins ? params.focusedBins.split(',').map((code) => code.trim()).filter(Boolean) : []),
     [params.focusedBins]
   );
+  const focusedItemId = params.focusedItemId ? Number(params.focusedItemId) : undefined;
   const focusedItemName = params.focusedItemName;
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | undefined>();
@@ -56,20 +58,35 @@ export default function WarehouseDiagramScreen() {
   const [viewMode, setViewMode] = useState<'map' | 'grid'>('map');
   const user = useAuthStore(state => state.user);
   const isStaff = user?.roleId === 4;
+  const companyId = user?.companyId ?? 0;
+  const staffId = user?.id ?? 0;
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
-  const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(inboundOrderId);
-  const { data: inboundTicket } = useInboundTicket(inboundOrderId);
-  const { data: outboundOrder } = useOutboundTicket(outboundOrderId);
+  const { data: recommendationItems = [], isLoading: recommendationsLoading, refetch: refetchRecommendations } = useInboundStorageRecommendations(inboundOrderId);
+  const { data: inboundTicket, refetch: refetchInboundTicket } = useInboundTicket(inboundOrderId);
+  const { data: staffInboundOrders = [] } = useInboundOrdersByStaff(companyId, staffId);
+  const { data: outboundOrder, refetch: refetchOutboundOrder } = useOutboundTicket(outboundOrderId);
   
   const {
     data: structure,
     isLoading: structureLoading,
     error: structureError,
+    refetch: refetchStructure,
   } = useWarehouseStructure(selectedWarehouseId);
 
   const updateInboundItems = useUpdateInboundTicketItems();
   const updateOutboundItems = useUpdateOutboundTicketItems();
+  const { refetch: refetchWarehouses } = useWarehouses();
+  
+  const handleRefresh = async () => {
+    await Promise.all([
+      refetchWarehouses(),
+      refetchRecommendations(),
+      refetchStructure(),
+      inboundOrderId ? refetchInboundTicket() : Promise.resolve(),
+      outboundOrderId ? refetchOutboundOrder() : Promise.resolve(),
+    ]);
+  };
   const [isProcessing, setIsProcessing] = useState(false);
 
   const recommendedBins = useMemo(() => {
@@ -83,8 +100,16 @@ export default function WarehouseDiagramScreen() {
 
   const effectiveHighlightedBins = focusedBinsArray.length > 0 ? focusedBinsArray : recommendedBins;
 
+  const scopedInboundRecommendationItems = useMemo(() => {
+    if (!inboundOrderId || !focusedItemId) {
+      return recommendationItems;
+    }
+
+    return recommendationItems.filter((item) => item.inboundOrderItemId === focusedItemId);
+  }, [inboundOrderId, focusedItemId, recommendationItems]);
+
   const recommendationPreview = useMemo(() => {
-    return recommendationItems
+    return scopedInboundRecommendationItems
       .flatMap((item) => (item.storageRecommendations || []).map((recommendation) => ({
         itemName: item.name,
         binIdCode: recommendation.binIdCode,
@@ -93,7 +118,7 @@ export default function WarehouseDiagramScreen() {
       })))
       .filter((entry) => !!entry.binIdCode)
       .slice(0, 4);
-  }, [recommendationItems]);
+  }, [scopedInboundRecommendationItems]);
 
   const recommendationResolution = useMemo(() => {
     if (!structure || effectiveHighlightedBins.length === 0) {
@@ -128,15 +153,46 @@ export default function WarehouseDiagramScreen() {
   const activeHighlightedShelf = selectedShelf?.id || recommendationResolution.firstShelf?.id;
 
   React.useEffect(() => {
-    if (!warehouses || warehouses.length === 0 || selectedWarehouseId) return;
+    if (!warehouses || warehouses.length === 0) return;
 
     if (initialWarehouseId && warehouses.some((warehouse) => warehouse.id === initialWarehouseId)) {
-      setSelectedWarehouseId(initialWarehouseId);
+      if (selectedWarehouseId !== initialWarehouseId) {
+        setSelectedWarehouseId(initialWarehouseId);
+      }
       return;
     }
 
-    setSelectedWarehouseId(warehouses[0].id);
+    if (!selectedWarehouseId || !warehouses.some((warehouse) => warehouse.id === selectedWarehouseId)) {
+      setSelectedWarehouseId(warehouses[0].id);
+    }
   }, [warehouses, selectedWarehouseId, initialWarehouseId]);
+
+  const ticketWarehouseId = React.useMemo(() => {
+    const fromTicket = inboundTicket?.warehouseId || inboundTicket?.warehouse?.id;
+    if (fromTicket) return fromTicket;
+
+    if (!inboundOrderId) return undefined;
+
+    const fromStaffOrders = staffInboundOrders.find((order) => order.id === inboundOrderId);
+    return fromStaffOrders?.warehouseId || fromStaffOrders?.warehouse?.id;
+  }, [inboundTicket, staffInboundOrders, inboundOrderId]);
+
+  React.useEffect(() => {
+    if (isPicking) return;
+    if (!ticketWarehouseId) return;
+    if (selectedWarehouseId === ticketWarehouseId) return;
+
+    if (warehouses?.some((warehouse) => warehouse.id === ticketWarehouseId)) {
+      setSelectedWarehouseId(ticketWarehouseId);
+    }
+  }, [isPicking, ticketWarehouseId, selectedWarehouseId, warehouses]);
+
+  React.useEffect(() => {
+    // Prevent stale shelf selection/modal when switching to another warehouse structure.
+    setModalVisible(false);
+    setSelectedShelf(null);
+    setSelectedZone(null);
+  }, [selectedWarehouseId]);
 
   const handleShelfPress = (shelf: Shelf, zone: WarehouseZone) => {
     setSelectedShelf(shelf);
@@ -186,12 +242,62 @@ export default function WarehouseDiagramScreen() {
 
   const handleConfirmOperationAtShelf = async (actionItems: ShelfActionItem[]) => {
     if (isProcessing) return;
+
+    if (!selectedShelf) {
+      AlertService.warning('Thiếu thông tin kệ', 'Vui lòng chọn lại kệ trước khi xác nhận.');
+      return;
+    }
+
+    if (!isPicking && ticketWarehouseId && selectedWarehouseId && ticketWarehouseId !== selectedWarehouseId) {
+      AlertService.warning('Sai kho', 'Kho đang mở không khớp với phiếu nhập. Vui lòng mở lại sơ đồ đúng kho của phiếu.');
+      return;
+    }
+
+    const selectedShelfBins = (selectedShelf.levels ?? []).flatMap((level) => level.bins ?? []);
+    const defaultBinId = selectedShelfBins[0]?.id ? String(selectedShelfBins[0].id) : undefined;
+    if (!defaultBinId) {
+      AlertService.warning('Thiếu vị trí bin', 'Kệ này chưa có bin hợp lệ để cập nhật.');
+      return;
+    }
+
+    const shelfBinIdSet = new Set(selectedShelfBins.map((bin) => String(bin.id)));
+    const normalizedActionItems = actionItems.map((item) => {
+      const currentBinId = String(item.binId || '');
+      if (shelfBinIdSet.has(currentBinId)) {
+        return item;
+      }
+
+      const binByCode = selectedShelfBins.find((bin) => bin.code === item.binCode);
+      return {
+        ...item,
+        binId: String(binByCode?.id || defaultBinId),
+      };
+    });
+
     setIsProcessing(true);
 
     try {
       if (!isPicking && inboundOrderId) {
         // Inbound: Update receivedQuantity to match expectedQuantity for these items
-        const itemsToUpdate = actionItems.map(item => ({
+        const validItems = normalizedActionItems.filter((item) => {
+          const productId = Number(item.productId || 0);
+          const quantity = Number(item.targetQuantity || 0);
+          const binId = String(item.binId || '').trim();
+          return productId > 0 && quantity > 0 && binId.length > 0;
+        });
+
+        if (validItems.length === 0) {
+          console.warn('[WarehouseDiagramScreen] inbound confirm blocked: no valid items', {
+            inboundOrderId,
+            selectedWarehouseId,
+            ticketWarehouseId,
+            rawItems: normalizedActionItems,
+          });
+          AlertService.warning('Dữ liệu chưa hợp lệ', 'Không có mặt hàng hợp lệ để cập nhật (thiếu productId/binId hoặc số lượng).');
+          return;
+        }
+
+        const itemsToUpdate = validItems.map(item => ({
           id: item.id,
           productId: item.productId,
           receivedQuantity: (item.currentQuantity || 0) + (item.targetQuantity || 0),
@@ -203,15 +309,29 @@ export default function WarehouseDiagramScreen() {
           ]
         }));
 
+        console.log('[WarehouseDiagramScreen] inbound confirm payload', {
+          inboundOrderId,
+          selectedWarehouseId,
+          ticketWarehouseId,
+          selectedShelfId: selectedShelf.id,
+          selectedShelfCode: selectedShelf.code,
+          bins: itemsToUpdate.map((it) => ({
+            itemId: it.id,
+            productId: it.productId,
+            binId: it.locations?.[0]?.binId,
+            quantity: it.locations?.[0]?.quantity,
+          })),
+        });
+
         await updateInboundItems.mutateAsync({
           ticketId: inboundOrderId,
           items: itemsToUpdate as any,
         });
 
-        AlertService.success('Thành công', `Đã xác nhận xếp ${actionItems.length} mặt hàng vào kệ ${selectedShelf?.code}`);
+        AlertService.success('Thành công', `Đã xác nhận xếp ${validItems.length} mặt hàng vào kệ ${selectedShelf?.code}`);
       } else if (isPicking && outboundOrderId) {
         // Outbound: Update quantity to match target for these items
-        const itemsToUpdate = actionItems.map(item => ({
+        const itemsToUpdate = normalizedActionItems.map(item => ({
           id: item.id,
           productId: item.productId,
           receivedQuantity: (item.currentQuantity || 0) + (item.targetQuantity || 0),
@@ -228,10 +348,20 @@ export default function WarehouseDiagramScreen() {
           items: itemsToUpdate as any,
         });
 
-        AlertService.success('Thành công', `Đã xác nhận nhặt ${actionItems.length} mặt hàng từ kệ ${selectedShelf?.code}`);
+        AlertService.success('Thành công', `Đã xác nhận nhặt ${normalizedActionItems.length} mặt hàng từ kệ ${selectedShelf?.code}`);
       }
       setModalVisible(false);
-    } catch {
+    } catch (error: any) {
+      console.error('[WarehouseDiagramScreen] confirm operation failed', {
+        inboundOrderId,
+        outboundOrderId,
+        selectedWarehouseId,
+        ticketWarehouseId,
+        selectedShelfId: selectedShelf?.id,
+        selectedShelfCode: selectedShelf?.code,
+        errorMessage: error?.message,
+        errorData: error?.response?.data,
+      });
       AlertService.error('Lỗi', 'Không thể cập nhật trạng thái mặt hàng');
     } finally {
       setIsProcessing(false);
@@ -246,28 +376,36 @@ export default function WarehouseDiagramScreen() {
   const availableItemsForModal = useMemo(() => {
     if (!selectedShelf) return [];
     
-    const shelfBinCodes = (selectedShelf.levels ?? []).flatMap(l => (l.bins ?? []).map(b => b.code));
+    const shelfBins = (selectedShelf.levels ?? []).flatMap((level) => level.bins ?? []);
+    const shelfBinCodes = shelfBins.map((bin) => bin.code);
+    const shelfBinValues = new Set(shelfBins.flatMap((bin) => [String(bin.code), String(bin.id)]));
     const firstBin = selectedShelf.levels?.[0]?.bins?.[0];
     
     if (!isPicking) {
       // Inbound: Filter from recommendationItems
-      const recommended = recommendationItems
-        .filter(item => (item.storageRecommendations ?? []).some(r => shelfBinCodes.includes(r.binIdCode || '')))
+      const recommended = scopedInboundRecommendationItems
+        .filter(item => (item.storageRecommendations ?? []).some(r => shelfBinValues.has(String(r.binIdCode || ''))))
         .map(item => {
-          const matchedRec = item.storageRecommendations!.find(r => shelfBinCodes.includes(r.binIdCode || ''));
+          const matchedRec = item.storageRecommendations!.find(r => shelfBinValues.has(String(r.binIdCode || '')));
+          const matchedBin = (selectedShelf.levels ?? [])
+            .flatMap((level) => level.bins ?? [])
+            .find((bin) => bin.code === matchedRec?.binIdCode || String(bin.id) === String(matchedRec?.binIdCode));
           // Find quantities from ticket items
           const ticketItem = inboundTicket?.inboundOrderItems?.find(ti => ti.id === item.inboundOrderItemId);
+          const remainingQuantity = Math.max((ticketItem?.expectedQuantity ?? 0) - (ticketItem?.receivedQuantity ?? 0), 0);
+          const resolvedProductId = item.productId || ticketItem?.productId || ticketItem?.product?.id || 0;
           
           return {
             id: item.inboundOrderItemId,
-            productId: item.productId || 0,
+            productId: resolvedProductId,
             name: item.name || '',
             sku: item.sku,
-            // For recommended items, we target the recommended quantity
-            targetQuantity: matchedRec?.distanceInfo || (ticketItem?.expectedQuantity ?? 0) - (ticketItem?.receivedQuantity ?? 0),
+            // Quantity should follow remaining item quantity, not recommendation distance metadata.
+            targetQuantity: remainingQuantity,
             currentQuantity: ticketItem?.receivedQuantity || 0,
-            binCode: matchedRec?.binIdCode || '',
-            binId: matchedRec?.binId || matchedRec?.binIdCode || '',
+            binCode: matchedBin?.code || firstBin?.code || selectedShelf.code,
+            // BE expects ShelfLevelBin.IdCode, not numeric database id
+            binId: matchedBin?.id || firstBin?.id || '',
             isRecommended: true,
           };
         });
@@ -276,6 +414,7 @@ export default function WarehouseDiagramScreen() {
 
       // Manual fallback: allow placing all remaining quantity of pending items
       return (inboundTicket?.inboundOrderItems || [])
+        .filter(item => !focusedItemId || item.id === focusedItemId)
         .filter(item => (item.expectedQuantity ?? 0) > (item.receivedQuantity ?? 0))
         .map(item => ({
           id: item.id,
@@ -327,7 +466,7 @@ export default function WarehouseDiagramScreen() {
           isRecommended: false,
         }));
     }
-  }, [selectedShelf, isPicking, recommendationItems, inboundTicket, outboundOrder, effectiveHighlightedBins]);
+  }, [selectedShelf, isPicking, scopedInboundRecommendationItems, inboundTicket, outboundOrder, effectiveHighlightedBins, focusedItemId]);
 
   if (warehousesLoading) {
     return (
@@ -354,7 +493,7 @@ export default function WarehouseDiagramScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <RefreshContainer style={styles.container} onRefresh={handleRefresh}>
       <ScreenHeader 
         title="Sơ đồ kho" 
         subtitle={isStaff ? "Xem sơ đồ và tìm đường đi" : "Xem sơ đồ và thông tin kệ hàng"} 
@@ -550,7 +689,7 @@ export default function WarehouseDiagramScreen() {
           setPathModalVisible(false);
         }}
       />
-    </View>
+    </RefreshContainer>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Card, TabScreenHeader } from '@/components';
+import { Card, RefreshContainer, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundRequests, useInboundTickets } from '@/hooks/inbound-orders.hooks';
 import { InboundOrder, InboundRequest } from '@/types/inbound-order';
@@ -53,9 +53,16 @@ export default function InboundOrdersScreen() {
     const [selectedRequestStatus, setSelectedRequestStatus] = useState<RequestStatusKey | 'all'>('all');
     const [selectedTicketStatus, setSelectedTicketStatus] = useState<TicketStatusKey | 'all'>('all');
 
-    const { data: requests = [], isLoading: requestsLoading } = useInboundRequests();
-    const { data: tickets = [], isLoading: ticketsLoading } = useInboundTickets();
+    const { data: requests = [], isLoading: requestsLoading, refetch: refetchRequests } = useInboundRequests();
+    const { data: tickets = [], isLoading: ticketsLoading, refetch: refetchTickets } = useInboundTickets();
     const isLoading = requestsLoading || ticketsLoading;
+
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchRequests(),
+            refetchTickets()
+        ]);
+    };
 
     // Filter requests
     const filteredRequests = useMemo(() => {
@@ -320,7 +327,11 @@ export default function InboundOrdersScreen() {
             </TabScreenHeader>
 
             {/* Content */}
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={styles.contentContainer}
+                onRefresh={handleRefresh}
+            >
                 {isLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -350,7 +361,7 @@ export default function InboundOrdersScreen() {
                         filteredTickets.map(renderTicketCard)
                     )
                 )}
-            </ScrollView>
+            </RefreshContainer>
         </View>
     );
 }

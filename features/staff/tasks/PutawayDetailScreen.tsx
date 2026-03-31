@@ -1,4 +1,4 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useInboundStorageRecommendations, useUpdateInboundTicketItems } from '@/hooks';
@@ -10,7 +10,7 @@ import type { InboundItemStorageRecommendations, InboundOrderItem } from '@/type
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PutawayDetailScreen() {
@@ -22,16 +22,24 @@ export default function PutawayDetailScreen() {
     const companyId = user?.companyId ?? 0;
     const staffId = user?.id ?? 0;
 
-    const { data: staffOrders, isLoading } = useInboundOrdersByStaff(companyId, staffId);
+    const { data: staffOrders, isLoading, refetch: refetchOrders } = useInboundOrdersByStaff(companyId, staffId);
     const updateItems = useUpdateInboundTicketItems();
     const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
     const order = useMemo(() => staffOrders?.find((t) => t.id === numericId) ?? null, [staffOrders, numericId]);
     const error = !isLoading && !order;
-    const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(order?.id);
+    const { data: recommendationItems = [], isLoading: recommendationsLoading, refetch: refetchRecommendations } = useInboundStorageRecommendations(order?.id);
     
     // Fetch warehouse structure to show bins context for putaway suggestions
     const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
-    const { data: warehouseStructure, isLoading: warehouseLoading, error: warehouseError } = useWarehouseStructure(warehouseId);
+    const { data: warehouseStructure, isLoading: warehouseLoading, error: warehouseError, refetch: refetchWarehouse } = useWarehouseStructure(warehouseId);
+
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchOrders(),
+            refetchRecommendations(),
+            refetchWarehouse()
+        ]);
+    };
 
     const validBinCodes = useMemo(() => {
         if (!warehouseStructure?.zones) return new Set<string>();
@@ -164,6 +172,7 @@ export default function PutawayDetailScreen() {
                 warehouseId: String(order.warehouse?.id || order.warehouseId || ''),
                 inboundOrderId: String(order.id),
                 focusedBins: bins.join(','),
+                focusedItemId: String(item.id),
                 focusedItemName: item.name || item.product?.name || `SP #${item.productId}`,
             },
         } as any);
@@ -301,7 +310,11 @@ export default function PutawayDetailScreen() {
                 subtitle={order.referenceCode || `PUT-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={handleRefresh}
+            >
                 <View style={styles.placeholderNotice}>
                     <Feather name="info" size={16} color="#854d0e" />
                     <Text style={styles.placeholderNoticeText}>Đang dùng inbound ticket thật cho putaway. Khi backend có endpoint putaway riêng, app sẽ chuyển sang endpoint đó.</Text>
@@ -489,7 +502,7 @@ export default function PutawayDetailScreen() {
                         <Text style={styles.completeBtnText}>Xác nhận vị trí này</Text>
                     </TouchableOpacity>
                 )}
-            </ScrollView>
+            </RefreshContainer>
 
             <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                 <TouchableOpacity

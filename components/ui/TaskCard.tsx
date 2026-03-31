@@ -53,7 +53,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         router.push(`/(staff-tabs)/tasks/outbound/${task.relatedOrderId || task.id}` as any);
         break;
       case 'putaway':
-        router.push(`/(staff-tabs)/tasks/putaway/${task.relatedOrderId || task.id}` as any);
+        router.push(`/(staff-tabs)/tasks/inbound/${task.relatedOrderId || task.id}` as any);
         break;
       case 'count':
         router.push(`/(staff-tabs)/tasks/count/${task.id}` as any);

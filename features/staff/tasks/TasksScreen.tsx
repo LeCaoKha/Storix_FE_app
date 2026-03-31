@@ -1,8 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { HorizontalFilterBar, SafeAreaHeader, TaskCard, type FilterOption } from '@/components';
+import { HorizontalFilterBar, RefreshContainer, SafeAreaHeader, TaskCard, type FilterOption } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useTasks } from '@/hooks/task.hooks';
 import { Task, TaskStatus, TaskType } from '@/types/order';
@@ -10,7 +10,7 @@ import { Task, TaskStatus, TaskType } from '@/types/order';
 export default function TasksScreen() {
     const [activeFilter, setActiveFilter] = useState<'all' | TaskType>('all');
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
-    const { data: tasks = [], isLoading } = useTasks();
+    const { data: tasks = [], isLoading, refetch } = useTasks();
 
     // Helper functions
     const getFilterLabel = (type: 'all' | TaskType) => {
@@ -18,7 +18,6 @@ export default function TasksScreen() {
             case 'all': return 'Tất cả';
             case TaskType.OUTBOUND: return 'Xuất kho';
             case TaskType.INBOUND: return 'Nhập kho';
-            case TaskType.PUTAWAY: return 'Xếp hàng';
             case TaskType.INVENTORY_COUNT: return 'Kiểm kê';
             case TaskType.TRANSFER: return 'Chuyển kho';
             default: return type.charAt(0).toUpperCase() + type.slice(1);
@@ -31,7 +30,6 @@ export default function TasksScreen() {
             'all', 
             TaskType.OUTBOUND, 
             TaskType.INBOUND, 
-            TaskType.PUTAWAY, 
             TaskType.INVENTORY_COUNT, 
             TaskType.TRANSFER
         ];
@@ -65,6 +63,10 @@ export default function TasksScreen() {
     };
 
     const summary = getTaskSummary();
+
+    const handleRefresh = async () => {
+        await refetch();
+    };
 
     return (
         <View style={styles.container}>
@@ -123,9 +125,10 @@ export default function TasksScreen() {
             </View>
 
             {/* Tasks List */}
-            <ScrollView
+            <RefreshContainer
                 style={styles.tasksList}
                 showsVerticalScrollIndicator={false}
+                onRefresh={handleRefresh}
             >
                 {filteredTasks.length > 0 ? (
                     filteredTasks.map((task: Task) => (
@@ -143,7 +146,7 @@ export default function TasksScreen() {
                     </View>
                 )}
                 <View style={{ height: 20 }} />
-            </ScrollView>
+            </RefreshContainer>
         </View>
     );
 }

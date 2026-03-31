@@ -25,6 +25,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const PADDING = 20;
 const FOOTER_HEIGHT = 72;
+const SHELF_HIT_PADDING = 16;
 
 interface WarehouseLayoutProps {
   structure: WarehouseStructure;
@@ -154,7 +155,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     });
 
   const panGesture = Gesture.Pan()
-    .minDistance(3)
+    .minDistance(12)
     .onStart(() => {
       startTranslateX.value = translateX.value;
       startTranslateY.value = translateY.value;
@@ -178,42 +179,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     });
 
   // Tap to select shelf (Hit testing)
-  const singleTapGesture = Gesture.Tap()
-    .onStart((event) => {
-      // Find if a shelf was tapped
-      // Coordinates need to be adjusted based on the current scale and translation
-      const mapX = (event.x - translateX.value) / scale.value;
-      const mapY = (event.y - translateY.value) / scale.value;
-
-      let hitSomething = false;
-      (structure.zones ?? []).forEach(zone => {
-        (zone.shelves ?? []).forEach(shelf => {
-          const absX = zone.x + shelf.x;
-          const absY = zone.y + shelf.y;
-          if (mapX >= absX && mapX <= absX + shelf.width &&
-            mapY >= absY && mapY <= absY + shelf.height) {
-            hitSomething = true;
-            if (onShelfPress) {
-              runOnJS(onShelfPress)(shelf, zone);
-            }
-          }
-        });
-      });
-
-      if (!hitSomething && onZonePress) {
-        (structure.zones ?? []).forEach(zone => {
-          if (mapX >= zone.x && mapX <= zone.x + zone.width &&
-            mapY >= zone.y && mapY <= zone.y + zone.height) {
-            runOnJS(onZonePress)(zone);
-          }
-        });
-      }
-    });
-
-  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
   const composedGesture = Gesture.Simultaneous(
     Gesture.Simultaneous(pinchGesture, panGesture),
-    tapGesture
+    doubleTapGesture
   );
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -242,13 +210,13 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     );
   }, []);
 
-  const renderShelf = (shelf: Shelf, zone: WarehouseZone) => {
+  const renderShelf = (shelf: Shelf, zone: WarehouseZone, shelfIndex: number) => {
     const isHighlighted = highlightedShelf === shelf.id;
     const hasAnyRecommendations = (recommendedShelves?.length ?? 0) > 0;
     const isRecommended = (recommendedShelves ?? []).includes(shelf.id);
     const isDimmed = hasAnyRecommendations && !isRecommended && !isHighlighted;
 
-    const gradientId = `gradient-${shelf.id}`;
+    const gradientId = `gradient-${zone.id}-${shelf.id}-${shelfIndex}`;
 
     const baseColor = isHighlighted
       ? COLORS.primary
@@ -276,9 +244,24 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
     const absX = zone.x + shelf.x;
     const absY = zone.y + shelf.y;
+    const hitX = absX - SHELF_HIT_PADDING;
+    const hitY = absY - SHELF_HIT_PADDING;
+    const hitWidth = shelf.width + SHELF_HIT_PADDING * 2;
+    const hitHeight = shelf.height + SHELF_HIT_PADDING * 2;
 
     return (
-      <G key={shelf.id} opacity={isDimmed ? 0.4 : 1}>
+      <G key={`shelf-${zone.id}-${shelf.id}-${shelfIndex}`} opacity={isDimmed ? 0.4 : 1}>
+        {/* Expanded invisible hit area so tiny shelves are easy to tap */}
+        <Rect
+          x={hitX}
+          y={hitY}
+          width={hitWidth}
+          height={hitHeight}
+          fill="#000"
+          opacity={0.001}
+          onPress={() => onShelfPress?.(shelf, zone)}
+        />
+
         <Defs>
           <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={baseColor} stopOpacity="1" />
@@ -366,9 +349,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     );
   };
 
-  const renderZone = (zone: WarehouseZone) => {
+  const renderZone = (zone: WarehouseZone, zoneIndex: number) => {
     return (
-      <G key={zone.id}>
+      <G key={`zone-${zone.id}-${zoneIndex}`}>
         <Rect
           x={zone.x}
           y={zone.y}
@@ -378,6 +361,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           ry={12}
           fill={COLORS.primary}
           opacity={0.02}
+          onPress={() => onZonePress?.(zone)}
         />
 
         <Rect
@@ -417,7 +401,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           </SvgText>
         </G>
 
-        {(zone.shelves ?? []).map((shelf) => renderShelf(shelf, zone))}
+        {(zone.shelves ?? []).map((shelf, shelfIndex) => renderShelf(shelf, zone, shelfIndex))}
       </G>
     );
   };
@@ -463,7 +447,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
               <Rect width="100%" height="100%" fill="url(#grid)" />
 
-              {(structure.zones ?? []).map(renderZone)}
+              {(structure.zones ?? []).map((zone, zoneIndex) => renderZone(zone, zoneIndex))}
               {renderPath()}
 
               {showNodes && (

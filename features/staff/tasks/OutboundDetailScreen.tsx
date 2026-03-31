@@ -1,4 +1,4 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useOutboundTasksByStaff, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
@@ -9,7 +9,7 @@ import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // BE Status Flow (Staff allowed transitions):
@@ -50,7 +50,7 @@ export default function OutboundDetailScreen() {
     const staffId = user?.id ?? 0;
 
     // Lấy data từ staff task list (tránh 404 do filter companyId không nhất quán ở BE)
-    const { data: staffTasks, isLoading } = useOutboundTasksByStaff(companyId, staffId);
+    const { data: staffTasks, isLoading, refetch } = useOutboundTasksByStaff(companyId, staffId);
     const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
     const order = staffTasks?.find(t => t.id === numericId) ?? null;
     const error = !isLoading && !order;
@@ -218,7 +218,11 @@ export default function OutboundDetailScreen() {
                 subtitle={order.note || `OUT-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={async () => { await refetch(); }}
+            >
                 {/* Current Status Badge */}
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
@@ -330,7 +334,7 @@ export default function OutboundDetailScreen() {
 
                     </Card>
                 ))}
-            </ScrollView>
+            </RefreshContainer>
 
             <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                 {/* Report Issue button - only during QualityCheck */}
