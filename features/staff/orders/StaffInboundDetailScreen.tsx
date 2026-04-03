@@ -1,22 +1,34 @@
 import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
-import { useAppBack } from '@/hooks/useAppBack';
+import { useInboundOrdersByStaff, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { AlertService } from '@/stores/alert.store';
+import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function StaffInboundDetailScreen() {
     const router = useRouter();
-    const goBack = useAppBack('/(staff-tabs)/tasks');
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: order, isLoading, error, refetch } = useInboundTicket(id);
+    const user = useAuthStore((state) => state.user);
+    const companyId = user?.companyId ?? 0;
+    const staffId = user?.id ?? 0;
+    const orderId = parseInt(id || '0', 10);
+    const goHome = () => router.replace('/(staff-tabs)' as any);
+    const { data: staffOrders, isLoading, error, refetch: refetchStaffOrders } = useInboundOrdersByStaff(companyId, staffId);
+    const { data: inboundTicket, refetch: refetchInboundTicket } = useInboundTicket(orderId);
+    const order = useMemo(() => {
+        if (inboundTicket?.id === orderId) return inboundTicket;
+        return staffOrders?.find((ticket) => ticket.id === orderId) ?? null;
+    }, [inboundTicket, staffOrders, orderId]);
 
     const handleRefresh = async () => {
-        await refetch();
+        await Promise.all([
+            refetchStaffOrders(),
+            orderId > 0 ? refetchInboundTicket() : Promise.resolve(),
+        ]);
     };
     const updateItems = useUpdateInboundTicketItems();
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
@@ -52,7 +64,7 @@ export default function StaffInboundDetailScreen() {
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
+                    <TouchableOpacity style={styles.backButton} onPress={goHome}>
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -101,7 +113,7 @@ export default function StaffInboundDetailScreen() {
             });
 
             AlertService.success('Thành công', allReceived ? 'Đã hoàn tất nhận hàng' : 'Đã lưu thông tin nhận hàng', () => {
-                goBack();
+                goHome();
             });
         } catch {
             AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
@@ -115,6 +127,7 @@ export default function StaffInboundDetailScreen() {
             <ScreenHeader
                 title="Nhập Kho"
                 subtitle={order.referenceCode || `INB-${order.id}`}
+                onBack={goHome}
             />
 
             <RefreshContainer 

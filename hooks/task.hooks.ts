@@ -12,6 +12,7 @@ export const useTasks = () => {
         queryKey: ['tasks', staffId, companyId, warehouseId],
         queryFn: () => getTasks(staffId, companyId, warehouseId),
         enabled: !!staffId && !!companyId,
+        staleTime: 0,
     });
 };
 

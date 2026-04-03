@@ -51,6 +51,7 @@ export const useTransferOrder = (id: number) => {
         queryKey: ['transfer-order', companyId, id],
         queryFn: () => getTransferOrderById(id),
         enabled: !!id && !!companyId,
+        staleTime: 0,
     });
 };
 

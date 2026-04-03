@@ -1,7 +1,7 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/color';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface StaffHomeStatsProps {
   inboundCount: number;
@@ -61,12 +61,11 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 12,
   },
   card: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -81,7 +80,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   label: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B', // COLORS.slate500
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -93,7 +92,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   value: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '800',
     color: '#0F172A', // COLORS.slate900
   },

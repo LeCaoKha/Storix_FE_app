@@ -1,19 +1,19 @@
 import {
-  getOutboundRequestById as apiGetOutboundRequestById,
-  getOutboundTicketById as apiGetOutboundTicketById,
-  confirmOutboundOrder,
-  createOutboundRequest,
-  createOutboundTicket,
-  getAllOutboundRequests,
-  getAllOutboundTickets,
-  getInventoryAvailability,
-  getOutboundOrdersByStaff,
-  updateOutboundRequestStatus,
-  updateOutboundTicketItems,
-  updateOutboundTicketStatus,
-  type OutboundOrder as ApiOutboundOrder,
-  type CreateOutboundRequestPayload,
-  type UpdateOutboundItemPayload
+    getOutboundRequestById as apiGetOutboundRequestById,
+    getOutboundTicketById as apiGetOutboundTicketById,
+    confirmOutboundOrder,
+    createOutboundRequest,
+    createOutboundTicket,
+    getAllOutboundRequests,
+    getAllOutboundTickets,
+    getInventoryAvailability,
+    getOutboundOrdersByStaff,
+    updateOutboundRequestStatus,
+    updateOutboundTicketItems,
+    updateOutboundTicketStatus,
+    type OutboundOrder as ApiOutboundOrder,
+    type CreateOutboundRequestPayload,
+    type UpdateOutboundItemPayload
 } from '@/services/outbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { OutboundRequest } from '@/types/outbound-order';
@@ -150,6 +150,7 @@ export const useOutboundTicket = (id: number | string | undefined) => {
     queryKey: outboundOrderKeys.ticketDetail(numericId ?? 0),
     queryFn: () => getOutboundTicketById(companyId!, numericId!),
     enabled: !!companyId && !!numericId && !isNaN(numericId),
+    staleTime: 0,
   });
 };
 
@@ -179,6 +180,7 @@ export const useOutboundOrder = (id: number | string | undefined) => {
     queryKey: outboundOrderKeys.detail(numericId ?? 0),
     queryFn: () => getOutboundTicketById(companyId!, numericId!),
     enabled: !!companyId && !!numericId && !isNaN(numericId),
+    staleTime: 0,
   });
 };
 
@@ -264,6 +266,7 @@ export const useUpdateOutboundTicketItems = () => {
       updateOutboundTicketItems(ticketId, items),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.all });
+      queryClient.invalidateQueries({ queryKey: outboundOrderKeys.ticketDetail(variables.ticketId) });
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.detail(variables.ticketId) });
     },
   });
@@ -287,6 +290,7 @@ export const useUpdateOutboundTicketStatus = () => {
     }) => updateOutboundTicketStatus(ticketId, performedBy, status),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.all });
+      queryClient.invalidateQueries({ queryKey: outboundOrderKeys.ticketDetail(variables.ticketId) });
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.detail(variables.ticketId) });
     },
   });
@@ -313,8 +317,9 @@ export const useConfirmOutboundOrder = () => {
  */
 export const useOutboundTasksByStaff = (companyId: number, staffId: number) => {
   return useQuery({
-    queryKey: [...outboundOrderKeys.tickets(), 'staff', staffId],
+    queryKey: [...outboundOrderKeys.tickets(), 'staff', companyId, staffId],
     queryFn: () => getOutboundOrdersByStaff(companyId, staffId),
     enabled: !!companyId && !!staffId,
+    staleTime: 0,
   });
 };

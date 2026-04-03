@@ -86,8 +86,6 @@ export default function StaffTabLayout() {
                 options={{
                     title: "Thông báo",
                     tabBarIcon: ({ color }) => <Feather name="bell" size={28} color={color} />,
-                    tabBarBadge: 2, // Example badge
-                    tabBarBadgeStyle: { backgroundColor: COLORS.danger, color: '#fff', fontSize: 10 },
                 }}
                 listeners={({ navigation }) => ({
                     tabPress: (e) => {

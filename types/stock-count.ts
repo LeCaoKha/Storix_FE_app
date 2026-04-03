@@ -33,6 +33,8 @@ export interface UpdateStockCountItemPayload {
     countedQuantity: number;
     description?: string;
     status?: string;
+    productId?: number;
+    locationId?: number | null;
 }
 
 /**

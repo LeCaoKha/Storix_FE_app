@@ -2,8 +2,9 @@ import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useStockCountTicket, useUpdateStockCountItem } from '@/hooks/stock-count.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
-import type { StockCountItem } from '@/types/stock-count';
 import { AlertService } from '@/stores/alert.store';
+import { useAuthStore } from '@/stores/auth.store';
+import type { StockCountItem } from '@/types/stock-count';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -16,8 +17,10 @@ export default function InventoryCountDetailScreen() {
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const ticketId = parseInt(id || '0');
+    const user = useAuthStore((state) => state.user);
+    const companyId = user?.companyId ?? 0;
 
-    const { data: ticket, isLoading, error, refetch } = useStockCountTicket(ticketId);
+    const { data: ticket, isLoading, error, refetch } = useStockCountTicket(ticketId, companyId);
     const updateItem = useUpdateStockCountItem();
 
     const [counts, setCounts] = useState<Record<number, string>>({});
@@ -42,10 +45,11 @@ export default function InventoryCountDetailScreen() {
 
         try {
             await updateItem.mutateAsync({
+                ticketId: ticket.id,
+                performedBy: user?.id ?? 0,
                 itemId: item.id,
                 payload: {
                     countedQuantity: count,
-                    status: 'Counted'
                 }
             });
 

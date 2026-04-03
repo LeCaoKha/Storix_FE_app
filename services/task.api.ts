@@ -2,7 +2,7 @@ import { Task, TaskPriority, TaskStatus, TaskType } from '@/types/order';
 
 import { getInboundOrdersByStaff } from './inbound-order.api';
 import { getOutboundOrdersByStaff } from './outbound-order.api';
-import { getStockCountTickets } from './stock-count.api';
+import { getStockCountTicketsByStaff } from './stock-count.api';
 import { getTransferOrders } from './transfer.api';
 
 /**
@@ -62,10 +62,10 @@ export const getTasks = async (staffId: number, companyId: number, currentWareho
         }
 
         // Fetch inventory count tasks assigned to this staff
-        // BE: GET /api/inventory-count-tickets?warehouseId=&status=
+        // BE: GET /api/InventoryCount/get-tasks-for-staff/{companyId}/{staffId}
         // Roles: 2, 3, 4 — Staff có thể xem danh sách phiếu kiểm kê
         try {
-            const countTickets = await getStockCountTickets(companyId);
+            const countTickets = await getStockCountTicketsByStaff(companyId, staffId);
 
             const countTasks = countTickets
                 .filter(ticket =>
