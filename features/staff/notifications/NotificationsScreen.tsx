@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { COLORS } from '@/constants/color';
 import { Card, RefreshContainer, SafeAreaHeader } from '@/components';
+import { COLORS } from '@/constants/color';
+import { getUserNotifications, markNotificationAsRead, type NotificationItem } from '@/services/notification.api';
+import { useAuthStore } from '@/stores/auth.store';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useMemo } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Notification {
-  id: string;
+  id: number;
   type: 'inbound' | 'outbound' | 'inventory' | 'system';
   title: string;
   message: string;
@@ -14,65 +17,52 @@ interface Notification {
   date: string;
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: '1',
-    type: 'inbound',
-    title: 'Đơn nhập kho mới',
-    message: 'Đơn hàng #INB-2024-001 đã sẵn sàng để kiểm tra và nhận hàng.',
-    time: '09:30',
-    isRead: false,
-    date: 'Hôm nay',
-  },
-  {
-    id: '2',
-    type: 'outbound',
-    title: 'Hoàn thành xuất kho',
-    message: 'Lô hàng #OUT-7782 đã được bốc xếp lên xe thành công.',
-    time: '08:15',
-    isRead: false,
-    date: 'Hôm nay',
-  },
-  {
-    id: '3',
-    type: 'inventory',
-    title: 'Cảnh báo lệch tồn kho',
-    message: 'Sản phẩm "Sữa bột Vinamilk" tại kệ A1-02 phát hiện sai lệch 5 đơn vị so với hệ thống.',
-    time: 'Hôm qua',
-    isRead: true,
-    date: 'Hôm qua',
-  },
-  {
-    id: '4',
-    type: 'system',
-    title: 'Cập nhật hệ thống',
-    message: 'Hệ thống Storix đã được cập nhật phiên bản v2.4.5 để tối ưu hiệu năng.',
-    time: 'Hôm qua',
-    isRead: true,
-    date: 'Hôm qua',
-  },
-  {
-    id: '5',
-    type: 'inbound',
-    title: 'Điều chuyển kho',
-    message: 'Hàng hóa từ Kho B đang được chuyển đến khu vực của bạn.',
-    time: 'Thg 3 28',
-    isRead: true,
-    date: 'Cũ hơn',
-  },
-];
+const mapNotification = (item: NotificationItem): Notification => {
+  const createdAt = item.createdAt ? new Date(item.createdAt) : new Date();
+  const normalizedType = String(item.type || '').toLowerCase();
+
+  return {
+    id: Number(item.id),
+    type: normalizedType === 'outbound' ? 'outbound' : normalizedType === 'inventory' ? 'inventory' : normalizedType === 'system' ? 'system' : 'inbound',
+    title: item.title || 'Thông báo',
+    message: item.message || '',
+    time: createdAt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    isRead: !!item.isRead,
+    date: createdAt.toLocaleDateString('vi-VN'),
+  };
+};
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+
+  const { data: notifications = [], isLoading, refetch } = useQuery({
+    queryKey: ['notifications', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [] as Notification[];
+      const items = await getUserNotifications(user.id);
+      return items.map(mapNotification);
+    },
+    enabled: !!user?.id,
+    staleTime: 0,
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: (notificationId: number) => markNotificationAsRead(user?.id ?? 0, notificationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+    },
+  });
 
   const handleRefresh = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await refetch();
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  const markAllAsRead = async () => {
+    const unread = notifications.filter((notification) => !notification.isRead);
+    await Promise.all(unread.map((notification) => markReadMutation.mutateAsync(notification.id)));
+    await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
 
   const getCategoryTheme = (type: Notification['type']) => {
@@ -114,7 +104,7 @@ export default function NotificationsScreen() {
   };
 
   // Group notifications by date
-  const sections = notifications.reduce((acc, curr) => {
+  const sections = useMemo(() => notifications.reduce((acc, curr) => {
     const section = acc.find(s => s.title === curr.date);
     if (section) {
       section.data.push(curr);
@@ -122,7 +112,16 @@ export default function NotificationsScreen() {
       acc.push({ title: curr.date, data: [curr] });
     }
     return acc;
-  }, [] as { title: string, data: Notification[] }[]);
+  }, [] as { title: string, data: Notification[] }[]), [notifications]);
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingState]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.emptyTitle}>Đang tải thông báo...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -298,6 +297,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#475569',
     marginBottom: 8,
+  },
+  loadingState: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptySubtitle: {
     fontSize: 14,

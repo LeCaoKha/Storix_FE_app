@@ -1,6 +1,7 @@
 import { RefreshContainer, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundTickets } from '@/hooks';
+import { useInboundOrdersByStaff } from '@/hooks';
+import { useAuthStore } from '@/stores/auth.store';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
@@ -17,7 +18,8 @@ const TABS: { key: TabType; label: string }[] = [
 
 export default function StaffOrdersListScreen() {
     const router = useRouter();
-    const { data: tickets = [], isLoading, refetch } = useInboundTickets();
+    const user = useAuthStore((state) => state.user);
+    const { data: tickets = [], isLoading, refetch } = useInboundOrdersByStaff(user?.companyId ?? 0, user?.id ?? 0);
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -64,7 +66,13 @@ export default function StaffOrdersListScreen() {
     }
 
     const handleTicketPress = (id: number) => {
-        router.push(`/(staff-tabs)/orders/${id}` as any);
+        router.push({
+            pathname: '/(staff-tabs)/orders/[id]',
+            params: {
+                id: String(id),
+                from: '/(staff-tabs)/orders',
+            },
+        } as any);
     };
 
     const handleRefresh = async () => {

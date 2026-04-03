@@ -1,7 +1,7 @@
 import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
-import { useOutboundTasksByStaff, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
+import { useOutboundTasksByStaff, useOutboundTicket, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -50,9 +50,10 @@ export default function OutboundDetailScreen() {
     const staffId = user?.id ?? 0;
 
     // Lấy data từ staff task list (tránh 404 do filter companyId không nhất quán ở BE)
-    const { data: staffTasks, isLoading, refetch } = useOutboundTasksByStaff(companyId, staffId);
+    const { data: staffTasks, isLoading, refetch: refetchStaffTasks } = useOutboundTasksByStaff(companyId, staffId);
     const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
-    const order = staffTasks?.find(t => t.id === numericId) ?? null;
+    const { data: outboundTicket, refetch: refetchOutboundTicket } = useOutboundTicket(numericId);
+    const order = (outboundTicket?.id === numericId ? outboundTicket : null) || staffTasks?.find((t) => t.id === numericId) || null;
     const error = !isLoading && !order;
 
     const updateItems = useUpdateOutboundTicketItems();
@@ -221,7 +222,12 @@ export default function OutboundDetailScreen() {
             <RefreshContainer 
                 style={styles.content} 
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
-                onRefresh={async () => { await refetch(); }}
+                onRefresh={async () => {
+                    await Promise.all([
+                        refetchStaffTasks(),
+                        numericId ? refetchOutboundTicket() : Promise.resolve(),
+                    ]);
+                }}
             >
                 {/* Current Status Badge */}
                 <Card style={styles.infoCard}>

@@ -1,16 +1,21 @@
-import React from 'react';
-import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
-import { useAuthStore } from '@/stores';
+import { RefreshContainer, TabScreenHeader } from '@/components';
+import { StaffHomeQuickActions } from '@/components/staff/home/StaffHomeQuickActions';
+import { StaffHomeStats } from '@/components/staff/home/StaffHomeStats';
+import { StaffHomeWarehouseSnapshot } from '@/components/staff/home/StaffHomeWarehouseSnapshot';
 import { useInboundOrdersByStaff } from '@/hooks/inbound-orders.hooks';
 import { useOutboundTasksByStaff } from '@/hooks/outbound-orders.hooks';
-import { StaffHomeHeader } from '@/components/staff/home/StaffHomeHeader';
-import { StaffHomeStats } from '@/components/staff/home/StaffHomeStats';
-import { StaffHomeQuickActions } from '@/components/staff/home/StaffHomeQuickActions';
-import { StaffHomeWarehouseSnapshot } from '@/components/staff/home/StaffHomeWarehouseSnapshot';
-import { RefreshContainer } from '@/components';
+import { useAuthStore } from '@/stores';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function StaffHomeScreen() {
   const user = useAuthStore((state) => state.user);
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Chào buổi sáng';
+    if (hour < 18) return 'Chào buổi chiều';
+    return 'Chào buổi tối';
+  })();
   
   // Fetch tasks to get counts
   const { data: inboundTasks, isLoading: loadingInbound, refetch: refetchInbound } = useInboundOrdersByStaff(user?.companyId ?? 0, user?.id ?? 0);
@@ -30,18 +35,19 @@ export default function StaffHomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <RefreshContainer 
-        style={styles.container} 
+    <View style={styles.safeArea}>
+      <TabScreenHeader
+        title="Trang chủ"
+        subtitle={`${greeting}, ${user?.fullName || 'Nhân viên'} • ${user?.warehouseName || 'Chưa xác định'}`}
+        useTopSafeArea
+      />
+
+      <RefreshContainer
+        style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         onRefresh={handleRefresh}
       >
-        <StaffHomeHeader 
-          userName={user?.fullName || 'Nhân viên'} 
-          warehouseName={user?.warehouseName || 'Chưa xác định'} 
-        />
-        
         <StaffHomeStats 
           inboundCount={stats.inboundCount}
           outboundCount={stats.outboundCount}
@@ -58,7 +64,7 @@ export default function StaffHomeScreen() {
         </View>
         <StaffHomeWarehouseSnapshot warehouseId={user?.warehouseId} />
       </RefreshContainer>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -72,18 +78,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC', // Match COLORS.background slate-50
   },
   content: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 18,
     paddingBottom: 40,
   },
   sectionHeader: {
-    marginTop: 32, // More "breathing" space
+    marginTop: 24,
     marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 20, // Hierarchy upgrade
+    fontSize: 18,
     fontWeight: '700',
     color: '#1E293B', // COLORS.slate800
     letterSpacing: -0.5,

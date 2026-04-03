@@ -119,7 +119,7 @@ export default function HomeScreen() {
                         </Card>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/orders' as any)}>
+                    <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/(staff-tabs)/orders' as any)}>
                         <Card style={styles.gridCard}>
                             <Feather name="clipboard" size={24} color="#F59E0B" />
                             <Text style={styles.gridLabel}>Phiếu đơn hàng</Text>

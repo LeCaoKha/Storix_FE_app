@@ -1,8 +1,8 @@
-import React from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { COLORS } from '@/constants/color';
+import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface StaffHomeWarehouseSnapshotProps {
   warehouseId?: number;
@@ -92,7 +92,7 @@ export const StaffHomeWarehouseSnapshot: React.FC<StaffHomeWarehouseSnapshotProp
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   footer: {
-    padding: 16,
+    padding: 14,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',

@@ -1,18 +1,18 @@
 import {
-  getInboundRequestById as apiGetInboundRequestById,
-  getInboundTicketById as apiGetInboundTicketById,
-  getInboundStorageRecommendations,
-  createInboundRequest,
-  createInboundTicket,
-  getAllInboundRequests,
-  getAllInboundTickets,
-  getInboundOrdersByStaff,
-  updateInboundRequestStatus,
-  updateInboundTicketItems,
-  type InboundOrder as ApiInboundOrder,
-  type InboundItemStorageRecommendations,
-  type CreateInboundRequestPayload,
-  type UpdateInboundItemPayload,
+    getInboundRequestById as apiGetInboundRequestById,
+    getInboundTicketById as apiGetInboundTicketById,
+    createInboundRequest,
+    createInboundTicket,
+    getAllInboundRequests,
+    getAllInboundTickets,
+    getInboundOrdersByStaff,
+    getInboundStorageRecommendations,
+    updateInboundRequestStatus,
+    updateInboundTicketItems,
+    type InboundOrder as ApiInboundOrder,
+    type CreateInboundRequestPayload,
+    type InboundItemStorageRecommendations,
+    type UpdateInboundItemPayload,
 } from '@/services/inbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { InboundRequest } from '@/types/inbound-order';
@@ -175,6 +175,7 @@ export const useInboundTicket = (id: number | string | undefined) => {
     queryKey: inboundOrderKeys.ticketDetail(numericId ?? 0),
     queryFn: () => getInboundTicketById(companyId, numericId!),
     enabled: !!numericId && !isNaN(numericId) && !!companyId,
+    staleTime: 0,
   });
 };
 
@@ -270,6 +271,7 @@ export const useInboundOrdersByStaff = (companyId: number, staffId: number) => {
     queryKey: [...inboundOrderKeys.tickets(), 'staff', companyId, staffId],
     queryFn: () => getInboundOrdersByStaff(companyId, staffId),
     enabled: !!companyId && !!staffId,
+    staleTime: 0,
   });
 };
 
@@ -284,6 +286,7 @@ export const useUpdateInboundTicketItems = () => {
       updateInboundTicketItems(ticketId, items),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.all });
+      queryClient.invalidateQueries({ queryKey: inboundOrderKeys.ticketDetail(variables.ticketId) });
       queryClient.invalidateQueries({ queryKey: inboundOrderKeys.detail(variables.ticketId) });
     },
   });
@@ -309,5 +312,6 @@ export const useInboundStorageRecommendations = (inboundOrderId: number | undefi
     queryKey: inboundOrderKeys.ticketRecommendations(inboundOrderId ?? 0),
     queryFn: () => getTicketRecommendations(inboundOrderId!),
     enabled: !!inboundOrderId,
+    staleTime: 0,
   });
 };

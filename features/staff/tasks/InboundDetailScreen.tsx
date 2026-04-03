@@ -1,7 +1,7 @@
 import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
-import { useInboundOrdersByStaff, useInboundStorageRecommendations, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { AlertService } from '@/stores/alert.store';
@@ -26,7 +26,11 @@ export default function InboundDetailScreen() {
     // thay vì GET /tickets/{companyId}/{id} (filter theo CreatedByNavigation.CompanyId — sai, gây 404)
     const { data: staffOrders, isLoading, refetch: refetchOrders } = useInboundOrdersByStaff(companyId, staffId);
     const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
-    const order = useMemo(() => staffOrders?.find(t => t.id === numericId) ?? null, [staffOrders, numericId]);
+    const { data: inboundTicket, refetch: refetchTicket } = useInboundTicket(numericId);
+    const order = useMemo(() => {
+        if (inboundTicket?.id === numericId) return inboundTicket;
+        return staffOrders?.find((t) => t.id === numericId) ?? null;
+    }, [inboundTicket, staffOrders, numericId]);
     const error = !isLoading && !order;
     const { data: recommendationItems = [], isLoading: recommendationsLoading, refetch: refetchRecs } = useInboundStorageRecommendations(order?.id);
 
@@ -94,6 +98,15 @@ export default function InboundDetailScreen() {
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [isAutoSaving, setIsAutoSaving] = useState(false);
     const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchOrders(),
+            numericId > 0 ? refetchTicket() : Promise.resolve(),
+            refetchRecs(),
+            refetchStructure(),
+        ]);
+    };
 
     // Initialize receivedQuantity from existing data
     useEffect(() => {
@@ -300,14 +313,6 @@ export default function InboundDetailScreen() {
                 }
             }
         );
-    };
-
-    const handleRefresh = async () => {
-        await Promise.all([
-            refetchOrders(),
-            refetchRecs(),
-            refetchStructure()
-        ]);
     };
 
     return (

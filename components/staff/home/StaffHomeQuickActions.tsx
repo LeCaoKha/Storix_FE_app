@@ -1,7 +1,7 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/color';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 
 export const StaffHomeQuickActions: React.FC = () => {
   const router = useRouter();
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1,
     borderColor: '#F1F5F9',
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#1E293B',
   },
