@@ -32,6 +32,8 @@ export default function PutawayDetailScreen() {
     }, [inboundTicket, staffOrders, numericId]);
     const error = !isLoading && !order;
     const { data: recommendationItems = [], isLoading: recommendationsLoading, refetch: refetchRecommendations } = useInboundStorageRecommendations(order?.id);
+
+    const normalizeBinCode = (value?: string | null) => (value || '').trim().toLowerCase();
     
     // Fetch warehouse structure to show bins context for putaway suggestions
     const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
@@ -57,7 +59,27 @@ export default function PutawayDetailScreen() {
             )
         );
 
-        return new Set(bins.map((code) => code.trim()).filter(Boolean));
+        return new Set(bins.map((code) => normalizeBinCode(code)).filter(Boolean));
+    }, [warehouseStructure]);
+
+    const binIdCodeByInput = useMemo(() => {
+        const map = new Map<string, string>();
+        if (!warehouseStructure?.zones) return map;
+
+        warehouseStructure.zones.forEach((zone) => {
+            (zone.shelves || []).forEach((shelf) => {
+                (shelf.levels || []).forEach((level) => {
+                    (level.bins || []).forEach((bin) => {
+                        const normalizedCode = normalizeBinCode(bin.code);
+                        const normalizedId = normalizeBinCode(bin.id);
+                        if (normalizedCode) map.set(normalizedCode, bin.id);
+                        if (normalizedId) map.set(normalizedId, bin.id);
+                    });
+                });
+            });
+        });
+
+        return map;
     }, [warehouseStructure]);
 
     const [isProcessing, setIsProcessing] = useState(false);
@@ -188,11 +210,11 @@ export default function PutawayDetailScreen() {
     };
 
     const resolvePlacementBin = (itemId: number) => {
-        const selected = selectedBinByItem[itemId]?.trim();
-        if (selected) return selected;
-
         const manual = manualBinByItem[itemId]?.trim();
         if (manual) return manual;
+
+        const selected = selectedBinByItem[itemId]?.trim();
+        if (selected) return selected;
 
         return undefined;
     };
@@ -200,10 +222,14 @@ export default function PutawayDetailScreen() {
     const pickSuggestedBin = (itemId: number, binIdCode?: string) => {
         if (!binIdCode) return;
         setSelectedBinByItem((prev) => ({ ...prev, [itemId]: binIdCode }));
+        setManualBinByItem((prev) => ({ ...prev, [itemId]: '' }));
     };
 
     const updateManualBin = (itemId: number, value: string) => {
         setManualBinByItem((prev) => ({ ...prev, [itemId]: value }));
+        if (value.trim()) {
+            setSelectedBinByItem((prev) => ({ ...prev, [itemId]: '' }));
+        }
     };
 
     const handleScanLocation = () => {
@@ -257,7 +283,7 @@ export default function PutawayDetailScreen() {
             if (quantity <= 0) return false;
             const bin = resolvePlacementBin(item.id);
             if (!bin) return false;
-            return !validBinCodes.has(bin);
+            return !validBinCodes.has(normalizeBinCode(bin));
         });
 
         if (invalidBinItems.length > 0) {
@@ -276,19 +302,37 @@ export default function PutawayDetailScreen() {
             return;
         }
 
+        const hasPositiveReceiveDelta = items.some((item) => {
+            const previousReceived = item.receivedQuantity || 0;
+            const nextReceived = localQuantities[item.id] || 0;
+            return nextReceived > previousReceived;
+        });
+
+        if (!hasPositiveReceiveDelta) {
+            AlertService.warning(
+                'Chưa thể ghi nhận vị trí',
+                'Hiện tại hệ thống chỉ ghi nhận vị trí xếp khi có tăng số lượng nhận. Vui lòng cập nhật thêm số lượng nhận cho ít nhất 1 sản phẩm trước khi xác nhận putaway.',
+            );
+            return;
+        }
+
         setIsCompleting(true);
         try {
             const updatedItems = items.map((item: InboundOrderItem) => {
                 const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
                 const placementBin = resolvePlacementBin(item.id);
+                const normalizedPlacement = normalizeBinCode(placementBin);
+                const mappedBinIdCode = normalizedPlacement
+                    ? (binIdCodeByInput.get(normalizedPlacement) || placementBin)
+                    : placementBin;
 
                 return {
                 id: item.id,
                 productId: item.productId || 0,
                 expectedQuantity: item.expectedQuantity,
                 receivedQuantity: quantity,
-                locations: placementBin && quantity > 0
-                    ? [{ binId: placementBin, quantity }]
+                locations: mappedBinIdCode && quantity > 0
+                    ? [{ binId: mappedBinIdCode, quantity }]
                     : undefined,
                 };
             });

@@ -1,29 +1,37 @@
 import { COLORS } from '@/constants/color';
-import { Shelf, WarehouseZone } from '@/types/warehouse';
+import { AlertService } from '@/stores/alert.store';
+import { usePendingQuantitiesStore } from '@/stores/pending-quantities.store';
+import { useInboundStagingStore } from '@/stores/inbound-staging.store';
+import { Bin, Shelf, WarehouseZone } from '@/types/warehouse';
 import { Feather } from '@expo/vector-icons';
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { BinSelectionView } from './BinSelectionView';
 
 export interface ShelfActionItem {
-  id: number; // ID of the item in the ticket
+  id: number;
   productId: number;
   name: string;
   sku?: string;
   targetQuantity: number;
   currentQuantity: number;
+  recommendedQuantity?: number; // USER REQUEST: suggested for this specific shelf
   binCode: string;
   binId: number | string;
   isRecommended?: boolean;
-  pendingQuantity?: number; // User can specify how many to move now
+  pendingQuantity?: number;
 }
 
 interface ShelfDetailModalProps {
@@ -31,12 +39,12 @@ interface ShelfDetailModalProps {
   shelf: Shelf | null;
   zone: WarehouseZone | null;
   onClose: () => void;
-  onFindPath?: (shelf: Shelf) => void;
   recommendedItems?: ShelfActionItem[];
   onConfirmOperation?: (items: ShelfActionItem[]) => void;
-  onUpdateShelf?: (shelf: Shelf) => void;
   operationType?: 'inbound' | 'outbound';
   isProcessing?: boolean;
+  ticketId?: number;
+  shelfId?: string;
 }
 
 export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
@@ -44,179 +52,418 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
   shelf,
   zone,
   onClose,
-  onFindPath,
   recommendedItems = [],
   onConfirmOperation,
-  onUpdateShelf,
   operationType = 'inbound',
   isProcessing = false,
+  ticketId,
+  shelfId,
 }) => {
+  const [selectedBinId, setSelectedBinId] = useState<string | number | undefined>();
+  const [selectedQuantities, setSelectedQuantities] = useState<Record<number, number>>({});
+  const { getPendingQty, setPendingQty } = usePendingQuantitiesStore();
+
+  const isInbound = operationType === 'inbound';
+  const accentColor = isInbound ? COLORS.success : COLORS.primary;
+  const accentLight = isInbound ? COLORS.success + '15' : COLORS.primaryLight;
+
+  // Reset selectedBinId when modal opens or shelf changes
+  React.useEffect(() => {
+    if (visible && shelf) {
+      const recommendedBins = (shelf.levels ?? [])
+        .flatMap((level) => level.bins ?? [])
+        .filter((bin) =>
+          recommendedItems.some((item) => {
+            const binCodes = String(item.binCode).split(',').map((c) => c.trim());
+            return binCodes.includes(String(bin.code));
+          })
+        );
+
+      if (recommendedBins.length > 0) {
+        setSelectedBinId(recommendedBins[0].id);
+      } else {
+        const firstBin = (shelf.levels?.[0]?.bins ?? [])[0];
+        setSelectedBinId(firstBin?.id);
+      }
+    }
+  }, [visible, shelf, recommendedItems]);
+
+  // Restore draft quantities
+  React.useEffect(() => {
+    if (!visible) {
+      setSelectedQuantities({});
+      return;
+    }
+
+    const restoredQuantities: Record<number, number> = {};
+    recommendedItems.forEach((item) => {
+      if (ticketId && shelfId) {
+        restoredQuantities[item.id] = getPendingQty(ticketId, item.id, shelfId);
+      } else {
+        restoredQuantities[item.id] = 0;
+      }
+    });
+    setSelectedQuantities(restoredQuantities);
+  }, [visible, recommendedItems, ticketId, shelfId, getPendingQty]);
+
+  // Sync selectedQuantities to Zustand store when they change
+  React.useEffect(() => {
+    if (!ticketId || !shelfId) return;
+
+    Object.entries(selectedQuantities).forEach(([itemIdStr, qty]) => {
+      const itemId = Number(itemIdStr);
+      setPendingQty(ticketId, itemId, shelfId, qty);
+    });
+  }, [selectedQuantities, ticketId, shelfId, setPendingQty]);
+
+  // Get all recommended bin codes
+  const recommendedBinCodes = useMemo(() => {
+    return Array.from(
+      new Set(
+        recommendedItems
+          .filter((item) => item.isRecommended)
+          .map((item) => item.binCode)
+      )
+    );
+  }, [recommendedItems]);
+
+  const selectedBin = useMemo(() => {
+    if (!shelf || !selectedBinId) return undefined;
+    return (shelf.levels ?? [])
+      .flatMap((level) => level.bins ?? [])
+      .find((bin) => String(bin.id) === String(selectedBinId));
+  }, [shelf, selectedBinId]);
+
+  const itemsWithSelectedBin = useMemo(() => {
+    return recommendedItems.map((item) => {
+      const maxQuantity = Math.max(0, Number(item.targetQuantity || 0));
+      const quantity = Math.max(0, Math.min(Number(selectedQuantities[item.id] || 0), maxQuantity));
+      return {
+        ...item,
+        binId: selectedBin?.id ?? item.binId,
+        binCode: selectedBin?.code ?? item.binCode,
+        pendingQuantity: quantity,
+      };
+    });
+  }, [recommendedItems, selectedBin, selectedQuantities]);
+
+  const selectedTotalQuantity = useMemo(
+    () => itemsWithSelectedBin.reduce((sum, item) => sum + Number(item.pendingQuantity || 0), 0),
+    [itemsWithSelectedBin]
+  );
+
+  const updateItemQuantity = useCallback((itemId: number, increment: boolean, maxQuantity: number) => {
+    setSelectedQuantities((prev) => {
+      const current = Number(prev?.[itemId] || 0);
+      const nextValue = increment
+        ? Math.min(current + 1, maxQuantity)
+        : Math.max(current - 1, 0);
+
+      return { ...prev, [itemId]: nextValue };
+    });
+  }, []);
+
+  const updateItemQuantityFromInput = useCallback((itemId: number, value: string, maxQuantity: number) => {
+    const sanitized = value.replace(/[^0-9]/g, '');
+
+    if (sanitized.length === 0) {
+      setSelectedQuantities((prev) => ({ ...prev, [itemId]: 0 }));
+      return;
+    }
+
+    const nextValue = Math.min(Math.max(Number(sanitized), 0), maxQuantity);
+    setSelectedQuantities((prev) => ({ ...prev, [itemId]: nextValue }));
+  }, []);
+
+  const handleConfirmPress = useCallback(() => {
+    if (!onConfirmOperation) return;
+
+    if (selectedTotalQuantity <= 0) {
+      AlertService.warning('Chưa chọn số lượng', 'Vui lòng nhập số lượng lớn hơn 0 trước khi xác nhận.');
+      return;
+    }
+
+    onConfirmOperation(itemsWithSelectedBin);
+    
+    // Logic: Reset input to 0 after confirm to prep for next bin/item (Sequential Binning)
+    setSelectedQuantities({});
+  }, [itemsWithSelectedBin, onConfirmOperation, selectedTotalQuantity]);
+
   if (!shelf || !zone) return null;
 
   const hasItems = recommendedItems.length > 0;
-  const recommendedOnly = recommendedItems.filter(item => item.isRecommended);
-  const manualOnly = recommendedItems.filter(item => !item.isRecommended);
-
-  const renderItemSection = (items: ShelfActionItem[], title: string, isAuto: boolean) => {
-    if (items.length === 0) return null;
-
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: isAuto ? (operationType === 'inbound' ? COLORS.successText : COLORS.primary) : COLORS.slate600 }]}>
-            {title}
-          </Text>
-          <View style={[styles.badge, { backgroundColor: isAuto ? (operationType === 'inbound' ? COLORS.successLight : COLORS.primaryLight) : COLORS.slate100 }]}>
-            <Text style={[styles.badgeText, { color: isAuto ? (operationType === 'inbound' ? COLORS.success : COLORS.primary) : COLORS.slate500 }]}>
-              {items.length} mặt hàng
-            </Text>
-          </View>
-        </View>
-        
-        {items.map((item, idx) => (
-          <View key={`${item.id}-${idx}`} style={[styles.itemRow, !isAuto && styles.manualItemRow]}>
-            <View style={styles.itemInfo}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                {item.isRecommended && (
-                  <View style={styles.recBadge}>
-                    <Text style={styles.recBadgeText}>Gợi ý</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.itemMeta}>
-                <Text style={styles.itemSku}>{item.sku || 'No SKU'}</Text>
-                <View style={styles.dot} />
-                <Text style={styles.itemBin}>Vị trí: <Text style={{ fontWeight: '700' }}>{item.binCode}</Text></Text>
-              </View>
-            </View>
-            <View style={styles.itemQty}>
-              <Text style={styles.qtyLabel}>{operationType === 'inbound' ? 'Cần xếp' : 'Cần nhặt'}</Text>
-              <Text style={styles.qtyValue}>{item.targetQuantity}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    );
-  };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
-        <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-          {/* Header */}
-          <View style={[styles.header, hasItems && { borderBottomColor: operationType === 'inbound' ? COLORS.success + '30' : COLORS.primary + '30' }]}>
-            <View style={styles.headerLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: hasItems ? (operationType === 'inbound' ? COLORS.successLight : COLORS.primaryLight) : '#F1F5F9' }]}>
-                <Feather 
-                   name={hasItems ? (operationType === 'inbound' ? "arrow-down-circle" : "arrow-up-circle") : "package"} 
-                  size={24} 
-                  color={hasItems ? (operationType === 'inbound' ? COLORS.success : COLORS.primary) : COLORS.slate500} 
-                />
-              </View>
-              <View style={styles.headerText}>
-                <Text style={styles.shelfCode}>{shelf.code}</Text>
-                <Text style={styles.zoneCode}>Khu vực: {zone.code}</Text>
-              </View>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+
+          {/* Drag handle */}
+          <View style={styles.dragHandle} />
+
+          {/* ── Header ──────────────────────────────────────────────── */}
+          <View style={styles.header}>
+            <View style={[styles.headerIcon, { backgroundColor: accentLight }]}>
+              <Feather
+                name={isInbound ? 'arrow-down-circle' : 'arrow-up-circle'}
+                size={22}
+                color={accentColor}
+              />
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity 
-                style={styles.headerActionBtn}
-                onPress={() => onUpdateShelf?.(shelf)}
-                activeOpacity={0.7}
-              >
-                <Feather name="edit-2" size={18} color={COLORS.slate500} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Feather name="x" size={24} color="#666" />
-              </TouchableOpacity>
+            <View style={styles.headerText}>
+              <Text style={styles.headerShelfCode}>{shelf.code}</Text>
+              <Text style={styles.headerZone}>
+                {zone.code}
+                {' · '}
+                {(shelf.levels ?? []).length} tầng
+                {' · '}
+                {(shelf.levels ?? []).reduce((acc, l) => acc + (l.bins?.length ?? 0), 0)} ô
+              </Text>
             </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
+              <Feather name="x" size={18} color={COLORS.slate500} />
+            </TouchableOpacity>
           </View>
 
-          {/* Content */}
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Recommended Items */}
-            {renderItemSection(recommendedOnly, "Vị trí được gợi ý", true)}
-            
-            {/* Manual Placement Items */}
-            {renderItemSection(manualOnly, "Vị trí trống (Xếp hàng thủ công)", false)}
+          {/* ── Scrollable content ──────────────────────────────────── */}
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {hasItems ? (
+              <>
+                {/* Bin selection */}
+                <View style={styles.section}>
+                  <View style={styles.sectionLabelRow}>
+                    <View style={[styles.sectionDot, { backgroundColor: accentColor }]} />
+                    <Text style={styles.sectionLabel}>Chọn ô đặt hàng</Text>
+                  </View>
+                  <BinSelectionView
+                    shelf={shelf}
+                    selectedBinId={selectedBinId}
+                    recommendedBinCodes={recommendedBinCodes}
+                    onSelectBin={(bin: Bin) => setSelectedBinId(bin.id)}
+                  />
+                </View>
 
-            {/* Thông tin kệ */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Thông tin chi tiết</Text>
-              <View style={styles.infoGrid}>
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>Tọa độ</Text>
-                  <Text style={styles.infoValue}>{shelf.x.toFixed(1)}, {shelf.y.toFixed(1)}</Text>
+                <View style={styles.divider} />
+
+                {/* Item list */}
+                <View style={styles.section}>
+                  <View style={styles.sectionLabelRow}>
+                    <View style={[styles.sectionDot, { backgroundColor: accentColor }]} />
+                    <Text style={styles.sectionLabel}>
+                      {isInbound ? 'Hàng cần xếp' : 'Hàng cần nhặt'}
+                    </Text>
+                    <View style={[styles.countBadge, { backgroundColor: accentLight }]}>
+                      <Text style={[styles.countBadgeText, { color: accentColor }]}>
+                        {recommendedItems.length}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {recommendedItems.map((item) => {
+                    const qty = Number(selectedQuantities[item.id] ?? 0);
+                    const targetQty = Math.max(0, Number(item.targetQuantity || 0));
+                    const done = Number(item.currentQuantity || 0);
+                    
+                    // Logic fix: projectedDone is what's already in other bins + what's being entered now
+                    const projectedDone = Math.min(done + qty, targetQty);
+                    
+                    // Logic fix: projectedRemaining is what's still left to reach the target
+                    const projectedRemaining = Math.max(0, targetQty - projectedDone);
+                    
+                    const progress = targetQty > 0 ? Math.min(projectedDone / targetQty, 1) : 0;
+                    const activeBinCode = selectedBin?.code ?? item.binCode;
+
+                    const handleResetItem = () => {
+                      AlertService.confirm(
+                        'Xóa tiến độ?',
+                        `Bạn có muốn xóa toàn bộ số lượng đã xếp của mặt hàng "${item.name}" trên tất cả các kệ không?`,
+                        () => {
+                          const { clearItem } = useInboundStagingStore.getState();
+                          if (ticketId) clearItem(ticketId, item.id);
+                          AlertService.success('Đã xóa', 'Tiến độ của mặt hàng này đã được reset.');
+                        }
+                      );
+                    };
+
+                    return (
+                      <View key={item.id} style={styles.itemCard}>
+                        {/* Item info */}
+                        <View style={styles.itemTop}>
+                          <View style={styles.itemInfo}>
+                            <View style={styles.itemNameRow}>
+                              <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                                {item.isRecommended && (
+                                  <View style={[styles.recTag, { backgroundColor: accentLight }]}>
+                                    <Feather name="star" size={9} color={accentColor} />
+                                    <Text style={[styles.recTagText, { color: accentColor }]}>Gợi ý</Text>
+                                  </View>
+                                )}
+                                {projectedDone > 0 && (
+                                  <TouchableOpacity onPress={handleResetItem} activeOpacity={0.6}>
+                                    <View style={[styles.recTag, { backgroundColor: COLORS.danger + '10' }]}>
+                                      <Feather name="rotate-ccw" size={9} color={COLORS.danger} />
+                                      <Text style={[styles.recTagText, { color: COLORS.danger }]}>Reset</Text>
+                                    </View>
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            </View>
+                            <View style={styles.itemMetaRow}>
+                              {item.sku && (
+                                <Text style={styles.metaChip}>{item.sku}</Text>
+                              )}
+                              <View style={[styles.binTag, { backgroundColor: accentLight, borderColor: accentColor + '30' }]}>
+                                <Feather name="map-pin" size={10} color={accentColor} />
+                                <Text style={[styles.binTagText, { color: accentColor }]}>
+                                  {activeBinCode}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* Progress bar */}
+                        <View style={styles.progressWrap}>
+                          <View style={styles.progressTrack}>
+                            <View style={[styles.progressFill, {
+                              width: `${progress * 100}%` as any,
+                              backgroundColor: accentColor,
+                            }]} />
+                          </View>
+                          <Text style={styles.progressLabel}>
+                            {projectedDone}/{item.targetQuantity}
+                          </Text>
+                        </View>
+
+                        {/* Quantity controls */}
+                        <View style={styles.qtyRow}>
+                          <View style={styles.qtyHintWrap}>
+                            <Text style={styles.qtyHintMain}>
+                              {isInbound ? 'Sẽ nhập vào ô này' : 'Sẽ nhặt từ ô này'}
+                            </Text>
+                            
+                            {item.recommendedQuantity !== undefined && item.recommendedQuantity > 0 && (
+                              <View style={styles.recHintRow}>
+                                <Feather name="info" size={10} color={COLORS.primary} />
+                                <Text style={styles.recHintText}>
+                                  Gợi ý tại kệ này: <Text style={{ fontWeight: '800' }}>{item.recommendedQuantity}</Text>
+                                </Text>
+                              </View>
+                            )}
+
+                            <Text style={styles.qtyHintSub}>
+                              <Text style={{ color: COLORS.slate400 }}>Còn thiếu:</Text> <Text style={{ fontWeight: '700', color: projectedRemaining > 0 ? COLORS.warning : COLORS.slate700 }}>{projectedRemaining}</Text>
+                              {' · '}<Text style={{ color: COLORS.slate400 }}>Tổng xong:</Text> <Text style={{ fontWeight: '700', color: progress >= 1 ? COLORS.success : accentColor }}>{projectedDone}/{item.targetQuantity}</Text>
+                            </Text>
+                          </View>
+
+                          <View style={styles.qtyControls}>
+                            <TouchableOpacity
+                              style={[styles.qtyBtn, qty === 0 && styles.qtyBtnDisabled]}
+                              onPress={() => updateItemQuantity(item.id, false, targetQty - done)}
+                              activeOpacity={0.7}
+                              disabled={qty === 0}
+                            >
+                              <Feather name="minus" size={16} color={qty === 0 ? COLORS.slate300 : accentColor} />
+                            </TouchableOpacity>
+
+                            <TextInput
+                              style={[
+                                styles.qtyInput,
+                                qty > 0 && { borderColor: accentColor + '40', backgroundColor: accentLight, color: accentColor },
+                              ]}
+                              value={String(qty)}
+                              onChangeText={(text) => updateItemQuantityFromInput(item.id, text, targetQty - done)}
+                              keyboardType="number-pad"
+                              inputMode="numeric"
+                              returnKeyType="done"
+                              textAlign="center"
+                              textAlignVertical="center"
+                              maxLength={4}
+                              selectTextOnFocus
+                            />
+
+                            <TouchableOpacity
+                              style={[styles.qtyBtn, qty >= (targetQty - done) && styles.qtyBtnDisabled]}
+                              onPress={() => updateItemQuantity(item.id, true, targetQty - done)}
+                              activeOpacity={0.7}
+                              disabled={qty >= (targetQty - done)}
+                            >
+                              <Feather name="plus" size={16} color={qty >= (targetQty - done) ? COLORS.slate300 : accentColor} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>Kích thước</Text>
-                  <Text style={styles.infoValue}>{shelf.width}x{shelf.height}</Text>
+              </>
+            ) : (
+              /* No items state */
+              <View style={styles.emptyState}>
+                <View style={styles.emptyStateIcon}>
+                  <Feather name="check-circle" size={32} color={COLORS.slate300} />
                 </View>
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>Sức chứa</Text>
-                  <Text style={styles.infoValue}>{shelf.levels?.reduce((acc, l) => acc + (l.bins?.length || 0), 0)} Bins</Text>
-                </View>
+                <Text style={styles.emptyTitle}>Không có hàng cho kệ này</Text>
+                <Text style={styles.emptySubtitle}>
+                  Kệ{' '}<Text style={{ fontWeight: '700' }}>{shelf.code}</Text>{' '}không có mặt hàng nào trong phiếu này.
+                </Text>
               </View>
-            </View>
+            )}
           </ScrollView>
 
-          {/* Actions */}
-          <View style={styles.actions}>
-            {hasItems && onConfirmOperation && (
+          {/* ── Footer / Confirm button ─────────────────────────────── */}
+          {hasItems && onConfirmOperation && (
+            <View style={styles.footer}>
+              {/* Summary row */}
+              {selectedTotalQuantity > 0 && (
+                <View style={[styles.summaryRow, { backgroundColor: accentLight }]}>
+                  <Feather name="package" size={13} color={accentColor} />
+                  <Text style={[styles.summaryText, { color: accentColor }]}>
+                    {isInbound ? 'Sẽ nhập' : 'Sẽ nhặt'}{' '}
+                    <Text style={{ fontWeight: '800' }}>{selectedTotalQuantity}</Text> sản phẩm
+                    {selectedBin ? <> vào ô <Text style={{ fontWeight: '800' }}>{selectedBin.code}</Text></> : ''}
+                  </Text>
+                </View>
+              )}
+
               <TouchableOpacity
                 style={[
-                  styles.operationButton, 
-                  { backgroundColor: operationType === 'inbound' ? COLORS.success : COLORS.primary },
-                  isProcessing && { opacity: 0.7 }
+                  styles.confirmBtn,
+                  { backgroundColor: accentColor },
+                  (isProcessing || selectedTotalQuantity === 0) && styles.confirmBtnDisabled,
                 ]}
-                onPress={() => onConfirmOperation(recommendedItems)}
-                disabled={isProcessing}
+                onPress={handleConfirmPress}
+                disabled={isProcessing || selectedTotalQuantity === 0}
+                activeOpacity={0.85}
               >
                 {isProcessing ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
                     <Feather name="check-circle" size={18} color="#fff" />
-                    <Text style={styles.operationButtonText}>
-                      Xác nhận {operationType === 'inbound' ? 'đã xếp' : 'đã nhặt'} {recommendedItems.length} mặt hàng
+                    <Text style={styles.confirmBtnText}>
+                      {selectedTotalQuantity === 0
+                        ? `Chọn số lượng cần ${isInbound ? 'nhập' : 'nhặt'}`
+                        : `Xác nhận ${isInbound ? 'nhập' : 'nhặt'} ${selectedTotalQuantity} sản phẩm`}
                     </Text>
                   </>
                 )}
               </TouchableOpacity>
-            )}
-
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: hasItems ? 12 : 0 }}>
-              {onFindPath && (
-                <TouchableOpacity
-                  style={[styles.secondaryButton, { flex: 1.5 }]}
-                  onPress={() => {
-                    if (shelf) {
-                      onFindPath(shelf);
-                      onClose();
-                    }
-                  }}
-                >
-                  <Feather name="navigation" size={18} color={COLORS.slate600} />
-                  <Text style={styles.secondaryButtonText}>Tìm đường</Text>
-                </TouchableOpacity>
-              )}
-              
-              <TouchableOpacity
-                style={[styles.secondaryButton, { flex: 1 }]}
-                onPress={() => onUpdateShelf?.(shelf)}
-              >
-                <Feather name="settings" size={18} color={COLORS.slate600} />
-                <Text style={styles.secondaryButtonText}>Cập nhật</Text>
-              </TouchableOpacity>
             </View>
+          )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Pressable>
     </Modal>
   );
@@ -225,233 +472,366 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(2, 8, 23, 0.55)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
+  sheet: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
-    paddingBottom: 24,
+    height: '92%',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 20,
+    // flexShrink:1 makes the sheet respect maxHeight properly
+    // so its flex children (ScrollView) get the right available space
+    flexShrink: 1,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+
+  // ── Drag handle ───────────────────────────────────────────────────────────
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.slate200,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+
+  // ── Header ────────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderBottomColor: COLORS.borderLight,
     gap: 12,
-    flex: 1,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerText: {
     flex: 1,
   },
-  headerActionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shelfCode: {
+  headerShelfCode: {
     fontSize: 22,
     fontWeight: '800',
     color: COLORS.slate800,
     letterSpacing: -0.5,
   },
-  zoneCode: {
-    fontSize: 13,
-    color: COLORS.slate500,
-    fontWeight: '600',
-    marginTop: 1,
+  headerZone: {
+    fontSize: 12,
+    color: COLORS.slate400,
+    fontWeight: '500',
+    marginTop: 2,
   },
-  closeButton: {
-    width: 40,
-    height: 40,
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: COLORS.slate100,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 20,
   },
-  content: {
-    padding: 20,
+
+  // ── Body ──────────────────────────────────────────────────────────────────
+  body: {
+    flexShrink: 1,
+  },
+  bodyContent: {
+    flexGrow: 1,
+    paddingBottom: 8,
   },
   section: {
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: COLORS.slate800,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sectionHeader: {
+  sectionLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 8,
   },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+  sectionDot: {
+    width: 4,
+    height: 16,
+    borderRadius: 2,
   },
-  badgeText: {
+  sectionLabel: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.slate700,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    flex: 1,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  countBadgeText: {
     fontSize: 12,
     fontWeight: '800',
   },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 12,
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.borderLight,
+    marginHorizontal: 20,
   },
-  infoItem: {
-    flex: 1,
-    minWidth: '30%',
-    backgroundColor: '#F8FAFC',
+
+  // ── Item card ─────────────────────────────────────────────────────────────
+  itemCard: {
+    backgroundColor: COLORS.slate50,
+    borderRadius: 14,
     padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  infoLabel: {
-    fontSize: 11,
-    color: COLORS.slate500,
-    marginBottom: 4,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  infoValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.slate800,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 10,
     borderWidth: 1.5,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: COLORS.borderLight,
+    gap: 10,
   },
-  manualItemRow: {
-    opacity: 0.85,
-    borderStyle: 'dashed',
-    backgroundColor: '#FAFAFA',
-  },
-  recBadge: {
-    backgroundColor: COLORS.successLight,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  recBadgeText: {
-    fontSize: 10,
-    color: COLORS.success,
-    fontWeight: '800',
+  itemTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   itemInfo: {
     flex: 1,
+    gap: 6,
+  },
+  itemNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   itemName: {
     fontSize: 15,
     fontWeight: '700',
     color: COLORS.slate800,
+    flex: 1,
   },
-  itemMeta: {
+  recTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 5,
   },
-  itemSku: {
-    fontSize: 12,
+  recTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  itemMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  metaChip: {
+    fontSize: 11,
+    color: COLORS.slate400,
+    fontWeight: '600',
+    backgroundColor: COLORS.slate100,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
+  binTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  binTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // ── Progress ──────────────────────────────────────────────────────────────
+  progressWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: COLORS.slate200,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontWeight: '700',
     color: COLORS.slate500,
-    fontWeight: '500',
+    minWidth: 36,
+    textAlign: 'right',
   },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: COLORS.slate300,
-    marginHorizontal: 8,
+
+  // ── Quantity controls ─────────────────────────────────────────────────────
+  qtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
   },
-  itemBin: {
+  qtyHintWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  qtyHintMain: {
     fontSize: 12,
+    fontWeight: '700',
     color: COLORS.slate600,
   },
-  itemQty: {
-    alignItems: 'flex-end',
-    marginLeft: 12,
-  },
-  qtyLabel: {
+  qtyHintSub: {
     fontSize: 11,
-    color: COLORS.slate500,
-    marginBottom: 2,
-    fontWeight: '600',
+    color: COLORS.slate400,
+    fontWeight: '500',
   },
-  qtyValue: {
+  qtyControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  qtyBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: COLORS.slate100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.slate200,
+  },
+  qtyBtnDisabled: {
+    opacity: 0.4,
+  },
+  qtyInput: {
+    width: 54,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: COLORS.slate200,
+    paddingHorizontal: 8,
+    paddingVertical: 0,
     fontSize: 18,
     fontWeight: '800',
-    color: COLORS.slate800,
+    color: COLORS.slate700,
+    textAlign: 'center',
+    includeFontPadding: false,
+    lineHeight: 20,
   },
-  actions: {
-    padding: 20,
+
+  // ── Empty state ───────────────────────────────────────────────────────────
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+    gap: 10,
+  },
+  emptyStateIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: COLORS.slate100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.slate600,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: COLORS.slate400,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+
+  // ── Footer / Confirm ──────────────────────────────────────────────────────
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: COLORS.borderLight,
+    gap: 10,
   },
-  operationButton: {
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  summaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  confirmBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    height: 56,
-    borderRadius: 16,
+    height: 54,
+    borderRadius: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 5,
   },
-  operationButtonText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#fff',
+  confirmBtnDisabled: {
+    opacity: 0.45,
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  secondaryButton: {
+  confirmBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  recHintRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#F1F5F9',
-    height: 50,
-    borderRadius: 14,
+    gap: 4,
+    backgroundColor: COLORS.primary + '08',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginVertical: 4,
+    alignSelf: 'flex-start',
   },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.slate600,
+  recHintText: {
+    fontSize: 11,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });

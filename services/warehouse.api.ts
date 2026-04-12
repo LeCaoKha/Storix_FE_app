@@ -134,9 +134,32 @@ export const getWarehouseStructure = async (
   companyId: number,
   warehouseId: number
 ): Promise<WarehouseStructure> => {
+  const normalizedCompanyId = Number(companyId);
+  const normalizedWarehouseId = Number(warehouseId);
+
+  if (
+    !Number.isFinite(normalizedCompanyId) ||
+    normalizedCompanyId <= 0 ||
+    !Number.isFinite(normalizedWarehouseId) ||
+    normalizedWarehouseId <= 0
+  ) {
+    console.warn('[getWarehouseStructure] skip request because ids are invalid', {
+      companyId,
+      warehouseId,
+    });
+
+    return {
+      width: 1,
+      height: 1,
+      zones: [],
+      nodes: [],
+      edges: [],
+    };
+  }
+
   try {
     const response = await api.get<WarehouseStructure>(
-      `/api/get-warehouse-structure/${companyId}/${warehouseId}`
+      `/api/get-warehouse-structure/${normalizedCompanyId}/${normalizedWarehouseId}`
     );
     return response.data;
   } catch (error: any) {

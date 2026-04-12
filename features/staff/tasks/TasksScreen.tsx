@@ -19,7 +19,6 @@ export default function TasksScreen() {
             case TaskType.OUTBOUND: return 'Xuất kho';
             case TaskType.INBOUND: return 'Nhập kho';
             case TaskType.INVENTORY_COUNT: return 'Kiểm kê';
-            case TaskType.TRANSFER: return 'Chuyển kho';
             default: return type.charAt(0).toUpperCase() + type.slice(1);
         }
     };
@@ -30,8 +29,7 @@ export default function TasksScreen() {
             'all', 
             TaskType.OUTBOUND, 
             TaskType.INBOUND, 
-            TaskType.INVENTORY_COUNT, 
-            TaskType.TRANSFER
+            TaskType.INVENTORY_COUNT
         ];
         return filters.map(filter => ({
             value: filter,

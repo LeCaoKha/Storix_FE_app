@@ -308,10 +308,13 @@ const getTicketRecommendations = async (id: number): Promise<InboundItemStorageR
  * Hook lấy gợi ý vị trí xếp hàng cho từng item của phiếu nhập
  */
 export const useInboundStorageRecommendations = (inboundOrderId: number | undefined) => {
+  const normalizedInboundOrderId = Number(inboundOrderId);
+  const hasValidInboundOrderId = Number.isFinite(normalizedInboundOrderId) && normalizedInboundOrderId > 0;
+
   return useQuery({
-    queryKey: inboundOrderKeys.ticketRecommendations(inboundOrderId ?? 0),
-    queryFn: () => getTicketRecommendations(inboundOrderId!),
-    enabled: !!inboundOrderId,
+    queryKey: inboundOrderKeys.ticketRecommendations(hasValidInboundOrderId ? normalizedInboundOrderId : 0),
+    queryFn: () => (hasValidInboundOrderId ? getTicketRecommendations(normalizedInboundOrderId) : Promise.resolve([])),
+    enabled: hasValidInboundOrderId,
     staleTime: 0,
   });
 };

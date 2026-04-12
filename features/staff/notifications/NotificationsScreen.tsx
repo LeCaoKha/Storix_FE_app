@@ -18,16 +18,18 @@ interface Notification {
 }
 
 const mapNotification = (item: NotificationItem): Notification => {
-  const createdAt = item.createdAt ? new Date(item.createdAt) : new Date();
-  const normalizedType = String(item.type || '').toLowerCase();
+  const source = item.notification ?? item;
+  const createdAtValue = item.createdAt || source.createdAt;
+  const createdAt = createdAtValue ? new Date(createdAtValue) : new Date();
+  const normalizedType = String(item.type || source.type || '').toLowerCase();
 
   return {
     id: Number(item.id),
     type: normalizedType === 'outbound' ? 'outbound' : normalizedType === 'inventory' ? 'inventory' : normalizedType === 'system' ? 'system' : 'inbound',
-    title: item.title || 'Thông báo',
-    message: item.message || '',
+    title: item.title || source.title || 'Thông báo',
+    message: item.message || source.message || '',
     time: createdAt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-    isRead: !!item.isRead,
+    isRead: !!(item.isRead ?? source.isRead),
     date: createdAt.toLocaleDateString('vi-VN'),
   };
 };
@@ -37,7 +39,7 @@ export default function NotificationsScreen() {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
 
-  const { data: notifications = [], isLoading, refetch } = useQuery({
+  const { data: notifications = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['notifications', user?.id],
     queryFn: async () => {
       if (!user?.id) return [] as Notification[];
@@ -64,6 +66,8 @@ export default function NotificationsScreen() {
     await Promise.all(unread.map((notification) => markReadMutation.mutateAsync(notification.id)));
     await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
+
+  const errorMessage = error instanceof Error ? error.message : 'Không tải được danh sách thông báo.';
 
   const getCategoryTheme = (type: Notification['type']) => {
     switch (type) {
@@ -143,6 +147,13 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
         </View>
 
+        {isError && (
+          <View style={styles.errorState}>
+            <Text style={styles.emptyTitle}>Không tải được thông báo</Text>
+            <Text style={styles.emptySubtitle}>{errorMessage}</Text>
+          </View>
+        )}
+
         {sections.map(section => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -150,7 +161,7 @@ export default function NotificationsScreen() {
           </View>
         ))}
 
-        {notifications.length === 0 && (
+        {!isError && notifications.length === 0 && !isLoading && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Hộp thư trống</Text>
             <Text style={styles.emptySubtitle}>Bạn không có thông báo nào vào lúc này.</Text>
@@ -291,6 +302,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 100,
+  },
+  errorState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   emptyTitle: {
     fontSize: 18,

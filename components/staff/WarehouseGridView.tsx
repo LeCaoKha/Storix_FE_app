@@ -35,112 +35,129 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
   const renderBinGrid = (shelf: Shelf, zone: WarehouseZone) => {
     const levels = shelf.levels ?? [];
     const isRecommendedShelf = (recommendedShelves ?? []).includes(shelf.id);
-    
-    if (levels.length === 0) {
-      return (
-        <View style={[styles.rackCard, isRecommendedShelf && styles.rackCardRecommended]}>
-          {/* Rack header */}
-          <View style={styles.rackHeader}>
-            <View style={[styles.rackIcon, isRecommendedShelf && { backgroundColor: COLORS.successLight }]}>
-              <Feather name="layers" size={16} color={isRecommendedShelf ? COLORS.success : "#475569"} />
-            </View>
-            <Text style={styles.rackTitle}>{shelf.code}</Text>
-            {isRecommendedShelf && (
-              <View style={styles.shelfRecBadge}>
-                <Text style={styles.shelfRecBadgeText}>Gợi ý</Text>
-              </View>
-            )}
-            <TouchableOpacity
-              style={styles.infoButton}
-              onPress={() => onShelfPress?.(shelf, zone)}
-            >
-              <Feather name="info" size={16} color="#3B82F6" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.emptyRack}>
-            <Text style={styles.emptyRackText}>No bins configured</Text>
-          </View>
-        </View>
-      );
-    }
+    const isHighlighted = highlightedShelf === shelf.id;
+    const totalBins = levels.reduce((acc, level) => acc + (level.bins?.length ?? 0), 0);
 
     return (
-      <View style={[styles.rackCard, isRecommendedShelf && styles.rackCardRecommended]}>
-        {/* Rack header */}
+      <TouchableOpacity
+        activeOpacity={0.92}
+        onPress={() => onShelfPress?.(shelf, zone)}
+        style={[
+          styles.rackCard,
+          isRecommendedShelf && styles.rackCardRecommended,
+          isHighlighted && !isRecommendedShelf && styles.rackCardHighlighted,
+        ]}
+      >
+        {/* Rack Header */}
         <View style={styles.rackHeader}>
-          <View style={[styles.rackIcon, isRecommendedShelf && { backgroundColor: COLORS.successLight }]}>
-            <Feather name="layers" size={16} color={isRecommendedShelf ? COLORS.success : "#475569"} />
-          </View>
-          <Text style={styles.rackTitle}>{shelf.code}</Text>
-          {isRecommendedShelf && (
-            <View style={styles.shelfRecBadge}>
-              <Text style={styles.shelfRecBadgeText}>Gợi ý</Text>
+          <View style={styles.rackHeaderLeft}>
+            <View style={[
+              styles.rackIconWrap,
+              isRecommendedShelf && { backgroundColor: COLORS.success + '18' },
+              isHighlighted && !isRecommendedShelf && { backgroundColor: COLORS.primaryLight },
+            ]}>
+              <Feather
+                name="layers"
+                size={16}
+                color={isRecommendedShelf ? COLORS.success : isHighlighted ? COLORS.primary : COLORS.slate500}
+              />
             </View>
-          )}
-          <View style={styles.rackStats}>
-            <Text style={styles.rackStatsText}>
-              {levels.length}L · {levels.reduce((acc, level) => acc + (level.bins?.length ?? 0), 0)}B
-            </Text>
+            <View>
+              <Text style={[
+                styles.rackTitle,
+                isRecommendedShelf && { color: COLORS.successText },
+                isHighlighted && !isRecommendedShelf && { color: COLORS.primary },
+              ]}>
+                {shelf.code}
+              </Text>
+              <Text style={styles.rackSubtitle}>
+                {levels.length} tầng · {totalBins} ô
+              </Text>
+            </View>
           </View>
-          <TouchableOpacity
-            style={styles.infoButton}
-            onPress={() => onShelfPress?.(shelf, zone)}
-          >
-            <Feather name="info" size={16} color="#3B82F6" />
-          </TouchableOpacity>
+
+          <View style={styles.rackHeaderRight}>
+            {isRecommendedShelf && (
+              <View style={styles.recBadge}>
+                <Feather name="star" size={10} color={COLORS.success} />
+                <Text style={styles.recBadgeText}>Gợi ý</Text>
+              </View>
+            )}
+            <View style={[
+              styles.infoBtn,
+              isRecommendedShelf && { backgroundColor: COLORS.success + '18' },
+              isHighlighted && !isRecommendedShelf && { backgroundColor: COLORS.primaryLight },
+            ]}>
+              <Feather
+                name="chevron-right"
+                size={16}
+                color={isRecommendedShelf ? COLORS.success : isHighlighted ? COLORS.primary : COLORS.slate400}
+              />
+            </View>
+          </View>
         </View>
 
-        {/* Bin grid - using actual API data */}
-        <View style={styles.binGrid}>
-          {levels.map((level) => (
-            <View key={level.id} style={styles.levelContainer}>
-              {/* Level label */}
-              <View style={styles.levelLabel}>
-                <Text style={styles.levelLabelText}>{level.code}</Text>
-              </View>
-              
-              {/* Bins in this level */}
-              <View style={styles.binRow}>
-                {(level.bins ?? []).map((bin) => {
-                  const isHighlighted = highlightedShelf === shelf.id;
-                  const isRecommendedBin = (highlightedBins ?? []).some((code) => 
-                    String(code) === bin.code || String(code) === bin.id
-                  );
-                  
-                  const hasAnyRecommendations = (recommendedShelves?.length ?? 0) > 0 || (highlightedBins?.length ?? 0) > 0;
-                  const isSuggested = isRecommendedShelf || isRecommendedBin;
-                  const isDimmed = hasAnyRecommendations && !isSuggested;
+        {levels.length === 0 ? (
+          <View style={styles.emptyRack}>
+            <Feather name="inbox" size={20} color={COLORS.slate300} />
+            <Text style={styles.emptyRackText}>Chưa có ô hàng</Text>
+          </View>
+        ) : (
+          <View style={styles.levelsContainer}>
+            {levels.map((level, levelIndex) => (
+              <View key={level.id} style={styles.levelRow}>
+                {/* Level tag */}
+                <View style={[
+                  styles.levelTag,
+                  isRecommendedShelf && { backgroundColor: COLORS.success + '18', borderColor: COLORS.success + '30' },
+                ]}>
+                  <Text style={[
+                    styles.levelTagText,
+                    isRecommendedShelf && { color: COLORS.success },
+                  ]}>
+                    {level.code}
+                  </Text>
+                </View>
 
-                  return (
-                    <TouchableOpacity
-                      key={bin.id}
-                      style={[
-                        styles.binSlot,
-                        isDimmed && styles.binSlotDimmed,
-                        isSuggested && styles.binSlotSuggested,
-                        isHighlighted && !isSuggested && styles.binSlotHighlighted,
-                      ]}
-                      activeOpacity={0.7}
-                      onPress={() => onShelfPress?.(shelf, zone)}
-                    >
-                      <Text style={[
-                        styles.binCode,
-                        isSuggested && styles.binCodeSuggested,
-                        isDimmed && styles.binCodeDimmed
-                      ]}>
-                        {bin.code}
-                      </Text>
-                      {isRecommendedBin && (
-                        <View style={styles.binRecDot} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
+                {/* Bins */}
+                <View style={styles.binsRow}>
+                  {(level.bins ?? []).map((bin) => {
+                    const isRecommendedBin = (highlightedBins ?? []).some(
+                      (code) => String(code) === bin.code || String(code) === bin.id
+                    );
+                    const hasAnyRecommendations =
+                      (recommendedShelves?.length ?? 0) > 0 || (highlightedBins?.length ?? 0) > 0;
+                    const isSuggested = isRecommendedShelf || isRecommendedBin;
+                    const isDimmed = hasAnyRecommendations && !isSuggested;
+
+                    return (
+                      <View
+                        key={bin.id}
+                        style={[
+                          styles.binSlot,
+                          isSuggested && styles.binSlotSuggested,
+                          isDimmed && styles.binSlotDimmed,
+                          isHighlighted && !isSuggested && !isDimmed && styles.binSlotHighlighted,
+                        ]}
+                      >
+                        <Text style={[
+                          styles.binCode,
+                          isSuggested && styles.binCodeSuggested,
+                          isDimmed && styles.binCodeDimmed,
+                          isHighlighted && !isSuggested && !isDimmed && styles.binCodeHighlighted,
+                        ]}>
+                          {bin.code}
+                        </Text>
+                        {isRecommendedBin && <View style={styles.binDot} />}
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
-          ))}
-        </View>
-      </View>
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
     );
   };
 
@@ -157,18 +174,14 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
             {(structure.zones ?? []).map((zone) => (
               <TouchableOpacity
                 key={zone.id}
-                style={[
-                  styles.zoneTab,
-                  selectedZone === zone.id && styles.zoneTabActive,
-                ]}
+                style={[styles.zoneTab, selectedZone === zone.id && styles.zoneTabActive]}
                 onPress={() => setSelectedZone(zone.id)}
+                activeOpacity={0.8}
               >
-                <Text
-                  style={[
-                    styles.zoneTabText,
-                    selectedZone === zone.id && styles.zoneTabTextActive,
-                  ]}
-                >
+                {selectedZone === zone.id && (
+                  <View style={styles.zoneTabDot} />
+                )}
+                <Text style={[styles.zoneTabText, selectedZone === zone.id && styles.zoneTabTextActive]}>
                   {zone.code}
                 </Text>
               </TouchableOpacity>
@@ -177,23 +190,29 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
         </View>
       )}
 
-      {/* Legend - simplified */}
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <Feather name="package" size={14} color="#64748B" />
-          <Text style={styles.legendText}>
-            {currentZone?.shelves?.reduce((acc, s) => acc + (s.levels?.length ?? 0), 0) || 0} Levels
+      {/* Stats bar */}
+      <View style={styles.statsBar}>
+        <View style={styles.statItem}>
+          <Feather name="package" size={13} color={COLORS.slate400} />
+          <Text style={styles.statText}>
+            {currentZone?.shelves?.reduce((acc, s) => acc + (s.levels?.length ?? 0), 0) || 0} tầng
           </Text>
         </View>
-        <View style={styles.legendDivider} />
-        <View style={styles.legendItem}>
-          <Feather name="grid" size={14} color="#64748B" />
-          <Text style={styles.legendText}>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Feather name="grid" size={13} color={COLORS.slate400} />
+          <Text style={styles.statText}>
             {currentZone?.shelves?.reduce(
               (acc, s) => acc + (s.levels ?? []).reduce((sum, l) => sum + (l.bins?.length ?? 0), 0),
               0
-            ) || 0}{' '}
-            Bins
+            ) || 0} ô hàng
+          </Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Feather name="layers" size={13} color={COLORS.slate400} />
+          <Text style={styles.statText}>
+            {currentZone?.shelves?.length || 0} kệ
           </Text>
         </View>
       </View>
@@ -208,12 +227,14 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
           <View key={shelf.id}>{renderBinGrid(shelf, currentZone)}</View>
         ))}
 
-        {!currentZone?.shelves || currentZone.shelves.length === 0 ? (
+        {(!currentZone?.shelves || currentZone.shelves.length === 0) && (
           <View style={styles.emptyState}>
-            <Feather name="inbox" size={48} color="#CBD5E1" />
-            <Text style={styles.emptyText}>No racks in this zone</Text>
+            <View style={styles.emptyStateIcon}>
+              <Feather name="inbox" size={32} color={COLORS.slate300} />
+            </View>
+            <Text style={styles.emptyText}>Chưa có kệ nào trong khu vực này</Text>
           </View>
-        ) : null}
+        )}
       </ScrollView>
     </View>
   );
@@ -222,228 +243,301 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.background,
   },
+
+  // ── Zone tabs ─────────────────────────────────────────────────────────────
   zoneTabs: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingVertical: 12,
+    borderBottomColor: COLORS.borderLight,
   },
   zoneTabsContent: {
     paddingHorizontal: 16,
+    paddingVertical: 10,
     gap: 8,
+    flexDirection: 'row',
   },
   zoneTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-  },
-  zoneTabActive: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#2563EB',
-  },
-  zoneTabText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  zoneTabTextActive: {
-    color: '#FFFFFF',
-  },
-  legend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.slate100,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
-  legendDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: '#CBD5E1',
+  zoneTabActive: {
+    backgroundColor: COLORS.primary + '15',
+    borderColor: COLORS.primary + '40',
   },
-  legendText: {
+  zoneTabDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+  },
+  zoneTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.slate500,
+    letterSpacing: 0.2,
+  },
+  zoneTabTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+
+  // ── Stats bar ─────────────────────────────────────────────────────────────
+  statsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+    gap: 0,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  statText: {
     fontSize: 12,
-    color: '#64748B',
+    color: COLORS.slate500,
     fontWeight: '600',
   },
+  statDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: COLORS.borderLight,
+  },
+
+  // ── Rack card ─────────────────────────────────────────────────────────────
   scrollView: {
     flex: 1,
   },
   gridContent: {
-    padding: 16,
-    gap: 16,
+    padding: 14,
+    gap: 10,
+    paddingBottom: 32,
   },
   rackCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderLight,
+    overflow: 'hidden',
+    shadowColor: COLORS.slate900,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
   },
   rackCardRecommended: {
-    borderColor: COLORS.success,
-    borderWidth: 1.5,
-    backgroundColor: COLORS.success + '05',
+    borderColor: COLORS.success + '60',
+    backgroundColor: '#FBFFFE',
+    shadowColor: COLORS.success,
+    shadowOpacity: 0.08,
+    elevation: 3,
   },
+  rackCardHighlighted: {
+    borderColor: COLORS.primary + '50',
+    backgroundColor: '#FAFFFE',
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.08,
+  },
+
+  // ── Rack header ───────────────────────────────────────────────────────────
   rackHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
   },
-  rackIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+  rackHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  rackHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rackIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: COLORS.slate100,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rackTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  shelfRecBadge: {
-    backgroundColor: COLORS.success,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  shelfRecBadgeText: {
-    color: '#fff',
-    fontSize: 10,
     fontWeight: '800',
-    textTransform: 'uppercase',
+    color: COLORS.slate800,
+    letterSpacing: -0.3,
   },
-  binRecDot: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.success,
-  },
-  rackStats: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
-  },
-  rackStatsText: {
+  rackSubtitle: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
+    color: COLORS.slate400,
+    fontWeight: '500',
+    marginTop: 1,
   },
-  infoButton: {
-    width: 32,
-    height: 32,
+  recBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.success + '18',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: COLORS.success + '30',
+  },
+  recBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.success,
+    letterSpacing: 0.3,
+  },
+  infoBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: COLORS.slate100,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  binGrid: {
-    gap: 12,
+
+  // ── Levels & bins ─────────────────────────────────────────────────────────
+  levelsContainer: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
   },
-  levelContainer: {
-    gap: 6,
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
   },
-  levelLabel: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#3B82F6',
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+  levelTag: {
+    minWidth: 36,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: COLORS.slate100,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
   },
-  levelLabelText: {
+  levelTagText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    color: COLORS.slate500,
+    letterSpacing: 0.3,
   },
-  binRow: {
+  binsRow: {
+    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
   },
   binSlot: {
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: COLORS.slate200,
+    backgroundColor: COLORS.slate50,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
-    minWidth: 50,
-  },
-  binSlotHighlighted: {
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
+    minWidth: 44,
   },
   binSlotSuggested: {
-    borderWidth: 2,
-    borderColor: COLORS.success,
-    backgroundColor: COLORS.successLight,
+    borderColor: COLORS.success + '70',
+    backgroundColor: COLORS.success + '10',
+  },
+  binSlotHighlighted: {
+    borderColor: COLORS.primary + '60',
+    backgroundColor: COLORS.primaryLight,
   },
   binSlotDimmed: {
-    opacity: 0.4,
-    backgroundColor: COLORS.slate50,
-    borderColor: COLORS.slate200,
+    opacity: 0.3,
   },
   binCode: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: COLORS.slate600,
+    letterSpacing: 0.2,
   },
   binCodeSuggested: {
     color: COLORS.successText,
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  binCodeHighlighted: {
+    color: COLORS.primary,
+    fontWeight: '700',
   },
   binCodeDimmed: {
-    color: COLORS.slate400,
+    color: COLORS.slate300,
   },
+  binDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: COLORS.success,
+  },
+
+  // ── Empty states ──────────────────────────────────────────────────────────
   emptyRack: {
-    paddingVertical: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    backgroundColor: COLORS.slate50,
   },
   emptyRackText: {
     fontSize: 13,
-    color: '#94A3B8',
-    fontStyle: 'italic',
+    color: COLORS.slate400,
+    fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
+    gap: 12,
+  },
+  emptyStateIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: COLORS.slate100,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
     fontSize: 14,
-    color: '#94A3B8',
-    marginTop: 12,
+    color: COLORS.slate400,
     fontWeight: '500',
   },
 });
