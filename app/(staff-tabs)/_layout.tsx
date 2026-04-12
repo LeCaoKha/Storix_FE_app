@@ -11,6 +11,7 @@ export default function StaffTabLayout() {
 
     return (
         <Tabs
+            initialRouteName="tasks/index"
             screenOptions={{
                 tabBarActiveTintColor: COLORS.primary,
                 tabBarInactiveTintColor: COLORS.textMuted,
@@ -27,16 +28,8 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "Trang chủ",
-                    tabBarIcon: ({ color }) => <Feather name="home" size={28} color={color} />,
+                    href: null,
                 }}
-                listeners={({ navigation }) => ({
-                    tabPress: (e) => {
-                        if (navigation.isFocused()) {
-                            useRefreshStore.getState().triggerRefresh();
-                        }
-                    },
-                })}
             />
             <Tabs.Screen
                 name="tasks/index"

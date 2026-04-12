@@ -16,7 +16,7 @@ const resolveFallbackFromSegments = (segments: string[]) => {
 
     if (segments.includes('(staff-tabs)')) {
         if (segments.includes('tasks')) return '/(staff-tabs)/tasks';
-        if (segments.includes('orders')) return '/(staff-tabs)/tasks';
+        if (segments.includes('orders')) return '/(staff-tabs)/orders';
         if (segments.includes('profile')) return '/(staff-tabs)/profile';
         if (segments.includes('warehouse')) return '/(staff-tabs)/warehouse';
 

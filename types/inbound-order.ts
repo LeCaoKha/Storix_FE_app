@@ -43,6 +43,7 @@ export interface StorageRecommendation {
   binIdCode?: string;
   path?: string;
   distanceInfo?: number;
+  quantity?: number;
   reason?: string;
   createdAt?: string;
 }

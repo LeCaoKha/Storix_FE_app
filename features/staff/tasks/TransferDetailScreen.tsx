@@ -7,6 +7,7 @@ import {
     useStartTransferPicking,
     useTransferOrder
 } from '@/hooks/transfer.hooks';
+import { useAuthStore } from '@/stores/auth.store';
 import { TransferOrderItem } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -19,6 +20,7 @@ export default function StaffTransferDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const transferId = parseInt(id || '0', 10);
     const insets = useSafeAreaInsets();
+    const user = useAuthStore((state) => state.user);
 
     const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
 
@@ -52,6 +54,31 @@ export default function StaffTransferDetailScreen() {
     }
 
     const normalizedStatus = transfer.status.toLowerCase();
+
+    const resolveCarrierUserId = () => {
+        const timeline = transfer.timeline || [];
+        for (let i = timeline.length - 1; i >= 0; i -= 1) {
+            const action = timeline[i]?.action || '';
+            if (!action.startsWith('CARRIER:')) continue;
+            const idValue = Number(action.split(':')[1]);
+            if (Number.isFinite(idValue) && idValue > 0) return idValue;
+        }
+        return null;
+    };
+
+    const currentUserId = Number(user?.id || 0);
+    const currentWarehouseId = Number(user?.warehouseId || 0);
+    const sourceWarehouseId = Number(transfer.sourceWarehouseId || 0);
+    const destinationWarehouseId = Number(transfer.destinationWarehouseId || 0);
+    const assignedCarrierUserId = resolveCarrierUserId();
+
+    const canProcessSourceFlow =
+        sourceWarehouseId > 0 &&
+        currentWarehouseId === sourceWarehouseId &&
+        (!assignedCarrierUserId || assignedCarrierUserId === currentUserId);
+
+    const canProcessDestinationFlow =
+        destinationWarehouseId > 0 && currentWarehouseId === destinationWarehouseId;
 
     // Action Handlers
     const handleStartPicking = () => {
@@ -178,40 +205,55 @@ export default function StaffTransferDetailScreen() {
 
             {/* Actions Footer */}
             <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
-                {normalizedStatus === 'approved' && (
+                {normalizedStatus === 'approved' && canProcessSourceFlow && (
                     <Button 
                         title="Bắt đầu lấy hàng" 
                         onPress={handleStartPicking} 
                         loading={startPickingMutation.isPending} 
                     />
                 )}
-                {normalizedStatus === 'picking' && (
+                {normalizedStatus === 'picking' && canProcessSourceFlow && (
                     <Button 
                         title="Xác nhận đã đóng gói" 
                         onPress={handleMarkPacked} 
                         loading={markPackedMutation.isPending} 
                     />
                 )}
-                {normalizedStatus === 'packed' && (
+                {normalizedStatus === 'packed' && canProcessSourceFlow && (
                     <Button 
                         title="Giao cho vận chuyển" 
                         onPress={handleShip} 
                         loading={shipMutation.isPending} 
                     />
                 )}
-                {normalizedStatus === 'in_transit' && (
+                {normalizedStatus === 'in_transit' && canProcessDestinationFlow && (
                     <Button 
                         title="Kiểm nhận hàng" 
                         onPress={handleReceive} 
                     />
                 )}
-                {normalizedStatus === 'completed' && (
+                {normalizedStatus === 'completed' && canProcessSourceFlow && (
                     <Button 
                         title="Xác nhận kiểm hàng" 
                         onPress={handleQualityCheck}
                         variant="outline"
                         style={{ marginTop: 8 }}
                     />
+                )}
+                {normalizedStatus === 'approved' && !canProcessSourceFlow && (
+                    <Text style={styles.permissionNotice}>Bạn không phụ trách bước lấy hàng của phiếu này.</Text>
+                )}
+                {normalizedStatus === 'picking' && !canProcessSourceFlow && (
+                    <Text style={styles.permissionNotice}>Bạn không phụ trách bước đóng gói của phiếu này.</Text>
+                )}
+                {normalizedStatus === 'packed' && !canProcessSourceFlow && (
+                    <Text style={styles.permissionNotice}>Bạn không phụ trách bước giao vận của phiếu này.</Text>
+                )}
+                {normalizedStatus === 'in_transit' && !canProcessDestinationFlow && (
+                    <Text style={styles.permissionNotice}>Chỉ staff kho đích mới được kiểm nhận hàng.</Text>
+                )}
+                {normalizedStatus === 'completed' && !canProcessSourceFlow && (
+                    <Text style={styles.permissionNotice}>Bước kiểm hàng hiện chỉ mở cho staff kho nguồn.</Text>
                 )}
                 {(normalizedStatus === 'quality_checked' || normalizedStatus === 'quality_issue') && (
                     <View style={styles.completedNotice}>
@@ -265,6 +307,12 @@ const styles = StyleSheet.create({
     },
     completedNotice: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12
+    },
+    permissionNotice: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        textAlign: 'center',
+        paddingVertical: 6,
     },
     completedText: { color: COLORS.success, fontWeight: '600' }
 });

@@ -2,10 +2,12 @@ import {
     getStockCountTicketById,
     getStockCountTickets,
     getStockCountTicketsByStaff,
-    UpdateStockCountItemPayload,
-    updateStockCountTicketItems
+    getWarehouseInventory,
+    updateStockCountTicketItems,
+    updateStockCountTicketStatus
 } from '@/services/stock-count.api';
 import { useAuthStore } from '@/stores/auth.store';
+import { UpdateStockCountItemPayload } from '@/types/stock-count';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export const stockCountKeys = {
@@ -47,6 +49,18 @@ export const useStockCountTicket = (ticketId: number, companyId?: number) => {
     });
 };
 
+export const useWarehouseInventory = (warehouseId?: number, productIds?: number[]) => {
+    const { user } = useAuthStore();
+    const companyId = user?.companyId ?? 0;
+
+    return useQuery({
+        queryKey: ['warehouse-inventory', companyId, warehouseId, productIds],
+        queryFn: () => getWarehouseInventory(companyId, warehouseId!, productIds),
+        enabled: !!companyId && !!warehouseId && !!productIds && productIds.length > 0,
+        staleTime: 0,
+    });
+};
+
 export const useUpdateStockCountItem = () => {
     const queryClient = useQueryClient();
     const { user } = useAuthStore();
@@ -70,13 +84,38 @@ export const useUpdateStockCountItem = () => {
                         stockCountItemId: itemId,
                         productId: payload.productId,
                         countedQuantity: payload.countedQuantity,
-                        locationId: payload.locationId ?? null,
+                        binId: payload.locationId?.toString() ?? null,
                     },
                 ],
             }),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: stockCountKeys.tickets() });
             queryClient.invalidateQueries({ queryKey: stockCountKeys.ticket(variables.ticketId) });
+        },
+    });
+};
+
+export const useUpdateStockCountStatus = () => {
+    const queryClient = useQueryClient();
+    const { user } = useAuthStore();
+
+    return useMutation({
+        mutationFn: ({
+            ticketId,
+            status,
+            approverId,
+        }: {
+            ticketId: number;
+            status: string;
+            approverId?: number;
+        }) =>
+            updateStockCountTicketStatus(ticketId, {
+                approverId: approverId ?? user?.id ?? 0,
+                status,
+            }),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: stockCountKeys.all });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] }); // Invalidate tasks as well
         },
     });
 };

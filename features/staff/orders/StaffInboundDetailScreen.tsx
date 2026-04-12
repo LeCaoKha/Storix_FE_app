@@ -1,22 +1,23 @@
 import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
+import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function StaffInboundDetailScreen() {
-    const router = useRouter();
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id, from } = useLocalSearchParams<{ id: string; from?: string | string[] }>();
     const user = useAuthStore((state) => state.user);
     const companyId = user?.companyId ?? 0;
     const staffId = user?.id ?? 0;
     const orderId = parseInt(id || '0', 10);
-    const goHome = () => router.replace('/(staff-tabs)' as any);
+    const fromPath = Array.isArray(from) ? from[0] : from;
+    const goBack = useAppBack(fromPath || '/(staff-tabs)/orders');
     const { data: staffOrders, isLoading, error, refetch: refetchStaffOrders } = useInboundOrdersByStaff(companyId, staffId);
     const { data: inboundTicket, refetch: refetchInboundTicket } = useInboundTicket(orderId);
     const order = useMemo(() => {
@@ -64,7 +65,7 @@ export default function StaffInboundDetailScreen() {
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
                     <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={goHome}>
+                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
                         <Text style={styles.backButtonText}>Quay lại</Text>
                     </TouchableOpacity>
                 </View>
@@ -113,7 +114,7 @@ export default function StaffInboundDetailScreen() {
             });
 
             AlertService.success('Thành công', allReceived ? 'Đã hoàn tất nhận hàng' : 'Đã lưu thông tin nhận hàng', () => {
-                goHome();
+                goBack();
             });
         } catch {
             AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
@@ -127,7 +128,7 @@ export default function StaffInboundDetailScreen() {
             <ScreenHeader
                 title="Nhập Kho"
                 subtitle={order.referenceCode || `INB-${order.id}`}
-                onBack={goHome}
+                onBack={goBack}
             />
 
             <RefreshContainer 

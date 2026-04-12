@@ -107,6 +107,20 @@ export default function ManagerTabLayout() {
                 })}
             />
             <Tabs.Screen
+                name="notifications"
+                options={{
+                    title: "Thông báo",
+                    tabBarIcon: ({ color }) => <Feather name="bell" size={28} color={color} />,
+                }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
+            />
+            <Tabs.Screen
                 name="profile"
                 options={{
                     href: '/(manager-tabs)/profile', // Show this tab

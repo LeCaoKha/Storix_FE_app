@@ -3,12 +3,11 @@ import { Task, TaskPriority, TaskStatus, TaskType } from '@/types/order';
 import { getInboundOrdersByStaff } from './inbound-order.api';
 import { getOutboundOrdersByStaff } from './outbound-order.api';
 import { getStockCountTicketsByStaff } from './stock-count.api';
-import { getTransferOrders } from './transfer.api';
 
 /**
  * Lấy tất cả tasks của staff hiện tại
  */
-export const getTasks = async (staffId: number, companyId: number, currentWarehouseId?: number): Promise<Task[]> => {
+export const getTasks = async (staffId: number, companyId: number, _currentWarehouseId?: number): Promise<Task[]> => {
     try {
         const tasks: Task[] = [];
 
@@ -91,50 +90,6 @@ export const getTasks = async (staffId: number, companyId: number, currentWareho
             console.warn('[getTasks] Failed to fetch inventory count tasks:', err);
         }
 
-        // Fetch warehouse transfer tasks
-        // BE transfer status filter currently expects exact value, so fetch and filter on client.
-        try {
-            const transferOrders = await getTransferOrders({});
-
-            const activeTransferStatuses = new Set([
-                'approved',
-                'picking',
-                'packed',
-                'in_transit',
-                'completed',
-                'quality_checked',
-                'quality_issue',
-                // Keep compatibility for legacy rows.
-                'received_full',
-                'received_partial',
-                'received',
-            ]);
-
-            const transferTasks = transferOrders
-                .filter(order => activeTransferStatuses.has((order.status || '').toLowerCase()))
-                .filter(order => {
-                    if (!currentWarehouseId) return true;
-                    return order.sourceWarehouseId === currentWarehouseId || order.destinationWarehouseId === currentWarehouseId;
-                })
-                .map(order => ({
-                id: `transfer-${order.id}`,
-                title: `Điều chuyển: ${order.referenceCode || `TRS-${order.id}`}`,
-                description: `Chuyển hàng từ ${order.sourceWarehouse?.name || 'Kho nguồn'} đến ${order.destinationWarehouse?.name || 'Kho đích'}`,
-                type: TaskType.TRANSFER,
-                status: mapTransferStatus(order.status),
-                priority: TaskPriority.MEDIUM,
-                assignedTo: String(staffId),
-                relatedOrderId: String(order.id),
-                location: order.sourceWarehouse?.name,
-                createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
-                updatedAt: order.createdAt ? new Date(order.createdAt) : new Date(),
-                }));
-
-            tasks.push(...transferTasks);
-        } catch (err) {
-            console.warn('[getTasks] Failed to fetch transfer tasks:', err);
-        }
-
         // Sort by created date (newest first)
         tasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
@@ -178,42 +133,24 @@ function mapOutboundStatus(status?: string): TaskStatus {
 }
 
 function mapCountStatus(status?: string): TaskStatus {
-    // BE InventoryCountTicket statuses: Draft, InProgress, PendingApproval, Approved, Completed
+    // BE InventoryCountTicket statuses: Pending, In Progress, Finished, Approved, Rejected
     switch (status?.toLowerCase()) {
         case 'draft':
+        case 'pending':
             return TaskStatus.PENDING;
+        case 'in progress':
         case 'inprogress':
         case 'in_progress':
         case 'pendingapproval':
         case 'pending_approval':
             return TaskStatus.IN_PROGRESS;
+        case 'finished':
         case 'approved':
         case 'completed':
+        case 'rejected':
             return TaskStatus.COMPLETED;
         default:
             return TaskStatus.PENDING;
     }
 }
 
-function mapTransferStatus(status?: string): TaskStatus {
-    // BE Transfer statuses: Draft, PendingApproval, Approved, Picking, Packed, InTransit, Completed, QualityChecked, QualityIssue, Cancelled
-    switch (status?.toLowerCase()) {
-        case 'approved':
-            return TaskStatus.PENDING;
-        case 'picking':
-        case 'packed':
-        case 'in_transit':
-        case 'completed':
-        case 'received':
-        case 'received_full':
-        case 'received_partial':
-            return TaskStatus.IN_PROGRESS;
-        case 'quality_checked':
-        case 'quality_issue':
-            return TaskStatus.COMPLETED;
-        case 'cancelled':
-            return TaskStatus.CANCELLED;
-        default:
-            return TaskStatus.PENDING;
-    }
-}

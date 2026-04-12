@@ -64,13 +64,66 @@ export const updateInboundTicketItems = async (
  * Lấy gợi ý vị trí xếp hàng cho từng item trong phiếu nhập
  */
 export const getInboundStorageRecommendations = async (inboundOrderId: number) => {
+  const normalizedInboundOrderId = Number(inboundOrderId);
+  if (!Number.isFinite(normalizedInboundOrderId) || normalizedInboundOrderId <= 0) {
+    return [] as InboundItemStorageRecommendations[];
+  }
+
   const res = await api.get(
-    `/api/InventoryInbound/get-inbound-orders/${inboundOrderId}/storage-recommendations`
+    `/api/InventoryInbound/get-inbound-orders/${normalizedInboundOrderId}/storage-recommendations`
   );
 
   if (!Array.isArray(res.data)) return [] as InboundItemStorageRecommendations[];
 
-  return res.data as InboundItemStorageRecommendations[];
+  // Backward/forward compatible mapping because BE recommendation payload can evolve.
+  return res.data.map((rawItem: any) => {
+    const rawRecommendations = Array.isArray(rawItem?.storageRecommendations)
+      ? rawItem.storageRecommendations
+      : Array.isArray(rawItem?.recommendations)
+        ? rawItem.recommendations
+        : [];
+
+    const storageRecommendations = rawRecommendations
+      .map((rawRec: any) => {
+        const normalizedBinIdCode =
+          rawRec?.binIdCode ??
+          rawRec?.binCode ??
+          (typeof rawRec?.binId === 'string' ? rawRec.binId : undefined);
+
+        const normalizedDistanceInfo =
+          typeof rawRec?.distanceInfo === 'number'
+            ? rawRec.distanceInfo
+            : typeof rawRec?.distance === 'number'
+              ? rawRec.distance
+              : undefined;
+
+        const normalizedQuantity =
+          typeof rawRec?.quantity === 'number'
+            ? rawRec.quantity
+            : undefined;
+
+        return {
+          id: Number(rawRec?.id || 0),
+          recommendationId: rawRec?.recommendationId,
+          binId: typeof rawRec?.binId === 'number' ? rawRec.binId : undefined,
+          binIdCode: normalizedBinIdCode,
+          path: rawRec?.path,
+          distanceInfo: normalizedDistanceInfo,
+          quantity: normalizedQuantity,
+          reason: rawRec?.reason,
+          createdAt: rawRec?.createdAt,
+        };
+      })
+      .filter((rec: any) => rec.id > 0 || !!rec.binIdCode);
+
+    return {
+      inboundOrderItemId: Number(rawItem?.inboundOrderItemId ?? rawItem?.inboundProductId ?? 0),
+      productId: rawItem?.productId,
+      sku: rawItem?.sku,
+      name: rawItem?.name,
+      storageRecommendations,
+    } as InboundItemStorageRecommendations;
+  });
 };
 
 /**

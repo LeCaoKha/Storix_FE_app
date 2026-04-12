@@ -83,11 +83,17 @@ export const useWarehouses = () => {
 export const useWarehouseStructure = (warehouseId?: number) => {
   const user = useAuthStore((state) => state.user);
   const companyId = user?.companyId;
+  const normalizedWarehouseId = Number(warehouseId);
+  const canFetchStructure =
+    typeof companyId === 'number' &&
+    companyId > 0 &&
+    Number.isFinite(normalizedWarehouseId) &&
+    normalizedWarehouseId > 0;
 
   return useQuery({
-    queryKey: ['warehouse-structure', companyId, warehouseId],
-    queryFn: () => getWarehouseStructure(companyId!, warehouseId!),
-    enabled: !!companyId && !!warehouseId,
+    queryKey: ['warehouse-structure', companyId, normalizedWarehouseId],
+    queryFn: () => getWarehouseStructure(companyId!, normalizedWarehouseId),
+    enabled: canFetchStructure,
     staleTime: 5 * 60 * 1000, // Cache 5 phút vì warehouse structure ít thay đổi
   });
 };

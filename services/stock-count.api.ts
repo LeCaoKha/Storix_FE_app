@@ -1,9 +1,76 @@
 import {
+    StockCountItem,
     StockCountTicket,
     StockCountTicketDetail,
+    UpdateStockCountItemPayload,
     WarehouseInventoryItem
 } from '@/types/stock-count';
 import { api } from './axios.instance';
+
+type RawStockCountItem = {
+    id: number;
+    productId?: number | null;
+    systemQuantity?: number | null;
+    countedQuantity?: number | null;
+    discrepancy?: number | null;
+    status?: boolean | null;
+    description?: string | null;
+    locationId?: number | null;
+    product?: {
+        sku?: string | null;
+        name?: string | null;
+    } | null;
+};
+
+type RawStockCountTicket = {
+    id: number;
+    warehouseId?: number | null;
+    name?: string | null;
+    type?: string | null;
+    status?: string | null;
+    createdAt?: string | null;
+    executedDay?: string | null;
+    finishedDay?: string | null;
+    description?: string | null;
+    inventoryCountItems?: RawStockCountItem[] | null;
+};
+
+const mapStockCountItem = (item: RawStockCountItem): StockCountItem => ({
+    id: item.id,
+    productId: item.productId ?? undefined,
+    sku: item.product?.sku ?? undefined,
+    name: item.product?.name ?? undefined,
+    systemQuantity: item.systemQuantity ?? 0,
+    countedQuantity: item.countedQuantity ?? undefined,
+    discrepancy: item.discrepancy ?? undefined,
+    status: typeof item.status === 'boolean' ? String(item.status) : undefined,
+    description: item.description ?? undefined,
+    locationId: item.locationId ?? undefined,
+});
+
+const mapStockCountTicket = (ticket: RawStockCountTicket): StockCountTicket => {
+    const items = ticket.inventoryCountItems ?? [];
+    return {
+        id: ticket.id,
+        warehouseId: ticket.warehouseId ?? undefined,
+        name: ticket.name ?? undefined,
+        type: ticket.type ?? undefined,
+        status: ticket.status ?? undefined,
+        createdAt: ticket.createdAt ?? undefined,
+        executedDay: ticket.executedDay ?? undefined,
+        finishedDay: ticket.finishedDay ?? undefined,
+        itemCount: items.length,
+        description: ticket.description ?? undefined,
+    };
+};
+
+const mapStockCountTicketDetail = (ticket: RawStockCountTicket): StockCountTicketDetail => {
+    const base = mapStockCountTicket(ticket);
+    return {
+        ...base,
+        items: (ticket.inventoryCountItems ?? []).map(mapStockCountItem),
+    };
+};
 
 // ============== API Functions ==============
 
@@ -14,7 +81,7 @@ import { api } from './axios.instance';
  */
 export const getStockCountTickets = async (_companyId: number, warehouseId?: number, status?: string) => {
     const res = await api.get(`/api/InventoryCount/tickets/${_companyId}`);
-    const tickets = res.data as StockCountTicket[];
+    const tickets = (res.data as RawStockCountTicket[]).map(mapStockCountTicket);
 
     return tickets.filter((ticket) => {
         const matchesWarehouse = !warehouseId || ticket.warehouseId === warehouseId;
@@ -30,7 +97,7 @@ export const getStockCountTickets = async (_companyId: number, warehouseId?: num
  */
 export const getStockCountTicketsByStaff = async (companyId: number, staffId: number) => {
     const res = await api.get(`/api/InventoryCount/get-tasks-for-staff/${companyId}/${staffId}`);
-    return res.data as StockCountTicket[];
+    return (res.data as RawStockCountTicket[]).map(mapStockCountTicket);
 };
 
 /**
@@ -40,7 +107,7 @@ export const getStockCountTicketsByStaff = async (companyId: number, staffId: nu
  */
 export const getStockCountTicketById = async (companyId: number, ticketId: number) => {
     const res = await api.get(`/api/InventoryCount/tickets/${companyId}/${ticketId}`);
-    return res.data as StockCountTicketDetail;
+    return mapStockCountTicketDetail(res.data as RawStockCountTicket);
 };
 
 /**
@@ -56,13 +123,30 @@ export const updateStockCountTicketItems = async (
             stockCountItemId: number;
             productId?: number;
             countedQuantity?: number;
-            locationId?: number | null;
+            binId?: string | null;
         }>;
     }
 ) => {
     const res = await api.put(`/api/InventoryCount/tickets/${ticketId}/items`, payload);
-    return res.data as StockCountTicketDetail;
+    return mapStockCountTicketDetail(res.data as RawStockCountTicket);
 };
+
+/**
+ * Cập nhật trạng thái phiếu kiểm kê
+ * BE Route: PUT /api/InventoryCount/update-ticket/{id}/status
+ */
+export const updateStockCountTicketStatus = async (
+    id: number,
+    payload: {
+        approverId: number;
+        status: string;
+    }
+) => {
+    const res = await api.put(`/api/InventoryCount/update-ticket/${id}/status`, payload);
+    return mapStockCountTicketDetail(res.data as RawStockCountTicket);
+};
+
+export type { UpdateStockCountItemPayload };
 
 /**
  * Lấy danh sách tồn kho thực tế trong một kho (theo productIds tuỳ chọn)

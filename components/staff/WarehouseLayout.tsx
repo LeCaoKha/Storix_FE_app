@@ -1,7 +1,7 @@
 import { COLORS } from '@/constants/color';
 import { NavigationNode, Shelf, WarehouseStructure, WarehouseZone } from '@/types/warehouse';
 import { Feather } from '@expo/vector-icons';
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
     Dimensions,
     LayoutChangeEvent,
@@ -58,6 +58,78 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     height: SCREEN_HEIGHT * 0.55,
   });
 
+  const resolveShelfAbsolutePosition = useCallback((shelf: Shelf, zone: WarehouseZone) => {
+    const isRelativeToZone =
+      shelf.x >= -1 &&
+      shelf.y >= -1 &&
+      shelf.x + shelf.width <= zone.width + 1 &&
+      shelf.y + shelf.height <= zone.height + 1;
+
+    if (isRelativeToZone) {
+      return { x: zone.x + shelf.x, y: zone.y + shelf.y, coordinateMode: 'relative' as const };
+    }
+
+    return { x: shelf.x, y: shelf.y, coordinateMode: 'absolute' as const };
+  }, []);
+
+  const normalizedZones = useMemo(() => {
+    return (structure.zones ?? []).map((zone) => {
+      const seen = new Set<string>();
+      const uniqueShelves = (zone.shelves ?? []).filter((shelf) => {
+        const dedupeKey = String(shelf.id || `${shelf.code}-${shelf.x}-${shelf.y}-${shelf.width}-${shelf.height}`);
+        if (seen.has(dedupeKey)) return false;
+        seen.add(dedupeKey);
+        return true;
+      });
+
+      const overlaps = (a: Shelf, b: Shelf) => {
+        const aPos = resolveShelfAbsolutePosition(a, zone);
+        const bPos = resolveShelfAbsolutePosition(b, zone);
+
+        return (
+          aPos.x < bPos.x + b.width &&
+          aPos.x + a.width > bPos.x &&
+          aPos.y < bPos.y + b.height &&
+          aPos.y + a.height > bPos.y
+        );
+      };
+
+      const scoreShelfQuality = (shelf: Shelf) => {
+        const id = String(shelf.id ?? '');
+        const numericId = /^s-\d{8,}/.test(id) ? 2 : 0;
+        const structureScore = ((shelf.levels?.length ?? 0) > 0 ? 1 : 0) + ((shelf.accessNodes?.length ?? 0) > 0 ? 1 : 0);
+        return numericId + structureScore;
+      };
+
+      // Collapse overlapping duplicates in the same zone when they share the same shelf code.
+      const resolvedShelves: Shelf[] = [];
+      uniqueShelves.forEach((candidate) => {
+        const sameCodeIndex = resolvedShelves.findIndex((existing) => {
+          const hasSameCode = String(existing.code ?? '') === String(candidate.code ?? '');
+          return hasSameCode && overlaps(existing, candidate);
+        });
+
+        if (sameCodeIndex === -1) {
+          resolvedShelves.push(candidate);
+          return;
+        }
+
+        const existing = resolvedShelves[sameCodeIndex];
+        const existingScore = scoreShelfQuality(existing);
+        const candidateScore = scoreShelfQuality(candidate);
+
+        if (candidateScore > existingScore) {
+          resolvedShelves[sameCodeIndex] = candidate;
+        }
+      });
+
+      return {
+        ...zone,
+        shelves: resolvedShelves,
+      };
+    });
+  }, [resolveShelfAbsolutePosition, structure.zones]);
+
   const contentBounds = useMemo(() => {
     let minX = Number.POSITIVE_INFINITY;
     let minY = Number.POSITIVE_INFINITY;
@@ -78,14 +150,27 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       maxY = Math.max(maxY, y + r);
     };
 
-    (structure.zones ?? []).forEach((zone) => {
+    normalizedZones.forEach((zone) => {
       includeRect(zone.x, zone.y, zone.width, zone.height);
       (zone.shelves ?? []).forEach((shelf) => {
-        includeRect(zone.x + shelf.x, zone.y + shelf.y, shelf.width, shelf.height);
+        const { x, y } = resolveShelfAbsolutePosition(shelf, zone);
+        includeRect(x, y, shelf.width, shelf.height);
       });
     });
 
-    (structure.nodes ?? []).forEach((node) => includePoint(node.x, node.y, node.radius ?? 2));
+    // Ignore navigation nodes that are too far outside warehouse content.
+    // Outlier nodes can make the initial fit scale extremely small, causing
+    // the map to look blank on first open.
+    const nodeXMin = -100;
+    const nodeYMin = -100;
+    const nodeXMax = Math.max(structure.width + 100, 100);
+    const nodeYMax = Math.max(structure.height + 100, 100);
+    (structure.nodes ?? []).forEach((node) => {
+      if (node.x < nodeXMin || node.x > nodeXMax || node.y < nodeYMin || node.y > nodeYMax) {
+        return;
+      }
+      includePoint(node.x, node.y, node.radius ?? 2);
+    });
 
     if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
       minX = 0;
@@ -109,13 +194,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       width: Math.max(maxX - minX, 1),
       height: Math.max(maxY - minY, 1),
     };
-  }, [structure]);
-
-  const nodeMap = useMemo(() => {
-    const map = new Map<string, NavigationNode>();
-    (structure.nodes ?? []).forEach(node => map.set(node.id, node));
-    return map;
-  }, [structure.nodes]);
+  }, [normalizedZones, resolveShelfAbsolutePosition, structure.height, structure.nodes, structure.width]);
 
   const onMapLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -125,7 +204,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   };
 
   // Initial fit calculation
-  const calculateInitialFit = () => {
+  const calculateInitialFit = useCallback(() => {
     const availableWidth = Math.max(viewport.width - PADDING, 1);
     const availableHeight = Math.max(viewport.height - FOOTER_HEIGHT - PADDING, 1);
 
@@ -139,11 +218,11 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     scale.value = withSpring(initialScale);
     translateX.value = withSpring((viewport.width - scaledWidth) / 2 - contentBounds.minX * initialScale);
     translateY.value = withSpring((availableHeight - scaledHeight) / 2 - contentBounds.minY * initialScale);
-  };
+  }, [contentBounds.height, contentBounds.minX, contentBounds.minY, contentBounds.width, scale, translateX, translateY, viewport.height, viewport.width]);
 
   useEffect(() => {
     calculateInitialFit();
-  }, [structure, viewport.width, viewport.height, contentBounds]);
+  }, [calculateInitialFit]);
 
   // Gestures
   const pinchGesture = Gesture.Pinch()
@@ -208,7 +287,97 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       -1,
       true
     );
-  }, []);
+  }, [pulse]);
+
+  useEffect(() => {
+    const zones = normalizedZones;
+    const shelfRects: {
+      zoneId: string;
+      zoneCode: string;
+      shelfId: string;
+      shelfCode: string;
+      x: number;
+      y: number;
+      coordinateMode: 'relative' | 'absolute';
+      width: number;
+      height: number;
+    }[] = [];
+
+    zones.forEach((zone) => {
+      (zone.shelves ?? []).forEach((shelf) => {
+        shelfRects.push({
+          zoneId: String(zone.id),
+          zoneCode: String(zone.code ?? ''),
+          shelfId: String(shelf.id),
+          shelfCode: String(shelf.code ?? ''),
+          ...resolveShelfAbsolutePosition(shelf, zone),
+          width: shelf.width,
+          height: shelf.height,
+        });
+      });
+    });
+
+    console.log('[WarehouseLayout] structure summary', {
+      warehouseSize: { width: structure.width, height: structure.height },
+      zoneCount: zones.length,
+      shelfCount: shelfRects.length,
+    });
+
+    console.log('[WarehouseLayout] zones',
+      zones.map((zone) => ({
+        id: zone.id,
+        code: zone.code,
+        x: zone.x,
+        y: zone.y,
+        width: zone.width,
+        height: zone.height,
+        shelfCount: (zone.shelves ?? []).length,
+      }))
+    );
+
+    console.log('[WarehouseLayout] shelves (absolute)',
+      shelfRects.map((shelf) => ({
+        zoneId: shelf.zoneId,
+        zoneCode: shelf.zoneCode,
+        shelfId: shelf.shelfId,
+        shelfCode: shelf.shelfCode,
+        x: shelf.x,
+        y: shelf.y,
+        coordinateMode: shelf.coordinateMode,
+        width: shelf.width,
+        height: shelf.height,
+      }))
+    );
+
+    const overlaps: { a: string; b: string; zoneA: string; zoneB: string }[] = [];
+    for (let i = 0; i < shelfRects.length; i++) {
+      for (let j = i + 1; j < shelfRects.length; j++) {
+        const a = shelfRects[i];
+        const b = shelfRects[j];
+
+        const isOverlap =
+          a.x < b.x + b.width &&
+          a.x + a.width > b.x &&
+          a.y < b.y + b.height &&
+          a.y + a.height > b.y;
+
+        if (isOverlap) {
+          overlaps.push({
+            a: `${a.shelfCode} (${a.shelfId}) @ [${a.x}, ${a.y}, ${a.width}, ${a.height}]`,
+            b: `${b.shelfCode} (${b.shelfId}) @ [${b.x}, ${b.y}, ${b.width}, ${b.height}]`,
+            zoneA: `${a.zoneCode} (${a.zoneId})`,
+            zoneB: `${b.zoneCode} (${b.zoneId})`,
+          });
+        }
+      }
+    }
+
+    if (overlaps.length > 0) {
+      console.warn('[WarehouseLayout] detected shelf overlaps', overlaps);
+    } else {
+      console.log('[WarehouseLayout] no shelf overlap detected from data rectangles');
+    }
+  }, [normalizedZones, resolveShelfAbsolutePosition, structure.height, structure.width]);
 
   const renderShelf = (shelf: Shelf, zone: WarehouseZone, shelfIndex: number) => {
     const isHighlighted = highlightedShelf === shelf.id;
@@ -242,8 +411,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           ? COLORS.slate300 
           : COLORS.slate400;
 
-    const absX = zone.x + shelf.x;
-    const absY = zone.y + shelf.y;
+    const { x: absX, y: absY } = resolveShelfAbsolutePosition(shelf, zone);
     const hitX = absX - SHELF_HIT_PADDING;
     const hitY = absY - SHELF_HIT_PADDING;
     const hitWidth = shelf.width + SHELF_HIT_PADDING * 2;
@@ -447,7 +615,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
               <Rect width="100%" height="100%" fill="url(#grid)" />
 
-              {(structure.zones ?? []).map((zone, zoneIndex) => renderZone(zone, zoneIndex))}
+              {normalizedZones.map((zone, zoneIndex) => renderZone(zone, zoneIndex))}
               {renderPath()}
 
               {showNodes && (

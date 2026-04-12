@@ -10,6 +10,15 @@ export interface TransferOrder {
     sourceWarehouse?: { name: string };
     destinationWarehouse?: { name: string };
     items?: TransferOrderItem[];
+    timeline?: TransferTimelineItem[];
+}
+
+export interface TransferTimelineItem {
+    id: number;
+    action?: string;
+    timestamp?: string;
+    userId?: number;
+    userName?: string;
 }
 
 export interface TransferAvailability {
