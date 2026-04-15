@@ -1,6 +1,8 @@
 import { Card, RefreshContainer, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { getUserNotifications, markNotificationAsRead, type NotificationItem } from '@/services/notification.api';
+import { deleteNotification, getUserNotifications, markNotificationAsRead, type NotificationItem } from '@/services/notification.api';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useMemo } from 'react';
@@ -57,14 +59,33 @@ export default function NotificationsScreen() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (notificationId: number) => deleteNotification(user?.id ?? 0, notificationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+  });
+
   const handleRefresh = async () => {
     await refetch();
   };
 
   const markAllAsRead = async () => {
     const unread = notifications.filter((notification) => !notification.isRead);
+    if (unread.length === 0) return;
     await Promise.all(unread.map((notification) => markReadMutation.mutateAsync(notification.id)));
     await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+  };
+
+  const clearAllNotifications = async () => {
+    if (notifications.length === 0) return;
+    try {
+      await Promise.all(notifications.map((notification) => deleteMutation.mutateAsync(notification.id)));
+      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const errorMessage = error instanceof Error ? error.message : 'Không tải được danh sách thông báo.';
@@ -85,12 +106,19 @@ export default function NotificationsScreen() {
       <Card key={item.id} style={[styles.notificationCard, !item.isRead && styles.unreadCard]}>
         <View style={styles.cardHeader}>
           <View style={styles.titleWrapper}>
-            {!item.isRead && <View style={styles.unreadIndicator} />}
             <Text style={[styles.title, !item.isRead && styles.unreadText]} numberOfLines={1}>
               {item.title}
             </Text>
           </View>
-          <Text style={styles.timeText}>{item.time}</Text>
+          <View style={styles.headerRight}>
+            <Text style={styles.timeText}>{item.time}</Text>
+            <TouchableOpacity 
+              onPress={() => deleteMutation.mutate(item.id)}
+              style={styles.deleteButton}
+            >
+              <Ionicons name="trash-outline" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.messageText} numberOfLines={3}>
@@ -142,9 +170,15 @@ export default function NotificationsScreen() {
           <Text style={styles.totalText}>
             {notifications.filter(n => !n.isRead).length} Thông báo mới
           </Text>
-          <TouchableOpacity onPress={markAllAsRead}>
-            <Text style={styles.markReadText}>Đánh dấu đã đọc</Text>
-          </TouchableOpacity>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity onPress={markAllAsRead}>
+              <Text style={styles.markReadText}>Đọc tất cả</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity onPress={clearAllNotifications}>
+              <Text style={styles.clearAllText}>Xóa tất cả</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {isError && (
@@ -260,7 +294,7 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   unreadText: {
-    color: '#0F172A',
+    color: COLORS.primary,
   },
   timeText: {
     fontSize: 12,
@@ -328,5 +362,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94A3B8',
     textAlign: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteButton: {
+    padding: 6,
+    marginLeft: 4,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  divider: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#E2E8F0',
+  },
+  clearAllText: {
+    fontSize: 14,
+    color: '#EF4444',
+    fontWeight: '600',
   },
 });

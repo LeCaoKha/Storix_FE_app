@@ -41,3 +41,8 @@ export const markNotificationAsRead = async (userId: number, userNotificationId:
   const res = await api.put(`/api/Notification/mark-as-read/${userId}/${userNotificationId}`);
   return res.data;
 };
+
+export const deleteNotification = async (userId: number, userNotificationId: number) => {
+  const res = await api.delete(`/api/Notification/delete/${userId}/${userNotificationId}`);
+  return res.data;
+};
