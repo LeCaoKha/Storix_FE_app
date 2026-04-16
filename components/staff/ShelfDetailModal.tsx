@@ -1,7 +1,7 @@
 import { COLORS } from '@/constants/color';
 import { AlertService } from '@/stores/alert.store';
-import { usePendingQuantitiesStore } from '@/stores/pending-quantities.store';
 import { useInboundStagingStore } from '@/stores/inbound-staging.store';
+import { usePendingQuantitiesStore } from '@/stores/pending-quantities.store';
 import { Bin, Shelf, WarehouseZone } from '@/types/warehouse';
 import { Feather } from '@expo/vector-icons';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -61,7 +61,7 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
 }) => {
   const [selectedBinId, setSelectedBinId] = useState<string | number | undefined>();
   const [selectedQuantities, setSelectedQuantities] = useState<Record<number, number>>({});
-  const { getPendingQty, setPendingQty } = usePendingQuantitiesStore();
+  const { getPendingQty, setPendingQty, clearShelfPending } = usePendingQuantitiesStore();
 
   const isInbound = operationType === 'inbound';
   const accentColor = isInbound ? COLORS.success : COLORS.primary;
@@ -184,10 +184,19 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
     }
 
     onConfirmOperation(itemsWithSelectedBin);
-    
-    // Logic: Reset input to 0 after confirm to prep for next bin/item (Sequential Binning)
-    setSelectedQuantities({});
-  }, [itemsWithSelectedBin, onConfirmOperation, selectedTotalQuantity]);
+
+    // Clear persisted pending quantities immediately to avoid restoring old value on next render.
+    if (ticketId && shelfId) {
+      clearShelfPending(ticketId, shelfId);
+    }
+
+    // Reset input to 0 after confirm to prep for next bin/item (Sequential Binning).
+    const resetMap: Record<number, number> = {};
+    recommendedItems.forEach((item) => {
+      resetMap[item.id] = 0;
+    });
+    setSelectedQuantities(resetMap);
+  }, [itemsWithSelectedBin, onConfirmOperation, selectedTotalQuantity, ticketId, shelfId, clearShelfPending, recommendedItems]);
 
   if (!shelf || !zone) return null;
 

@@ -3,8 +3,7 @@ import {
     getStockCountTickets,
     getStockCountTicketsByStaff,
     getWarehouseInventory,
-    updateStockCountTicketItems,
-    updateStockCountTicketStatus
+    updateStockCountTicketItems
 } from '@/services/stock-count.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { UpdateStockCountItemPayload } from '@/types/stock-count';
@@ -91,31 +90,6 @@ export const useUpdateStockCountItem = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: stockCountKeys.tickets() });
             queryClient.invalidateQueries({ queryKey: stockCountKeys.ticket(variables.ticketId) });
-        },
-    });
-};
-
-export const useUpdateStockCountStatus = () => {
-    const queryClient = useQueryClient();
-    const { user } = useAuthStore();
-
-    return useMutation({
-        mutationFn: ({
-            ticketId,
-            status,
-            approverId,
-        }: {
-            ticketId: number;
-            status: string;
-            approverId?: number;
-        }) =>
-            updateStockCountTicketStatus(ticketId, {
-                approverId: approverId ?? user?.id ?? 0,
-                status,
-            }),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: stockCountKeys.all });
-            queryClient.invalidateQueries({ queryKey: ['tasks'] }); // Invalidate tasks as well
         },
     });
 };
