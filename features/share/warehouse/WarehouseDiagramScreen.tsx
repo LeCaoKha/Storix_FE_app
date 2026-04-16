@@ -2,7 +2,7 @@ import { RefreshContainer, ScreenHeader } from '@/components';
 import { PathInstructionsModal, ShelfDetailModal, WarehouseGridView, WarehouseLayout } from '@/components/staff';
 import { ShelfActionItem } from '@/components/staff/ShelfDetailModal';
 import { COLORS } from '@/constants/color';
-import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket } from '@/hooks';
 import { useOutboundTicket, useUpdateOutboundTicketItems } from '@/hooks/outbound-orders.hooks';
 import { useStockCountTicket, useWarehouseInventory } from '@/hooks/stock-count.hooks';
 import { useWarehouses, useWarehouseStructure } from '@/hooks/warehouse.hooks';
@@ -16,13 +16,12 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    InteractionManager,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function WarehouseDiagramScreen() {
@@ -64,7 +63,7 @@ export default function WarehouseDiagramScreen() {
   const [pathModalVisible, setPathModalVisible] = useState(false);
   const [currentLocation] = useState<{ x: number; y: number } | null>(null);
   const [viewMode, setViewMode] = useState<'map' | 'grid'>('map');
-  const [localReceivedByItemId, setLocalReceivedByItemId] = useState<Record<number, number>>({});
+  const [, setLocalReceivedByItemId] = useState<Record<number, number>>({});
   const user = useAuthStore(state => state.user);
   const isStaff = user?.roleId === 4;
   const companyId = user?.companyId ?? 0;
@@ -84,10 +83,10 @@ export default function WarehouseDiagramScreen() {
     refetch: refetchStructure,
   } = useWarehouseStructure(selectedWarehouseId);
 
-  const updateInboundItems = useUpdateInboundTicketItems();
   const updateOutboundItems = useUpdateOutboundTicketItems();
   const { refetch: refetchWarehouses } = useWarehouses();
   const stagedTickets = useInboundStagingStore((state) => state.tickets);
+  const inboundStagingTicket = useInboundStagingStore((state) => (inboundOrderId ? state.tickets[inboundOrderId] : undefined));
   const setStagedPlacement = useInboundStagingStore((state) => state.setPlacement);
   const getItemStagedQuantity = useInboundStagingStore((state) => state.getItemStagedQuantity);
   const getItemStagedBins = useInboundStagingStore((state) => state.getItemStagedBins);
@@ -104,6 +103,13 @@ export default function WarehouseDiagramScreen() {
 
     setLocalReceivedByItemId(nextMap);
   }, [getItemStagedQuantity, inboundOrderId]);
+
+  const getInboundCurrentReceived = React.useCallback((itemId: number) => {
+    const ticketItem = inboundTicket?.inboundOrderItems?.find((ti) => ti.id === itemId);
+    const baseReceived = Number(ticketItem?.receivedQuantity || 0);
+    const stagedReceived = Number(inboundStagingTicket?.items?.[itemId]?.total || 0);
+    return baseReceived + stagedReceived;
+  }, [inboundStagingTicket, inboundTicket]);
   
   const handleRefresh = async () => {
     await Promise.all([
@@ -386,11 +392,6 @@ export default function WarehouseDiagramScreen() {
       };
     });
 
-    const isWarehouseBinValidationError = (error: any) => {
-      const message = String(error?.response?.data?.message || '').toLowerCase();
-      return message.includes('do not belong to the order warehouse') || message.includes('shelflevelbins not found');
-    };
-
     const normalizeBinValue = (value?: string | number | null) => String(value ?? '').trim().toLowerCase();
 
     const resolveRecommendationBinIdCode = (inboundOrderItemId: number, preferredBinValues: (string | number | undefined)[]) => {
@@ -460,15 +461,13 @@ export default function WarehouseDiagramScreen() {
         const shelfCode = selectedShelf.code || 'kệ';
         AlertService.success('Đã ghi nhận', `Đã lưu các mặt hàng vào ${shelfCode}. Bạn có thể chọn Bin khác để nhập tiếp.`);
 
-        // Sync heavy data in next tick / after interactions to avoid UI lag
-        InteractionManager.runAfterInteractions(() => {
-          syncLocalReceivedByItemId(inboundTicket);
-          
-          // Clear the draft for this shelf now that it's confirmed
-          if (selectedShelf && inboundOrderId) {
-            clearShelfPending(inboundOrderId, selectedShelf.id);
-          }
-        });
+        // Sync immediately so quantity/progress updates without waiting for idle frame.
+        syncLocalReceivedByItemId(inboundTicket);
+
+        // Clear the draft for this shelf right away after successful confirm.
+        if (selectedShelf && inboundOrderId) {
+          clearShelfPending(inboundOrderId, selectedShelf.id);
+        }
       } else if (isPicking && outboundOrderId) {
         // Outbound: Update quantity to match target for these items
         const validItems = normalizedActionItems.filter((item) => Number(item.pendingQuantity ?? item.targetQuantity ?? 0) > 0);
@@ -540,22 +539,16 @@ export default function WarehouseDiagramScreen() {
     const shelfBinValues = new Set(shelfBins.flatMap((bin) => [String(bin.code), String(bin.id)]));
     const firstBin = selectedShelf.levels?.[0]?.bins?.[0];
 
-    const getQuantityOnCurrentShelf = (itemId: number) => {
-      if (!inboundOrderId) return 0;
-      const binsStaged = getItemStagedBins(inboundOrderId, itemId);
-      let qty = 0;
-      for (const [binIdCode, q] of Object.entries(binsStaged)) {
-        if (shelfBinValues.has(binIdCode)) {
-          qty += q;
-        }
-      }
-      return qty;
-    };
-    
     if (!isPicking) {
       // Inbound: Filter from recommendationItems
       const recommended = scopedInboundRecommendationItems
         .filter(item => (item.storageRecommendations ?? []).some(r => shelfBinValues.has(String(r.binIdCode ?? r.binId ?? ''))))
+        .filter((item) => {
+          const ticketItem = inboundTicket?.inboundOrderItems?.find((ti) => ti.id === item.inboundOrderItemId);
+          const totalExpected = Number(ticketItem?.expectedQuantity ?? 0);
+          const totalReceived = getInboundCurrentReceived(item.inboundOrderItemId);
+          return totalExpected - totalReceived > 0;
+        })
         .map(item => {
           const matchedRec = item.storageRecommendations!.find(r => shelfBinValues.has(String(r.binIdCode ?? r.binId ?? '')));
           const matchedBin = (selectedShelf.levels ?? [])
@@ -563,7 +556,7 @@ export default function WarehouseDiagramScreen() {
             .find((bin) => bin.code === matchedRec?.binIdCode || String(bin.id) === String(matchedRec?.binIdCode ?? matchedRec?.binId));
           // Find quantities from ticket items
           const ticketItem = inboundTicket?.inboundOrderItems?.find(ti => ti.id === item.inboundOrderItemId);
-          const currentReceived = Number(localReceivedByItemId[item.inboundOrderItemId] ?? ticketItem?.receivedQuantity ?? 0);
+          const currentReceived = getInboundCurrentReceived(item.inboundOrderItemId);
           
           // USER REQUEST: targetQuantity is the TOTAL expected (e.g. 20), not just for this shelf
           const totalExpected = Number(ticketItem?.expectedQuantity ?? 0);
@@ -592,12 +585,10 @@ export default function WarehouseDiagramScreen() {
       return (inboundTicket?.inboundOrderItems || [])
         .filter(item => !focusedItemId || item.id === focusedItemId)
         .filter(item => {
-          const qtyOnThisShelf = getQuantityOnCurrentShelf(item.id);
-          const totalRemaining = (item.expectedQuantity ?? 0) - Number(localReceivedByItemId[item.id] ?? item.receivedQuantity ?? 0) + qtyOnThisShelf;
+          const totalRemaining = (item.expectedQuantity ?? 0) - getInboundCurrentReceived(item.id);
           return totalRemaining > 0;
         })
         .map(item => {
-          const qtyOnThisShelf = getQuantityOnCurrentShelf(item.id);
           const targetQty = (item.expectedQuantity || 0); // Use total expected
           return {
             id: item.id,
@@ -605,7 +596,7 @@ export default function WarehouseDiagramScreen() {
             name: item.productName || item.product?.name || item.name || `SP #${item.productId}`,
             sku: item.sku || item.product?.sku,
             targetQuantity: targetQty,
-            currentQuantity: Number(localReceivedByItemId[item.id] ?? item.receivedQuantity ?? 0) - qtyOnThisShelf,
+            currentQuantity: getInboundCurrentReceived(item.id),
             binCode: firstBin?.code || selectedShelf.code,
             binId: firstBin?.id || '',
             isRecommended: false,
@@ -650,7 +641,7 @@ export default function WarehouseDiagramScreen() {
           isRecommended: false,
         }));
     }
-  }, [selectedShelf, isPicking, scopedInboundRecommendationItems, inboundTicket, outboundOrder, effectiveHighlightedBins, focusedItemId, localReceivedByItemId, getItemStagedBins]);
+  }, [selectedShelf, isPicking, scopedInboundRecommendationItems, inboundTicket, outboundOrder, effectiveHighlightedBins, focusedItemId, getInboundCurrentReceived]);
 
   if (warehousesLoading) {
     return (

@@ -1,7 +1,6 @@
 import { Card, RefreshContainer, ScreenHeader } from '@/components';
-import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
-import { useStockCountTicket, useUpdateStockCountItem, useUpdateStockCountStatus } from '@/hooks/stock-count.hooks';
+import { useStockCountTicket, useUpdateStockCountItem } from '@/hooks/stock-count.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -23,12 +22,10 @@ export default function InventoryCountDetailScreen() {
 
     const { data: ticket, isLoading, error, refetch } = useStockCountTicket(ticketId, companyId);
     const updateItem = useUpdateStockCountItem();
-    const updateStatus = useUpdateStockCountStatus();
 
     const [counts, setCounts] = useState<Record<number, string>>({});
     const [revealedItems, setRevealedItems] = useState<Record<number, boolean>>({});
     const [isProcessing, setIsProcessing] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
     const [editingItems, setEditingItems] = useState<Record<number, boolean>>({});
 
     const handleCountChange = (itemId: number, value: string) => {
@@ -78,35 +75,6 @@ export default function InventoryCountDetailScreen() {
 
     const handleEditItem = (itemId: number) => {
         setEditingItems(prev => ({ ...prev, [itemId]: true }));
-    };
-
-    const handleComplete = async () => {
-        if (!ticket) return;
-        const allConfirmed = ticket.items.every(item => revealedItems[item.id] || item.countedQuantity != null);
-        if (!allConfirmed) {
-            AlertService.warning('Lưu ý', 'Vui lòng xác nhận số lượng cho tất cả các mặt hàng');
-            return;
-        }
-
-        setIsProcessing(true);
-        try {
-            if (ticket.status?.toLowerCase() !== 'finished') {
-                await updateStatus.mutateAsync({
-                    ticketId: ticket.id,
-                    status: 'Finished',
-                });
-            }
-
-            AlertService.success('Thành công', 'Đã hoàn thành và lưu kết quả kiểm kê', () => {
-                goBack();
-            });
-        } catch (err: any) {
-            console.error('Failed to complete stock count:', err);
-            const errorMessage = err.response?.data?.message || 'Không thể hoàn thành phiếu kiểm kê. Vui lòng thử lại.';
-            AlertService.error('Lỗi hoàn tất', errorMessage);
-        } finally {
-            setIsProcessing(false);
-        }
     };
 
     const handleRefresh = async () => {
@@ -250,23 +218,7 @@ export default function InventoryCountDetailScreen() {
                     </View>
                 </View>
 
-                <View style={styles.searchContainer}>
-                    <Feather name="search" size={18} color={COLORS.textMuted} style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Tìm theo sản phẩm hoặc SKU..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        clearButtonMode="while-editing"
-                    />
-                </View>
-
                 {ticket.items
-                    .filter(item => 
-                        !searchQuery || 
-                        item.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        item.sku?.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
                     .map(item => {
                         const isBeingEdited = editingItems[item.id];
                         const isConfirmed = item.countedQuantity != null || revealedItems[item.id];
@@ -403,26 +355,6 @@ export default function InventoryCountDetailScreen() {
                     })}
                 <View style={{ height: 40 }} />
             </RefreshContainer>
-
-            {!isTicketFinished && (
-                <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
-                    <TouchableOpacity
-                        style={[
-                            styles.completeBtn, 
-                            (isProcessing || !ticket.items.every(item => revealedItems[item.id] || item.countedQuantity != null)) && styles.disabledBtn
-                        ]}
-                        onPress={handleComplete}
-                        disabled={isProcessing || !ticket.items.every(item => revealedItems[item.id] || item.countedQuantity != null)}
-                    >
-                        <Text style={[
-                            styles.completeBtnText,
-                            (isProcessing || !ticket.items.every(item => revealedItems[item.id] || item.countedQuantity != null)) && styles.disabledBtnText
-                        ]}>
-                            {isProcessing ? 'Đang lưu...' : 'Hoàn thành đợt kiểm kê'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            )}
         </View>
     );
 }
@@ -614,25 +546,6 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: 'bold',
         color: COLORS.primary,
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 48,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: COLORS.borderLight,
-    },
-    searchIcon: {
-        marginRight: 8,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 14,
-        color: COLORS.text,
     },
     itemCard: {
         marginBottom: 16,
@@ -838,30 +751,5 @@ const styles = StyleSheet.create({
     boldText: {
         fontWeight: 'bold',
         color: COLORS.text,
-    },
-    footer: {
-        padding: 20,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-    },
-    completeBtn: {
-        height: 52,
-        backgroundColor: COLORS.primary,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    completeBtnText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    disabledBtn: {
-        backgroundColor: '#E5E7EB',
-        opacity: 1, // Disable opacity to keep text clear
-    },
-    disabledBtnText: {
-        color: '#9CA3AF',
     },
 });

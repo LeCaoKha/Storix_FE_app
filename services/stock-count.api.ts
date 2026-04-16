@@ -119,12 +119,12 @@ export const updateStockCountTicketItems = async (
     ticketId: number,
     payload: {
         performedBy: number;
-        items: Array<{
+        items: {
             stockCountItemId: number;
             productId?: number;
             countedQuantity?: number;
             binId?: string | null;
-        }>;
+        }[];
     }
 ) => {
     const res = await api.put(`/api/InventoryCount/tickets/${ticketId}/items`, payload);
@@ -132,20 +132,8 @@ export const updateStockCountTicketItems = async (
 };
 
 /**
- * Cập nhật trạng thái phiếu kiểm kê
- * BE Route: PUT /api/InventoryCount/update-ticket/{id}/status
+ * Export type payload for stock count update
  */
-export const updateStockCountTicketStatus = async (
-    id: number,
-    payload: {
-        approverId: number;
-        status: string;
-    }
-) => {
-    const res = await api.put(`/api/InventoryCount/update-ticket/${id}/status`, payload);
-    return mapStockCountTicketDetail(res.data as RawStockCountTicket);
-};
-
 export type { UpdateStockCountItemPayload };
 
 /**
