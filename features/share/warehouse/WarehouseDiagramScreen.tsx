@@ -2,9 +2,9 @@ import { RefreshContainer, ScreenHeader } from '@/components';
 import { PathInstructionsModal, ShelfDetailModal, WarehouseGridView, WarehouseLayout } from '@/components/staff';
 import { ShelfActionItem } from '@/components/staff/ShelfDetailModal';
 import { COLORS } from '@/constants/color';
-import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket } from '@/hooks';
+import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket, useProductInventoryLocations } from '@/hooks';
 import { useOutboundTicket, useUpdateOutboundTicketItems } from '@/hooks/outbound-orders.hooks';
-import { useStockCountTicket, useWarehouseInventory } from '@/hooks/stock-count.hooks';
+import { useStockCountTicket, useUpdateStockCountItem, useWarehouseInventory } from '@/hooks/stock-count.hooks';
 import { useWarehouses, useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -75,6 +75,10 @@ export default function WarehouseDiagramScreen() {
   const { data: staffInboundOrders = [] } = useInboundOrdersByStaff(companyId, staffId);
   const { data: outboundOrder, refetch: refetchOutboundOrder } = useOutboundTicket(outboundOrderId);
   const { data: stockCountTicket, refetch: refetchStockCountTicket } = useStockCountTicket(inventoryCountTicketId || 0, companyId);
+  const { data: productInventoryLocations = [], isLoading: productInventoryLocationsLoading } = useProductInventoryLocations(
+    isCounting ? focusedItemId : undefined,
+    isCounting ? (selectedWarehouseId || initialWarehouseId) : undefined,
+  );
   
   const {
     data: structure,
@@ -84,6 +88,7 @@ export default function WarehouseDiagramScreen() {
   } = useWarehouseStructure(selectedWarehouseId);
 
   const updateOutboundItems = useUpdateOutboundTicketItems();
+  const updateStockCountItem = useUpdateStockCountItem();
   const { refetch: refetchWarehouses } = useWarehouses();
   const stagedTickets = useInboundStagingStore((state) => state.tickets);
   const inboundStagingTicket = useInboundStagingStore((state) => (inboundOrderId ? state.tickets[inboundOrderId] : undefined));
@@ -163,6 +168,45 @@ export default function WarehouseDiagramScreen() {
     });
     return Array.from(new Set(bins));
   }, [suggestedInventory]);
+
+  const productLocationShelfKeys = useMemo(() => {
+    return Array.from(
+      new Set(
+        productInventoryLocations
+          .flatMap((location) => [location.shelfIdCode, location.shelfCode])
+          .filter((value): value is string => !!value && value.trim().length > 0)
+          .map((value) => value.trim())
+      )
+    );
+  }, [productInventoryLocations]);
+
+  const productLocationShelfResolution = useMemo(() => {
+    if (!structure || productLocationShelfKeys.length === 0) {
+      return { shelfIds: [] as string[], firstShelf: null as Shelf | null, firstZone: null as WarehouseZone | null };
+    }
+
+    const shelfIds = new Set<string>();
+    let firstShelf: Shelf | null = null;
+    let firstZone: WarehouseZone | null = null;
+
+    for (const zone of structure.zones ?? []) {
+      for (const shelf of zone.shelves ?? []) {
+        const isMatched = productLocationShelfKeys.some(
+          (code) => String(code) === String(shelf.id) || String(code) === String(shelf.code)
+        );
+
+        if (isMatched) {
+          shelfIds.add(shelf.id);
+          if (!firstShelf) {
+            firstShelf = shelf;
+            firstZone = zone;
+          }
+        }
+      }
+    }
+
+    return { shelfIds: Array.from(shelfIds), firstShelf, firstZone };
+  }, [productLocationShelfKeys, structure]);
   
   const effectiveHighlightedBins = useMemo(() => {
     if (focusedBinsArray.length > 0) return focusedBinsArray;
@@ -238,7 +282,11 @@ export default function WarehouseDiagramScreen() {
     return { shelfIds: Array.from(shelfIds), firstShelf, firstZone };
   }, [effectiveHighlightedBins, structure]);
 
-  const recommendedShelvesForRender = recommendationResolution.shelfIds;
+  const activeShelfResolution = isCounting && productLocationShelfResolution.shelfIds.length > 0
+    ? productLocationShelfResolution
+    : recommendationResolution;
+
+  const recommendedShelvesForRender = activeShelfResolution.shelfIds;
 
   const activeHighlightedShelf = selectedShelf?.id;
 
@@ -327,11 +375,11 @@ export default function WarehouseDiagramScreen() {
   };
 
   const handleFindPathToRecommended = () => {
-    if (!recommendationResolution.firstShelf) return;
+    if (!activeShelfResolution.firstShelf) return;
 
-    setSelectedShelf(recommendationResolution.firstShelf);
-    setSelectedZone(recommendationResolution.firstZone);
-    handleFindPath(recommendationResolution.firstShelf);
+    setSelectedShelf(activeShelfResolution.firstShelf);
+    setSelectedZone(activeShelfResolution.firstZone);
+    handleFindPath(activeShelfResolution.firstShelf);
   };
 
   const handleConfirmOperationAtShelf = async (actionItems: ShelfActionItem[]) => {
@@ -411,7 +459,29 @@ export default function WarehouseDiagramScreen() {
     setIsProcessing(true);
 
     try {
-      if (!isPicking && inboundOrderId) {
+      if (isCounting && inventoryCountTicketId) {
+        const validItems = normalizedActionItems.filter((item) => Number(item.pendingQuantity ?? 0) >= 0);
+
+        if (validItems.length === 0) {
+          AlertService.warning('Dữ liệu chưa hợp lệ', 'Không có mặt hàng kiểm kê hợp lệ để cập nhật.');
+          return;
+        }
+
+        await Promise.all(validItems.map((item) =>
+          updateStockCountItem.mutateAsync({
+            ticketId: inventoryCountTicketId,
+            itemId: item.id,
+            payload: {
+              productId: item.productId,
+              countedQuantity: Number(item.pendingQuantity ?? 0),
+              locationId: Number.isFinite(Number(item.binId)) ? Number(item.binId) : null,
+            },
+          })
+        ));
+
+        await refetchStockCountTicket();
+        AlertService.success('Đã ghi nhận', 'Đã cập nhật số lượng kiểm kê cho kệ này.');
+      } else if (!isPicking && inboundOrderId) {
         // Inbound: Update only the user-selected quantity in this shelf.
         const validItems = normalizedActionItems.filter((item) => {
           const productId = Number(item.productId || 0);
@@ -539,6 +609,29 @@ export default function WarehouseDiagramScreen() {
     const shelfBinValues = new Set(shelfBins.flatMap((bin) => [String(bin.code), String(bin.id)]));
     const firstBin = selectedShelf.levels?.[0]?.bins?.[0];
 
+    if (isCounting) {
+      const isFocusedShelfByProductLocation =
+        productLocationShelfKeys.length === 0 ||
+        productLocationShelfKeys.some((code) => String(code) === String(selectedShelf.id) || String(code) === String(selectedShelf.code));
+
+      if (!isFocusedShelfByProductLocation) return [];
+
+      return (stockCountTicket?.items || [])
+        .filter((item) => !focusedItemId || item.productId === focusedItemId)
+        .map((item) => ({
+          id: item.id,
+          productId: item.productId || 0,
+          name: item.name || `SP #${item.productId}`,
+          sku: item.sku,
+          targetQuantity: 0,
+          currentQuantity: 0,
+          binCode: firstBin?.code || selectedShelf.code,
+          binId: firstBin?.id || '',
+          isRecommended: true,
+          pendingQuantity: Number(item.countedQuantity ?? 0),
+        }));
+    }
+
     if (!isPicking) {
       // Inbound: Filter from recommendationItems
       const recommended = scopedInboundRecommendationItems
@@ -641,7 +734,19 @@ export default function WarehouseDiagramScreen() {
           isRecommended: false,
         }));
     }
-  }, [selectedShelf, isPicking, scopedInboundRecommendationItems, inboundTicket, outboundOrder, effectiveHighlightedBins, focusedItemId, getInboundCurrentReceived]);
+  }, [
+    selectedShelf,
+    isCounting,
+    isPicking,
+    stockCountTicket,
+    productLocationShelfKeys,
+    scopedInboundRecommendationItems,
+    inboundTicket,
+    outboundOrder,
+    effectiveHighlightedBins,
+    focusedItemId,
+    getInboundCurrentReceived,
+  ]);
 
   if (warehousesLoading) {
     return (
@@ -758,7 +863,32 @@ export default function WarehouseDiagramScreen() {
                   {focusedItemName ? `Kiểm kê: ${focusedItemName}` : `Kiểm kê: ${stockCountTicket.name || 'Phiếu #' + stockCountTicket.id}`}
                 </Text>
               </View>
-              {effectiveHighlightedBins.length === 0 ? (
+              {productInventoryLocationsLoading ? (
+                <Text style={styles.recommendationPanelSubtle}>Đang tra vị trí sản phẩm trong kho...</Text>
+              ) : isCounting && focusedItemName && productLocationShelfKeys.length > 0 ? (
+                <>
+                  <Text style={styles.recommendationPanelSubtle}>
+                    Vị trí sản phẩm đang có trong kho: {productLocationShelfKeys.join(', ')}
+                  </Text>
+                  {productInventoryLocations.map((location) => (
+                    <View key={location.inventoryLocationId} style={styles.recommendationRow}>
+                      <Text style={styles.recommendationItemName} numberOfLines={1}>
+                        {location.shelfCode || location.shelfIdCode || `Kệ #${location.shelfId}`}
+                      </Text>
+                      <Text style={[styles.recommendationChip, { backgroundColor: COLORS.info + '14', color: COLORS.info }]}>Vị trí</Text>
+                    </View>
+                  ))}
+                  {activeShelfResolution.firstShelf && (
+                    <TouchableOpacity 
+                      style={[styles.recommendationCta, { backgroundColor: COLORS.info }]} 
+                      onPress={handleFindPathToRecommended}
+                    >
+                      <Feather name="navigation" size={14} color="#fff" />
+                      <Text style={styles.recommendationCtaText}>Tìm đường đến kệ của sản phẩm</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              ) : effectiveHighlightedBins.length === 0 ? (
                 <Text style={styles.recommendationPanelSubtle}>
                   Không tìm thấy vị trí nào cần kiểm kê cho các sản phẩm này.
                 </Text>
@@ -769,7 +899,7 @@ export default function WarehouseDiagramScreen() {
                       ? (inventoryBins.length > 0 ? `Vị trí kiểm kê đã gán: ${inventoryBins.join(', ')}` : `Gợi ý vị trí tồn kho: ${suggestedBins.join(', ')}`)
                       : `Tìm thấy ${effectiveHighlightedBins.length} vị trí kệ (${inventoryBins.length} đã gán, ${suggestedBins.length} gợi ý).`}
                   </Text>
-                  {recommendationResolution.firstShelf && (
+                  {activeShelfResolution.firstShelf && (
                     <TouchableOpacity 
                       style={[styles.recommendationCta, { backgroundColor: COLORS.info }]} 
                       onPress={handleFindPathToRecommended}
@@ -903,7 +1033,7 @@ export default function WarehouseDiagramScreen() {
         zone={selectedZone}
         recommendedItems={availableItemsForModal}
         onConfirmOperation={handleConfirmOperationAtShelf}
-        operationType={isPicking ? 'outbound' : 'inbound'}
+        operationType={isPicking ? 'outbound' : isCounting ? 'counting' : 'inbound'}
         isProcessing={isProcessing}
         ticketId={operationId}
         shelfId={selectedShelf?.id}

@@ -4,7 +4,7 @@ import { useInboundStagingStore } from '@/stores/inbound-staging.store';
 import { usePendingQuantitiesStore } from '@/stores/pending-quantities.store';
 import { Bin, Shelf, WarehouseZone } from '@/types/warehouse';
 import { Feather } from '@expo/vector-icons';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -41,7 +41,7 @@ interface ShelfDetailModalProps {
   onClose: () => void;
   recommendedItems?: ShelfActionItem[];
   onConfirmOperation?: (items: ShelfActionItem[]) => void;
-  operationType?: 'inbound' | 'outbound';
+  operationType?: 'inbound' | 'outbound' | 'counting';
   isProcessing?: boolean;
   ticketId?: number;
   shelfId?: string;
@@ -60,12 +60,14 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
   shelfId,
 }) => {
   const [selectedBinId, setSelectedBinId] = useState<string | number | undefined>();
-  const [selectedQuantities, setSelectedQuantities] = useState<Record<number, number>>({});
+  const [renderCounter, setRenderCounter] = useState(0);
+  const textInputRefs = useRef<Record<number, string>>({});
   const { getPendingQty, setPendingQty, clearShelfPending } = usePendingQuantitiesStore();
 
+  const isCountingOp = operationType === 'counting';
   const isInbound = operationType === 'inbound';
-  const accentColor = isInbound ? COLORS.success : COLORS.primary;
-  const accentLight = isInbound ? COLORS.success + '15' : COLORS.primaryLight;
+  const accentColor = isCountingOp ? COLORS.info : (isInbound ? COLORS.success : COLORS.primary);
+  const accentLight = isCountingOp ? COLORS.info + '15' : (isInbound ? COLORS.success + '15' : COLORS.primaryLight);
 
   // Reset selectedBinId when modal opens or shelf changes
   React.useEffect(() => {
@@ -88,33 +90,35 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
     }
   }, [visible, shelf, recommendedItems]);
 
-  // Restore draft quantities
+  // Restore draft quantities and initialize TextInput refs
   React.useEffect(() => {
     if (!visible) {
-      setSelectedQuantities({});
+      textInputRefs.current = {};
       return;
     }
 
-    const restoredQuantities: Record<number, number> = {};
     recommendedItems.forEach((item) => {
       if (ticketId && shelfId) {
-        restoredQuantities[item.id] = getPendingQty(ticketId, item.id, shelfId);
+        const pending = getPendingQty(ticketId, item.id, shelfId);
+        textInputRefs.current[item.id] = String(pending);
       } else {
-        restoredQuantities[item.id] = 0;
+        textInputRefs.current[item.id] = '0';
       }
     });
-    setSelectedQuantities(restoredQuantities);
+    // Trigger re-render to show loaded values
+    setRenderCounter((c) => c + 1);
   }, [visible, recommendedItems, ticketId, shelfId, getPendingQty]);
 
-  // Sync selectedQuantities to Zustand store when they change
+  // Sync ref values to Zustand store when modal closes or on confirm
   React.useEffect(() => {
     if (!ticketId || !shelfId) return;
 
-    Object.entries(selectedQuantities).forEach(([itemIdStr, qty]) => {
+    Object.entries(textInputRefs.current).forEach(([itemIdStr, qty]) => {
       const itemId = Number(itemIdStr);
-      setPendingQty(ticketId, itemId, shelfId, qty);
+      const numQty = Number(qty || 0);
+      setPendingQty(ticketId, itemId, shelfId, numQty);
     });
-  }, [selectedQuantities, ticketId, shelfId, setPendingQty]);
+  }, [renderCounter, ticketId, shelfId, setPendingQty]);
 
   // Get all recommended bin codes
   const recommendedBinCodes = useMemo(() => {
@@ -136,8 +140,9 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
 
   const itemsWithSelectedBin = useMemo(() => {
     return recommendedItems.map((item) => {
-      const maxQuantity = Math.max(0, Number(item.targetQuantity || 0));
-      const quantity = Math.max(0, Math.min(Number(selectedQuantities[item.id] || 0), maxQuantity));
+      const maxQuantity = isCountingOp ? 9999 : Math.max(0, Number(item.targetQuantity || 0));
+      const refValue = Number(textInputRefs.current[item.id] || 0);
+      const quantity = Math.max(0, Math.min(refValue, maxQuantity));
       return {
         ...item,
         binId: selectedBin?.id ?? item.binId,
@@ -145,7 +150,7 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
         pendingQuantity: quantity,
       };
     });
-  }, [recommendedItems, selectedBin, selectedQuantities]);
+  }, [recommendedItems, selectedBin, isCountingOp, renderCounter]);
 
   const selectedTotalQuantity = useMemo(
     () => itemsWithSelectedBin.reduce((sum, item) => sum + Number(item.pendingQuantity || 0), 0),
@@ -153,50 +158,63 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
   );
 
   const updateItemQuantity = useCallback((itemId: number, increment: boolean, maxQuantity: number) => {
-    setSelectedQuantities((prev) => {
-      const current = Number(prev?.[itemId] || 0);
-      const nextValue = increment
-        ? Math.min(current + 1, maxQuantity)
-        : Math.max(current - 1, 0);
-
-      return { ...prev, [itemId]: nextValue };
-    });
+    // Update ref value directly
+    const current = Number(textInputRefs.current[itemId] || 0);
+    const nextValue = increment
+      ? Math.min(current + 1, maxQuantity)
+      : Math.max(current - 1, 0);
+    textInputRefs.current[itemId] = String(nextValue);
+    // Trigger re-render to display new value
+    setRenderCounter((c) => c + 1);
   }, []);
 
   const updateItemQuantityFromInput = useCallback((itemId: number, value: string, maxQuantity: number) => {
+    // Store the raw input in ref only (don't update state to avoid TextInput re-renders)
     const sanitized = value.replace(/[^0-9]/g, '');
-
-    if (sanitized.length === 0) {
-      setSelectedQuantities((prev) => ({ ...prev, [itemId]: 0 }));
-      return;
-    }
-
-    const nextValue = Math.min(Math.max(Number(sanitized), 0), maxQuantity);
-    setSelectedQuantities((prev) => ({ ...prev, [itemId]: nextValue }));
+    textInputRefs.current[itemId] = sanitized;
   }, []);
 
   const handleConfirmPress = useCallback(() => {
     if (!onConfirmOperation) return;
 
-    if (selectedTotalQuantity <= 0) {
+    // Sync all ref values to state before processing
+    const syncedQuantities: Record<number, number> = {};
+    recommendedItems.forEach((item) => {
+      const refValue = textInputRefs.current[item.id] || '0';
+      const maxQuantity = isCountingOp ? 9999 : Math.max(0, Number(item.targetQuantity || 0));
+      const numValue = Math.min(Math.max(Number(refValue || 0), 0), maxQuantity);
+      syncedQuantities[item.id] = numValue;
+    });
+
+    if (!isCountingOp && Object.values(syncedQuantities).reduce((sum, v) => sum + v, 0) <= 0) {
       AlertService.warning('Chưa chọn số lượng', 'Vui lòng nhập số lượng lớn hơn 0 trước khi xác nhận.');
       return;
     }
 
-    onConfirmOperation(itemsWithSelectedBin);
+    // Update state with synced values
+    // Create items with synced bin and quantities
+    const itemsToProcess = recommendedItems.map((item) => {
+      return {
+        ...item,
+        binId: selectedBin?.id ?? item.binId,
+        binCode: selectedBin?.code ?? item.binCode,
+        pendingQuantity: syncedQuantities[item.id],
+      };
+    });
 
-    // Clear persisted pending quantities immediately to avoid restoring old value on next render.
+    onConfirmOperation(itemsToProcess);
+
+    // Clear persisted pending quantities immediately
     if (ticketId && shelfId) {
       clearShelfPending(ticketId, shelfId);
     }
 
-    // Reset input to 0 after confirm to prep for next bin/item (Sequential Binning).
-    const resetMap: Record<number, number> = {};
+    // Reset refs for next operation
     recommendedItems.forEach((item) => {
-      resetMap[item.id] = 0;
+      textInputRefs.current[item.id] = '0';
     });
-    setSelectedQuantities(resetMap);
-  }, [itemsWithSelectedBin, onConfirmOperation, selectedTotalQuantity, ticketId, shelfId, clearShelfPending, recommendedItems]);
+    setRenderCounter((c) => c + 1);
+  }, [onConfirmOperation, isCountingOp, selectedBin, ticketId, shelfId, clearShelfPending, recommendedItems]);
 
   if (!shelf || !zone) return null;
 
@@ -248,27 +266,29 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
             {hasItems ? (
               <>
                 {/* Bin selection */}
-                <View style={styles.section}>
-                  <View style={styles.sectionLabelRow}>
-                    <View style={[styles.sectionDot, { backgroundColor: accentColor }]} />
-                    <Text style={styles.sectionLabel}>Chọn ô đặt hàng</Text>
+                {!isCountingOp && (
+                  <View style={styles.section}>
+                    <View style={styles.sectionLabelRow}>
+                      <View style={[styles.sectionDot, { backgroundColor: accentColor }]} />
+                      <Text style={styles.sectionLabel}>Chọn ô đặt hàng</Text>
+                    </View>
+                    <BinSelectionView
+                      shelf={shelf}
+                      selectedBinId={selectedBinId}
+                      recommendedBinCodes={recommendedBinCodes}
+                      onSelectBin={(bin: Bin) => setSelectedBinId(bin.id)}
+                    />
                   </View>
-                  <BinSelectionView
-                    shelf={shelf}
-                    selectedBinId={selectedBinId}
-                    recommendedBinCodes={recommendedBinCodes}
-                    onSelectBin={(bin: Bin) => setSelectedBinId(bin.id)}
-                  />
-                </View>
+                )}
 
-                <View style={styles.divider} />
+                {!isCountingOp && <View style={styles.divider} />}
 
                 {/* Item list */}
                 <View style={styles.section}>
                   <View style={styles.sectionLabelRow}>
                     <View style={[styles.sectionDot, { backgroundColor: accentColor }]} />
                     <Text style={styles.sectionLabel}>
-                      {isInbound ? 'Hàng cần xếp' : 'Hàng cần nhặt'}
+                      {isCountingOp ? 'Hàng cần kiểm kê' : (isInbound ? 'Hàng cần xếp' : 'Hàng cần nhặt')}
                     </Text>
                     <View style={[styles.countBadge, { backgroundColor: accentLight }]}>
                       <Text style={[styles.countBadgeText, { color: accentColor }]}>
@@ -278,9 +298,10 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                   </View>
 
                   {recommendedItems.map((item) => {
-                    const qty = Number(selectedQuantities[item.id] ?? 0);
+                    const qty = Number(textInputRefs.current[item.id] ?? 0);
                     const targetQty = Math.max(0, Number(item.targetQuantity || 0));
                     const done = Number(item.currentQuantity || 0);
+                    const maxAdjustable = isCountingOp ? 9999 : Math.max(0, targetQty - done);
                     
                     // Logic fix: projectedDone is what's already in other bins + what's being entered now
                     const projectedDone = Math.min(done + qty, targetQty);
@@ -317,7 +338,7 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                                     <Text style={[styles.recTagText, { color: accentColor }]}>Gợi ý</Text>
                                   </View>
                                 )}
-                                {projectedDone > 0 && (
+                                {!isCountingOp && projectedDone > 0 && (
                                   <TouchableOpacity onPress={handleResetItem} activeOpacity={0.6}>
                                     <View style={[styles.recTag, { backgroundColor: COLORS.danger + '10' }]}>
                                       <Feather name="rotate-ccw" size={9} color={COLORS.danger} />
@@ -342,26 +363,28 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                         </View>
 
                         {/* Progress bar */}
-                        <View style={styles.progressWrap}>
-                          <View style={styles.progressTrack}>
-                            <View style={[styles.progressFill, {
-                              width: `${progress * 100}%` as any,
-                              backgroundColor: accentColor,
-                            }]} />
+                        {!isCountingOp && (
+                          <View style={styles.progressWrap}>
+                            <View style={styles.progressTrack}>
+                              <View style={[styles.progressFill, {
+                                width: `${progress * 100}%` as any,
+                                backgroundColor: accentColor,
+                              }]} />
+                            </View>
+                            <Text style={styles.progressLabel}>
+                              {projectedDone}/{item.targetQuantity}
+                            </Text>
                           </View>
-                          <Text style={styles.progressLabel}>
-                            {projectedDone}/{item.targetQuantity}
-                          </Text>
-                        </View>
+                        )}
 
                         {/* Quantity controls */}
                         <View style={styles.qtyRow}>
                           <View style={styles.qtyHintWrap}>
                             <Text style={styles.qtyHintMain}>
-                              {isInbound ? 'Sẽ nhập vào ô này' : 'Sẽ nhặt từ ô này'}
+                              {isCountingOp ? 'Sẽ ghi nhận số lượng kiểm kê' : (isInbound ? 'Sẽ nhập vào ô này' : 'Sẽ nhặt từ ô này')}
                             </Text>
                             
-                            {item.recommendedQuantity !== undefined && item.recommendedQuantity > 0 && (
+                            {!isCountingOp && item.recommendedQuantity !== undefined && item.recommendedQuantity > 0 && (
                               <View style={styles.recHintRow}>
                                 <Feather name="info" size={10} color={COLORS.primary} />
                                 <Text style={styles.recHintText}>
@@ -370,16 +393,18 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                               </View>
                             )}
 
-                            <Text style={styles.qtyHintSub}>
-                              <Text style={{ color: COLORS.slate400 }}>Còn thiếu:</Text> <Text style={{ fontWeight: '700', color: projectedRemaining > 0 ? COLORS.warning : COLORS.slate700 }}>{projectedRemaining}</Text>
-                              {' · '}<Text style={{ color: COLORS.slate400 }}>Tổng xong:</Text> <Text style={{ fontWeight: '700', color: progress >= 1 ? COLORS.success : accentColor }}>{projectedDone}/{item.targetQuantity}</Text>
-                            </Text>
+                            {!isCountingOp && (
+                              <Text style={styles.qtyHintSub}>
+                                <Text style={{ color: COLORS.slate400 }}>Còn thiếu:</Text> <Text style={{ fontWeight: '700', color: projectedRemaining > 0 ? COLORS.warning : COLORS.slate700 }}>{projectedRemaining}</Text>
+                                {' · '}<Text style={{ color: COLORS.slate400 }}>Tổng xong:</Text> <Text style={{ fontWeight: '700', color: progress >= 1 ? COLORS.success : accentColor }}>{projectedDone}/{item.targetQuantity}</Text>
+                              </Text>
+                            )}
                           </View>
 
                           <View style={styles.qtyControls}>
                             <TouchableOpacity
                               style={[styles.qtyBtn, qty === 0 && styles.qtyBtnDisabled]}
-                              onPress={() => updateItemQuantity(item.id, false, targetQty - done)}
+                              onPress={() => updateItemQuantity(item.id, false, maxAdjustable)}
                               activeOpacity={0.7}
                               disabled={qty === 0}
                             >
@@ -389,10 +414,10 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                             <TextInput
                               style={[
                                 styles.qtyInput,
-                                qty > 0 && { borderColor: accentColor + '40', backgroundColor: accentLight, color: accentColor },
+                                (textInputRefs.current[item.id] || '') !== '0' && { borderColor: accentColor + '40', backgroundColor: accentLight, color: accentColor },
                               ]}
-                              value={String(qty)}
-                              onChangeText={(text) => updateItemQuantityFromInput(item.id, text, targetQty - done)}
+                              value={textInputRefs.current[item.id] ?? '0'}
+                              onChangeText={(text) => updateItemQuantityFromInput(item.id, text, maxAdjustable)}
                               keyboardType="number-pad"
                               inputMode="numeric"
                               returnKeyType="done"
@@ -403,12 +428,12 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                             />
 
                             <TouchableOpacity
-                              style={[styles.qtyBtn, qty >= (targetQty - done) && styles.qtyBtnDisabled]}
-                              onPress={() => updateItemQuantity(item.id, true, targetQty - done)}
+                              style={[styles.qtyBtn, qty >= maxAdjustable && styles.qtyBtnDisabled]}
+                              onPress={() => updateItemQuantity(item.id, true, maxAdjustable)}
                               activeOpacity={0.7}
-                              disabled={qty >= (targetQty - done)}
+                              disabled={qty >= maxAdjustable}
                             >
-                              <Feather name="plus" size={16} color={qty >= (targetQty - done) ? COLORS.slate300 : accentColor} />
+                              <Feather name="plus" size={16} color={qty >= maxAdjustable ? COLORS.slate300 : accentColor} />
                             </TouchableOpacity>
                           </View>
                         </View>
@@ -439,9 +464,9 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                 <View style={[styles.summaryRow, { backgroundColor: accentLight }]}>
                   <Feather name="package" size={13} color={accentColor} />
                   <Text style={[styles.summaryText, { color: accentColor }]}>
-                    {isInbound ? 'Sẽ nhập' : 'Sẽ nhặt'}{' '}
+                    {isCountingOp ? 'Sẽ ghi nhận' : (isInbound ? 'Sẽ nhập' : 'Sẽ nhặt')}{' '}
                     <Text style={{ fontWeight: '800' }}>{selectedTotalQuantity}</Text> sản phẩm
-                    {selectedBin ? <> vào ô <Text style={{ fontWeight: '800' }}>{selectedBin.code}</Text></> : ''}
+                    {!isCountingOp && selectedBin ? <> vào ô <Text style={{ fontWeight: '800' }}>{selectedBin.code}</Text></> : ''}
                   </Text>
                 </View>
               )}
@@ -450,10 +475,10 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                 style={[
                   styles.confirmBtn,
                   { backgroundColor: accentColor },
-                  (isProcessing || selectedTotalQuantity === 0) && styles.confirmBtnDisabled,
+                  (isProcessing || (!isCountingOp && selectedTotalQuantity === 0)) && styles.confirmBtnDisabled,
                 ]}
                 onPress={handleConfirmPress}
-                disabled={isProcessing || selectedTotalQuantity === 0}
+                disabled={isProcessing || (!isCountingOp && selectedTotalQuantity === 0)}
                 activeOpacity={0.85}
               >
                 {isProcessing ? (
@@ -462,9 +487,11 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                   <>
                     <Feather name="check-circle" size={18} color="#fff" />
                     <Text style={styles.confirmBtnText}>
-                      {selectedTotalQuantity === 0
-                        ? `Chọn số lượng cần ${isInbound ? 'nhập' : 'nhặt'}`
-                        : `Xác nhận ${isInbound ? 'nhập' : 'nhặt'} ${selectedTotalQuantity} sản phẩm`}
+                      {isCountingOp
+                        ? 'Xác nhận kiểm kê'
+                        : (selectedTotalQuantity === 0
+                            ? `Chọn số lượng cần ${isInbound ? 'nhập' : 'nhặt'}`
+                            : `Xác nhận ${isInbound ? 'nhập' : 'nhặt'} ${selectedTotalQuantity} sản phẩm`)}
                     </Text>
                   </>
                 )}

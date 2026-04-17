@@ -69,3 +69,14 @@ export interface ProductType {
     companyId: number;
     name: string;
 }
+
+export interface ProductInventoryLocation {
+    inventoryLocationId: number;
+    inventoryId: number;
+    shelfId: number;
+    shelfCode?: string | null;
+    shelfIdCode?: string | null;
+    zoneId?: number | null;
+    quantity: number;
+    updatedAt?: string | null;
+}

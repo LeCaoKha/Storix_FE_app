@@ -190,20 +190,6 @@ export default function InventoryCountDetailScreen() {
                     </View>
                 </Card>
 
-                <TouchableOpacity
-                    style={styles.warehouseCard}
-                    onPress={openWarehouseForTicket}
-                >
-                    <View style={styles.warehouseIconWrap}>
-                        <Feather name="map" size={18} color={COLORS.primary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.warehouseTitle}>Sơ đồ kho thông minh</Text>
-                        <Text style={styles.warehouseSubtitle}>Nhấn để xem các vị trí cần kiểm kê trên sơ đồ</Text>
-                    </View>
-                    <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
-                </TouchableOpacity>
-
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionHeaderRow}>
                         <View>
@@ -350,6 +336,31 @@ export default function InventoryCountDetailScreen() {
                                         <Feather name="chevron-right" size={14} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 )}
+
+                                <TouchableOpacity 
+                                    style={[styles.locationContainer, { marginTop: 8 }]}
+                                    onPress={() => {
+                                        if (!ticket?.warehouseId) {
+                                            AlertService.warning('Lỗi', 'Không xác định được kho hàng.');
+                                            return;
+                                        }
+                                        router.push({
+                                            pathname: '/warehouse-view',
+                                            params: {
+                                                warehouseId: String(ticket.warehouseId || ''),
+                                                inventoryCountTicketId: String(ticket.id),
+                                                focusedItemId: String(item.productId),
+                                                focusedItemName: item.name || `SP #${item.productId}`,
+                                            },
+                                        } as any);
+                                    }}
+                                >
+                                    <View style={styles.locationLeft}>
+                                        <Feather name="search" size={14} color={COLORS.info} />
+                                        <Text style={[styles.locationText, { color: COLORS.info }]}>Xem vị trí sản phẩm</Text>
+                                    </View>
+                                    <Feather name="chevron-right" size={14} color={COLORS.info} />
+                                </TouchableOpacity>
                             </Card>
                         );
                     })}
