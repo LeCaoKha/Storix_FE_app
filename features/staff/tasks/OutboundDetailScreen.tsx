@@ -1,752 +1,869 @@
-import { Card, RefreshContainer, ScreenHeader } from '@/components';
-import { getBottomSafePadding } from '@/components/ui/safeArea';
-import { COLORS } from '@/constants/color';
-import { useOutboundTasksByStaff, useOutboundTicket, useUpdateOutboundTicketItems, useUpdateOutboundTicketStatus } from '@/hooks';
-import { useAppBack } from '@/hooks/useAppBack';
-import { AlertService } from '@/stores/alert.store';
-import { useAuthStore } from '@/stores/auth.store';
-import type { OutboundOrderItem } from '@/types/outbound-order';
-import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from "@/components";
+import { getBottomSafePadding } from "@/components/ui/safeArea";
+import { COLORS } from "@/constants/color";
+import {
+  useOutboundTasksByStaff,
+  useUpdateOutboundTicketItems,
+  useUpdateOutboundTicketStatus,
+} from "@/hooks";
+import { useAppBack } from "@/hooks/useAppBack";
+import { AlertService } from "@/stores/alert.store";
+import { useAuthStore } from "@/stores/auth.store";
+import type { OutboundOrderItem } from "@/types/outbound-order";
+import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // BE Status Flow (Staff allowed transitions):
 // Created → Picking → QualityCheck → (IssueReported | Packing) → Packing → LoadHandover
 // Manager confirms LoadHandover → Completed
-// Items update only during: QualityCheck or IssueReported
-type TicketStatus = 'Created' | 'Picking' | 'QualityCheck' | 'IssueReported' | 'Packing' | 'LoadHandover' | 'Completed';
+type TicketStatus =
+  | "Created"
+  | "Picking"
+  | "QualityCheck"
+  | "IssueReported"
+  | "Packing"
+  | "LoadHandover"
+  | "Completed";
 
-const STATUS_CONFIG: Record<TicketStatus, { label: string; color: string; bgColor: string }> = {
-    Created: { label: 'Đã tạo', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    Picking: { label: 'Đang lấy hàng', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
-    QualityCheck: { label: 'Kiểm tra chất lượng', color: '#7C3AED', bgColor: '#7C3AED20' },
-    IssueReported: { label: 'Có vấn đề', color: COLORS.danger, bgColor: COLORS.danger + '20' },
-    Packing: { label: 'Đóng gói', color: COLORS.teal600, bgColor: COLORS.teal50 },
-    LoadHandover: { label: 'Chờ Manager xác nhận', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
+const STATUS_CONFIG: Record<
+  TicketStatus,
+  { label: string; color: string; bgColor: string }
+> = {
+  Created: {
+    label: "Created",
+    color: COLORS.warning,
+    bgColor: COLORS.warning + "20",
+  },
+  Picking: {
+    label: "Picking",
+    color: COLORS.primary,
+    bgColor: COLORS.primaryLight + "20",
+  },
+  QualityCheck: {
+    label: "Quality Check",
+    color: "#7C3AED",
+    bgColor: "#7C3AED20",
+  },
+  IssueReported: {
+    label: "Issue Reported",
+    color: COLORS.danger,
+    bgColor: COLORS.danger + "20",
+  },
+  Packing: { label: "Packing", color: COLORS.teal600, bgColor: COLORS.teal50 },
+  LoadHandover: {
+    label: "Pending Approval",
+    color: COLORS.warning,
+    bgColor: COLORS.warning + "20",
+  },
+  Completed: {
+    label: "Completed",
+    color: COLORS.success,
+    bgColor: COLORS.success + "20",
+  },
 };
 
 // Get next staff action based on current status
-const getNextAction = (status: TicketStatus): { label: string; nextStatus: TicketStatus; color: string } | null => {
-    switch (status) {
-        case 'Created': return { label: 'Bắt đầu lấy hàng', nextStatus: 'Picking', color: COLORS.primary };
-        case 'Picking': return { label: 'Hoàn tất lấy hàng → Kiểm tra', nextStatus: 'QualityCheck', color: '#7C3AED' };
-        case 'QualityCheck': return { label: 'Đạt chất lượng → Đóng gói', nextStatus: 'Packing', color: COLORS.teal600 };
-        case 'IssueReported': return { label: 'Đã khắc phục → Đóng gói', nextStatus: 'Packing', color: COLORS.teal600 };
-        case 'Packing': return { label: 'Đóng gói xong → Bàn giao', nextStatus: 'LoadHandover', color: COLORS.warning };
-        default: return null; // LoadHandover & Completed: no staff action
-    }
+const getNextAction = (
+  status: TicketStatus,
+): { label: string; nextStatus: TicketStatus; color: string } | null => {
+  switch (status) {
+    case "Created":
+      return {
+        label: "Start Picking",
+        nextStatus: "Picking",
+        color: COLORS.primary,
+      };
+    case "Picking":
+      return {
+        label: "Finish Picking → Quality Check",
+        nextStatus: "QualityCheck",
+        color: "#7C3AED",
+      };
+    case "QualityCheck":
+      return {
+        label: "Passed → Packing",
+        nextStatus: "Packing",
+        color: COLORS.teal600,
+      };
+    case "IssueReported":
+      return {
+        label: "Resolved → Packing",
+        nextStatus: "Packing",
+        color: COLORS.teal600,
+      };
+    case "Packing":
+      return {
+        label: "Finish Packing → Handover",
+        nextStatus: "LoadHandover",
+        color: COLORS.warning,
+      };
+    default:
+      return null;
+  }
+};
+
+// Get previous staff action based on current status
+const getPreviousAction = (
+  status: TicketStatus,
+): { label: string; prevStatus: TicketStatus; color: string } | null => {
+  switch (status) {
+    case "Picking":
+      return {
+        label: "Undo Picking",
+        prevStatus: "Created",
+        color: COLORS.textMuted,
+      };
+    case "QualityCheck":
+      return {
+        label: "Back to Picking",
+        prevStatus: "Picking",
+        color: COLORS.textMuted,
+      };
+    case "IssueReported":
+      return {
+        label: "Cancel Issue",
+        prevStatus: "QualityCheck",
+        color: COLORS.textMuted,
+      };
+    case "Packing":
+      return {
+        label: "Back to QC",
+        prevStatus: "QualityCheck",
+        color: COLORS.textMuted,
+      };
+    default:
+      return null;
+  }
 };
 
 export default function OutboundDetailScreen() {
-    const router = useRouter();
-    const { id } = useLocalSearchParams<{ id: string }>();
-    const insets = useSafeAreaInsets();
-    const goBack = useAppBack();
-    const user = useAuthStore((state) => state.user);
-    const companyId = user?.companyId ?? 0;
-    const staffId = user?.id ?? 0;
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
+  const goBack = useAppBack();
+  const user = useAuthStore((state) => state.user);
+  const companyId = user?.companyId ?? 0;
+  const staffId = user?.id ?? 0;
 
-    // Lấy data từ staff task list (tránh 404 do filter companyId không nhất quán ở BE)
-    const { data: staffTasks, isLoading, refetch: refetchStaffTasks } = useOutboundTasksByStaff(companyId, staffId);
-    const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
-    const { data: outboundTicket, refetch: refetchOutboundTicket } = useOutboundTicket(numericId);
-    const order = (outboundTicket?.id === numericId ? outboundTicket : null) || staffTasks?.find((t) => t.id === numericId) || null;
-    const error = !isLoading && !order;
+  const { data: staffTasks, isLoading } = useOutboundTasksByStaff(
+    companyId,
+    staffId,
+  );
+  const numericId = typeof id === "string" ? parseInt(id, 10) : id;
+  const order = staffTasks?.find((t) => t.id === numericId) ?? null;
+  const error = !isLoading && !order;
 
-    const updateItems = useUpdateOutboundTicketItems();
-    const updateStatus = useUpdateOutboundTicketStatus();
+  const updateItems = useUpdateOutboundTicketItems();
+  const updateStatus = useUpdateOutboundTicketStatus();
 
-    const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
-    const [isSaving, setIsSaving] = useState(false);
-    const [isTransitioning, setIsTransitioning] = useState(false);
+  const [localQuantities, setLocalQuantities] = useState<Record<number, any>>(
+    {},
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-    const currentStatus = (order?.status as TicketStatus) || 'Created';
-    const statusConfig = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.Created;
-    const nextAction = getNextAction(currentStatus);
-    // BE: Items can only be updated during QualityCheck or IssueReported
-    const canEditItems = currentStatus === 'QualityCheck' || currentStatus === 'IssueReported';
-    // BE: IssueReported only from QualityCheck
-    const canReportIssue = currentStatus === 'QualityCheck';
+  // ===== ADDED CODE START =====
+  const [optimizedPath, setOptimizedPath] = useState<string[]>([]);
+  const [itemsToPick, setItemsToPick] = useState<any[]>([]);
+  // ===== ADDED CODE END =====
 
-    // Initialize state when order data is loaded
-    useEffect(() => {
-        const orderItems = order?.items || order?.outboundOrderItems;
-        if (orderItems) {
-            const initialQty: Record<number, number> = {};
-            orderItems.forEach((item: OutboundOrderItem) => {
-                initialQty[item.id] = item.quantity || 0;
-            });
-            setLocalQuantities(initialQty);
-        }
-    }, [order]);
+  const currentStatus = (order?.status as TicketStatus) || "Created";
+  const statusConfig = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.Created;
+  const nextAction = getNextAction(currentStatus);
+  const prevAction = getPreviousAction(currentStatus);
 
-    // Sort items by product name for easier picking
-    const sortedItems = React.useMemo(() => {
-        const orderItems = order?.items || order?.outboundOrderItems;
-        if (!orderItems) return [];
-        return [...orderItems].sort((a, b) => {
-            const nameA = a.productName || a.name || a.product?.name || '';
-            const nameB = b.productName || b.name || b.product?.name || '';
-            return nameA.localeCompare(nameB);
+  const canEditItems =
+    currentStatus !== "Created" &&
+    currentStatus !== "LoadHandover" &&
+    currentStatus !== "Completed";
+
+  const canReportIssue = currentStatus === "QualityCheck";
+
+  const showSaveBtn =
+    currentStatus === "QualityCheck" || currentStatus === "IssueReported";
+
+  useEffect(() => {
+    const orderItems = order?.items || order?.outboundOrderItems;
+    if (orderItems) {
+      setLocalQuantities((prev) => {
+        const nextState = { ...prev };
+        orderItems.forEach((item: OutboundOrderItem) => {
+          const beQty =
+            (item as any).pickedQuantity ?? (item as any).actualQuantity;
+          if (beQty !== undefined && beQty !== null && beQty > 0) {
+            nextState[item.id] = beQty;
+          } else if (nextState[item.id] === undefined) {
+            nextState[item.id] = 0;
+          }
         });
-    }, [order]);
-
-    if (isLoading) {
-        return (
-            <View style={styles.container}>
-                <ScreenHeader title="Đang tải..." />
-            </View>
-        );
+        return nextState;
+      });
     }
+  }, [order]);
 
-    if (!order || error) {
-        return (
-            <View style={styles.container}>
-                <ScreenHeader title="Lỗi" />
-                <View style={styles.centered}>
-                    <Feather name="alert-circle" size={48} color={COLORS.danger} />
-                    <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={goBack}>
-                        <Text style={styles.backButtonText}>Quay lại</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
+  // ===== ADDED CODE START =====
+  // FEATURE 1: FETCH PATH OPTIMIZATION ON LOAD
+  useEffect(() => {
+    const fetchPathOptimization = async () => {
+      if (!numericId) return;
+      try {
+        const response = await fetch(
+          `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${numericId}/path-optimization`,
         );
-    }
+        if (!response.ok) return;
 
-    const handleUpdateQty = (itemId: number, increment: boolean) => {
-        if (!canEditItems) {
-            AlertService.warning('Không thể sửa', 'Chỉ được cập nhật số lượng khi đang ở bước Kiểm tra chất lượng hoặc Báo lỗi.');
-            return;
+        const responseData = await response.json();
+        const payloadData = responseData?.payload?.[0];
+
+        if (payloadData && payloadData.status === "success") {
+          setOptimizedPath(payloadData.fullOptimizedPath || []);
+          setItemsToPick(payloadData.itemsToPick || []);
         }
-        setLocalQuantities(prev => {
-            const current = prev[itemId] || 0;
-            const orderItems = order?.items || order?.outboundOrderItems || [];
-            const item = orderItems.find((i: OutboundOrderItem) => i.id === itemId);
-            const maxQty = item?.quantity || 9999;
-            const newValue = increment
-                ? Math.min(current + 1, maxQty)
-                : Math.max(current - 1, 0);
-            return { ...prev, [itemId]: newValue };
-        });
+      } catch (err) {
+        console.log("Failed to fetch path optimization:", err);
+      }
     };
 
-    const handleSaveItems = async () => {
-        if (!order || !canEditItems) return;
-        setIsSaving(true);
-        try {
-            const orderItems = order.items || order.outboundOrderItems || [];
-            const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
-                id: item.id,
-                productId: item.productId || 0,
-                quantity: localQuantities[item.id] || item.quantity || 0,
-            }));
+    fetchPathOptimization();
+  }, [numericId]);
+  // ===== ADDED CODE END =====
 
-            await updateItems.mutateAsync({
-                ticketId: order.id,
-                items: updatedItems,
-            });
+  const sortedItems = React.useMemo(() => {
+    const orderItems = order?.items || order?.outboundOrderItems;
+    if (!orderItems) return [];
+    return [...orderItems].sort((a, b) => {
+      const nameA = a.productName || a.name || a.product?.name || "";
+      const nameB = b.productName || b.name || b.product?.name || "";
+      return nameA.localeCompare(nameB);
+    });
+  }, [order]);
 
-            AlertService.success('Thành công', 'Đã cập nhật số lượng');
-        } catch {
-            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    // Transition to next status
-    const handleTransition = async () => {
-        if (!order || !user || !nextAction) return;
-
-        const confirmMsg = nextAction.nextStatus === 'LoadHandover'
-            ? 'Sau khi bàn giao, Manager sẽ xác nhận hoàn thành đơn.'
-            : `Chuyển trạng thái sang "${STATUS_CONFIG[nextAction.nextStatus].label}"?`;
-
-        AlertService.confirm(
-            nextAction.label,
-            confirmMsg,
-            async () => {
-                setIsTransitioning(true);
-                try {
-                    await updateStatus.mutateAsync({
-                        ticketId: order.id,
-                        performedBy: user.id || 0,
-                        status: nextAction.nextStatus,
-                    });
-                    AlertService.success('Thành công', `Đã chuyển sang: ${STATUS_CONFIG[nextAction.nextStatus].label}`);
-                } catch {
-                    AlertService.error('Lỗi', 'Không thể cập nhật trạng thái');
-                } finally {
-                    setIsTransitioning(false);
-                }
-            }
-        );
-    };
-
-    // Report issue (only from QualityCheck)
-    const handleReportIssue = async () => {
-        if (!order || !user || !canReportIssue) return;
-
-        AlertService.confirm(
-            'Báo lỗi',
-            'Xác nhận có vấn đề với đơn hàng? Bạn có thể sửa số lượng sau khi báo lỗi.',
-            async () => {
-                setIsTransitioning(true);
-                try {
-                    await updateStatus.mutateAsync({
-                        ticketId: order.id,
-                        performedBy: user.id || 0,
-                        status: 'IssueReported',
-                    });
-                    AlertService.success('Đã báo lỗi', 'Hãy cập nhật số lượng rồi chuyển tiếp.');
-                } catch {
-                    AlertService.error('Lỗi', 'Không thể báo lỗi');
-                } finally {
-                    setIsTransitioning(false);
-                }
-            }
-        );
-    };
-
+  if (isLoading) {
     return (
-        <View style={styles.container}>
-            <ScreenHeader
-                title="Xuất Kho"
-                subtitle={order.note || `OUT-${order.id}`}
-            />
+      <View className="flex-1 bg-slate-50">
+        <ScreenHeader title="Loading..." />
+      </View>
+    );
+  }
 
-            <RefreshContainer 
-                style={styles.content} 
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
-                onRefresh={async () => {
-                    await Promise.all([
-                        refetchStaffTasks(),
-                        numericId ? refetchOutboundTicket() : Promise.resolve(),
-                    ]);
-                }}
+  if (!order || error) {
+    return (
+      <View className="flex-1 bg-slate-50">
+        <ScreenHeader title="Error" />
+        <View className="flex-1 justify-center items-center p-5">
+          <Feather name="alert-circle" size={48} color={COLORS.danger} />
+          <Text
+            className="text-base mt-3 mb-6 text-center"
+            style={{ color: COLORS.textMuted }}
+          >
+            Order information not found
+          </Text>
+          <TouchableOpacity
+            className="px-6 py-3 rounded-lg"
+            style={{ backgroundColor: COLORS.primary }}
+            onPress={goBack}
+          >
+            <Text className="text-white font-bold">Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  const handleUpdateQty = (itemId: number, increment: boolean) => {
+    if (!canEditItems) {
+      AlertService.warning(
+        "Cannot Edit",
+        "Quantities cannot be updated at this stage.",
+      );
+      return;
+    }
+    setLocalQuantities((prev) => {
+      const current = Number(prev[itemId]) || 0;
+      const orderItems = order?.items || order?.outboundOrderItems || [];
+      const item = orderItems.find((i: OutboundOrderItem) => i.id === itemId);
+      const maxQty = item?.quantity || 9999;
+      const newValue = increment
+        ? Math.min(current + 1, maxQty)
+        : Math.max(current - 1, 0);
+
+      return { ...prev, [itemId]: newValue };
+    });
+  };
+
+  const handleSaveItems = async () => {
+    if (!order || !showSaveBtn) return;
+    setIsSaving(true);
+    try {
+      const orderItems = order.items || order.outboundOrderItems || [];
+      const updatedItems = orderItems.map((item: OutboundOrderItem) => ({
+        id: item.id,
+        productId: item.productId || 0,
+        quantity: item.quantity || 1,
+        actualQuantity: Number(localQuantities[item.id]) || 0,
+        pickedQuantity: Number(localQuantities[item.id]) || 0,
+      }));
+
+      await updateItems.mutateAsync({
+        ticketId: order.id,
+        items: updatedItems,
+      });
+
+      AlertService.success("Success", "Quantities updated successfully");
+    } catch (error) {
+      console.error("Save Items Error:", error);
+      AlertService.error("Error", "Failed to update quantities");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ===== ADDED CODE START =====
+  // FEATURE 2: HANDLE PACKING -> HANDOVER
+  const handleHandover = async () => {
+    if (!numericId || !itemsToPick || itemsToPick.length === 0) return;
+
+    try {
+      const payload = itemsToPick.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        expectedQuantity: item.quantityToPick,
+        receivedQuantity:
+          localQuantities[item.id] !== undefined
+            ? Number(localQuantities[item.id])
+            : item.quantityToPick,
+        locations: (item.locationData?.availableBins || []).map((bin: any) => ({
+          binId: bin.binIdCode,
+          quantity: item.quantityToPick,
+        })),
+      }));
+
+      const response = await fetch(
+        `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${numericId}/items`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!response.ok) {
+        console.log("Failed to update items during handover");
+      }
+    } catch (err) {
+      console.log("Handover API error:", err);
+    }
+  };
+  // ===== ADDED CODE END =====
+
+  const handleTransition = async () => {
+    if (!order || !user || !nextAction) return;
+
+    const executeTransition = async () => {
+      setIsTransitioning(true);
+      try {
+        // ===== ADDED CODE START =====
+        if (nextAction.nextStatus === "LoadHandover") {
+          await handleHandover();
+        }
+        // ===== ADDED CODE END =====
+
+        await updateStatus.mutateAsync({
+          ticketId: order.id,
+          performedBy: user.id || 0,
+          status: nextAction.nextStatus,
+        });
+
+        AlertService.success(
+          "Success",
+          `Status changed to: ${STATUS_CONFIG[nextAction.nextStatus].label}`,
+        );
+      } catch (error) {
+        console.error(error);
+        AlertService.error("Error", "Failed to update status");
+      } finally {
+        setIsTransitioning(false);
+      }
+    };
+
+    if (nextAction.nextStatus === "Picking") {
+      executeTransition();
+      return;
+    }
+
+    const confirmMsg =
+      nextAction.nextStatus === "LoadHandover"
+        ? "After handover, the Manager will confirm the completion of the order."
+        : `Change status to "${STATUS_CONFIG[nextAction.nextStatus].label}"?`;
+
+    AlertService.confirm(nextAction.label, confirmMsg, executeTransition);
+  };
+
+  const handleRevertStatus = () => {
+    if (!order || !user || !prevAction) return;
+
+    AlertService.confirm(
+      "Revert Status",
+      `Are you sure you want to go back to ${STATUS_CONFIG[prevAction.prevStatus].label}?`,
+      async () => {
+        setIsTransitioning(true);
+        try {
+          await updateStatus.mutateAsync({
+            ticketId: order.id,
+            performedBy: user.id || 0,
+            status: prevAction.prevStatus,
+          });
+
+          AlertService.success(
+            "Reverted",
+            `Successfully went back to: ${STATUS_CONFIG[prevAction.prevStatus].label}`,
+          );
+        } catch {
+          AlertService.error("Error", "Failed to revert status");
+        } finally {
+          setIsTransitioning(false);
+        }
+      },
+    );
+  };
+
+  const handleReportIssue = async () => {
+    if (!order || !user || !canReportIssue) return;
+
+    AlertService.confirm(
+      "Report Issue",
+      "Confirm there is an issue with the order? You can edit quantities after reporting the issue.",
+      async () => {
+        setIsTransitioning(true);
+        try {
+          await updateStatus.mutateAsync({
+            ticketId: order.id,
+            performedBy: user.id || 0,
+            status: "IssueReported",
+          });
+          AlertService.success(
+            "Issue Reported",
+            "Please update quantities and proceed.",
+          );
+        } catch {
+          AlertService.error("Error", "Failed to report issue");
+        } finally {
+          setIsTransitioning(false);
+        }
+      },
+    );
+  };
+
+  return (
+    <View className="flex-1 bg-slate-50">
+      <ScreenHeader
+        title="Outbound Ticket"
+        subtitle={order.note || `OUT-${order.id}`}
+      />
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          padding: 20,
+          paddingBottom: 120 + insets.bottom,
+        }}
+      >
+        {/* Info Card */}
+        <View className="mb-4 bg-white p-4 rounded-xl shadow-sm">
+          <View className="flex-row items-center mb-2.5">
+            <Text
+              className="text-sm mr-2.5"
+              style={{ color: COLORS.textMuted }}
             >
-                {/* Current Status Badge */}
-                <Card style={styles.infoCard}>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoText}>Trạng thái:</Text>
-                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-                            <Text style={[styles.statusBadgeText, { color: statusConfig.color }]}>
-                                {statusConfig.label}
-                            </Text>
-                        </View>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Feather name="user" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Người tạo: <Text style={styles.boldText}>{order.createdByUser?.fullName || order.createdByUser?.email || order.createdByNavigation?.email || 'N/A'}</Text></Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Feather name="map-pin" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Giao đến: <Text style={styles.boldText}>{order.destination || 'N/A'}</Text></Text>
-                    </View>
-                    {!canEditItems && currentStatus !== 'LoadHandover' && currentStatus !== 'Completed' && (
-                        <Text style={{ fontSize: 12, color: COLORS.textMuted, fontStyle: 'italic', marginTop: 4 }}>
-                            Cập nhật số lượng chỉ khả dụng ở bước Kiểm tra CL / Báo lỗi
-                        </Text>
-                    )}
-                </Card>
+              Status:
+            </Text>
+            <View
+              className="px-2 py-1 rounded-md"
+              style={{ backgroundColor: statusConfig.bgColor }}
+            >
+              <Text
+                className="text-xs font-bold"
+                style={{ color: statusConfig.color }}
+              >
+                {statusConfig.label}
+              </Text>
+            </View>
+          </View>
+          <View className="flex-row items-center mb-2.5">
+            <Feather
+              name="user"
+              size={16}
+              color={COLORS.textMuted}
+              className="mr-2.5"
+            />
+            <Text className="text-sm" style={{ color: COLORS.textMuted }}>
+              Created By:{" "}
+              <Text className="font-semibold text-slate-800">
+                {order.createdByUser?.fullName ||
+                  order.createdByUser?.email ||
+                  order.createdByNavigation?.email ||
+                  "N/A"}
+              </Text>
+            </Text>
+          </View>
+          <View className="flex-row items-center">
+            <Feather
+              name="map-pin"
+              size={16}
+              color={COLORS.textMuted}
+              className="mr-2.5"
+            />
+            <Text className="text-sm" style={{ color: COLORS.textMuted }}>
+              Destination:{" "}
+              <Text className="font-semibold text-slate-800">
+                {order.destination || "N/A"}
+              </Text>
+            </Text>
+          </View>
+        </View>
 
-                {/* Warehouse Location Shortcut */}
-                <TouchableOpacity
-                    style={styles.warehouseCard}
-                    onPress={() => {
-                        const allBins: string[] = [];
-                        // Collect bins if the data structure supports it (e.g. from allocations)
-                        // If not, it just opens the map
-                        router.push({
-                            pathname: '/warehouse-view',
-                            params: {
-                                warehouseId: String(order.warehouse?.id || order.warehouseId || ''),
-                                outboundOrderId: String(order.id),
-                                focusedBins: allBins.join(','),
-                            },
-                        } as any);
-                    }}
-                >
-                    <View style={styles.warehouseIconWrap}>
-                        <Feather name="map" size={18} color={COLORS.primary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.warehouseTitle}>Sơ đồ kho</Text>
-                        <Text style={styles.warehouseSubtitle}>Nhấn để xem vị trí và tìm đường đi</Text>
-                    </View>
-                    <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
-                </TouchableOpacity>
+        {/* Warehouse Location Shortcut - CHỈ HIỂN THỊ Ở CREATED & PICKING */}
+        {(currentStatus === "Created" || currentStatus === "Picking") && (
+          <TouchableOpacity
+            className="flex-row items-center bg-white mb-4 p-3.5 rounded-xl shadow-sm border border-slate-100"
+            onPress={() => {
+              const allBins: string[] = [];
+              router.push({
+                pathname: "/warehouse-view",
+                params: {
+                  warehouseId: String(
+                    order.warehouse?.id || order.warehouseId || "",
+                  ),
+                  outboundOrderId: String(order.id),
+                  focusedBins: allBins.join(","),
+                  // ===== THÊM DÒNG NÀY VÀO =====
+                  status: "path_optimization",
+                  // ==============================
+                },
+              } as any);
+            }}
+          >
+            <View
+              className="w-10 h-10 rounded-lg items-center justify-center mr-3"
+              style={{ backgroundColor: COLORS.primary + "10" }}
+            >
+              <Feather name="map" size={18} color={COLORS.primary} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-slate-800">
+                Warehouse Map
+              </Text>
+              <Text
+                className="text-xs mt-0.5"
+                style={{ color: COLORS.textMuted }}
+              >
+                Tap to view location and navigate
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        )}
 
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{(order.items || order.outboundOrderItems)?.length ?? 0} mặt hàng</Text>
+        <View className="flex-row justify-between items-end mb-3 mt-2">
+          <Text className="text-base font-bold text-slate-800">
+            Product List
+          </Text>
+          <Text className="text-sm" style={{ color: COLORS.textMuted }}>
+            {(order.items || order.outboundOrderItems)?.length ?? 0} items
+          </Text>
+        </View>
+
+        {/* Item Cards */}
+        {sortedItems.map((item: OutboundOrderItem) => {
+          console.log("Check item data: ", item);
+          return (
+            <View
+              key={item.id}
+              className="mb-3 bg-white p-4 rounded-xl shadow-sm"
+            >
+              <View className="flex-row justify-between items-start mb-4">
+                <View className="flex-1 pr-3">
+                  <Text className="text-base font-bold text-slate-800 mb-1.5">
+                    {item.productName ||
+                      item.name ||
+                      item.product?.name ||
+                      `Product #${item.productId}`}
+                  </Text>
+                  <View className="flex-row flex-wrap">
+                    <View className="bg-slate-100 px-2 py-1 rounded">
+                      <Text
+                        className="text-xs font-semibold"
+                        style={{ color: COLORS.textMuted }}
+                      >
+                        {item.sku || item.product?.sku || "N/A"}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
 
-                {sortedItems.map((item: OutboundOrderItem) => (
-                    <Card key={item.id} style={styles.itemCard}>
-                        <View style={styles.itemHeader}>
-                            <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.productName || item.name || item.product?.name || `Sản phẩm #${item.productId}`}</Text>
-                                <View style={styles.skuRow}>
-                                    <View style={styles.skuBadge}>
-                                        <Text style={styles.skuText}>{item.sku || item.product?.sku || 'N/A'}</Text>
-                                    </View>
-                                </View>
-                            </View>
-                            <View style={[styles.statusBadge, {
-                                backgroundColor: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? COLORS.success + '20' : COLORS.warning + '20'
-                            }]}>
-                                <Text style={[styles.statusBadgeText, {
-                                    color: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? COLORS.success : COLORS.warning
-                                }]}>
-                                    {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? 'Xong' : 'Chờ'}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.counterRow}>
-                            <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
-                            {canEditItems ? (
-                                <View style={styles.counter}>
-                                    <TouchableOpacity
-                                        style={styles.counterBtn}
-                                        onPress={() => handleUpdateQty(item.id, false)}
-                                    >
-                                        <Feather name="minus" size={20} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                    <View style={styles.qtyDisplay}>
-                                        <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
-                                        <Text style={styles.qtyTotal}>/ {item.quantity || 0}</Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        style={styles.counterBtn}
-                                        onPress={() => handleUpdateQty(item.id, true)}
-                                    >
-                                        <Feather name="plus" size={20} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                            ) : (
-                                <View style={styles.qtyDisplay}>
-                                    <Text style={[styles.qtyValue, currentStatus === 'Completed' && { color: COLORS.success }]}>{item.quantity || 0}</Text>
-                                    <Text style={styles.qtyTotal}>/ {item.quantity || 0}</Text>
-                                </View>
-                            )}
-                        </View>
-
-
-                    </Card>
-                ))}
-            </RefreshContainer>
-
-            <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
-                {/* Report Issue button - only during QualityCheck */}
-                {canReportIssue && (
-                    <TouchableOpacity
-                        style={styles.reportBtn}
-                        onPress={handleReportIssue}
-                        disabled={isTransitioning}
+                {currentStatus !== "Created" && (
+                  <View
+                    className="px-2 py-1 rounded-md"
+                    style={{
+                      backgroundColor:
+                        (Number(localQuantities[item.id]) || 0) >=
+                        (item.quantity || 0)
+                          ? COLORS.success + "20"
+                          : COLORS.warning + "20",
+                    }}
+                  >
+                    <Text
+                      className="text-xs font-bold"
+                      style={{
+                        color:
+                          (Number(localQuantities[item.id]) || 0) >=
+                          (item.quantity || 0)
+                            ? COLORS.success
+                            : COLORS.warning,
+                      }}
                     >
-                        <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                        <Text style={styles.reportBtnText}>Báo lỗi</Text>
-                    </TouchableOpacity>
+                      {(Number(localQuantities[item.id]) || 0) >=
+                      (item.quantity || 0)
+                        ? "Done"
+                        : "Pending"}
+                    </Text>
+                  </View>
                 )}
+              </View>
 
-                {/* Save items - only during QualityCheck/IssueReported */}
-                {canEditItems && (
+              <View className="flex-row justify-between items-center mt-2 border-t border-slate-50 pt-3">
+                <Text className="text-sm font-medium text-slate-700">
+                  {currentStatus === "Created"
+                    ? "Item Quantity:"
+                    : currentStatus === "Picking"
+                      ? "Picked Quantity:"
+                      : "Ready Quantity:"}
+                </Text>
+
+                {canEditItems ? (
+                  <View className="flex-row items-center bg-slate-100 rounded-xl p-1">
                     <TouchableOpacity
-                        style={[styles.saveBtn, isSaving && styles.disabledBtn]}
-                        onPress={handleSaveItems}
-                        disabled={isSaving}
+                      className="w-10 h-10 rounded-lg bg-white justify-center items-center shadow-sm"
+                      onPress={() => handleUpdateQty(item.id, false)}
                     >
-                        <Text style={styles.saveBtnText}>
-                            {isSaving ? 'Đang lưu...' : 'Lưu số lượng'}
-                        </Text>
+                      <Feather name="minus" size={20} color={COLORS.primary} />
                     </TouchableOpacity>
-                )}
+                    <View className="flex-row items-baseline px-2 min-w-[70px] justify-center">
+                      <TextInput
+                        className="text-lg font-bold text-center p-0 m-0"
+                        style={{ color: COLORS.primary, minWidth: 32 }}
+                        keyboardType="numeric"
+                        value={
+                          localQuantities[item.id] !== undefined
+                            ? String(localQuantities[item.id])
+                            : "0"
+                        }
+                        onChangeText={(text) => {
+                          if (text === "") {
+                            setLocalQuantities((prev) => ({
+                              ...prev,
+                              [item.id]: "",
+                            }));
+                            return;
+                          }
+                          const num = parseInt(text.replace(/[^0-9]/g, ""), 10);
+                          if (isNaN(num)) return;
 
-                {/* Next status transition button */}
-                {nextAction && (
-                    <TouchableOpacity
-                        style={[styles.confirmBtn, { backgroundColor: nextAction.color }, isTransitioning && styles.disabledBtn]}
-                        onPress={handleTransition}
-                        disabled={isTransitioning}
-                    >
-                        <Feather name="arrow-right-circle" size={20} color="#fff" />
-                        <Text style={styles.confirmBtnText}>
-                            {isTransitioning ? 'Đang xử lý...' : nextAction.label}
-                        </Text>
-                    </TouchableOpacity>
-                )}
-
-                {/* LoadHandover / Completed: Read-only info */}
-                {currentStatus === 'LoadHandover' && (
-                    <View style={[styles.confirmBtn, { backgroundColor: COLORS.warning }]}>
-                        <Feather name="clock" size={20} color="#fff" />
-                        <Text style={styles.confirmBtnText}>Chờ Manager xác nhận</Text>
+                          const maxQty = item.quantity || 9999;
+                          setLocalQuantities((prev) => ({
+                            ...prev,
+                            [item.id]: Math.min(num, maxQty),
+                          }));
+                        }}
+                      />
+                      <Text
+                        className="text-sm ml-1"
+                        style={{ color: COLORS.textMuted }}
+                      >
+                        / {item.quantity || 0}
+                      </Text>
                     </View>
+                    <TouchableOpacity
+                      className="w-10 h-10 rounded-lg bg-white justify-center items-center shadow-sm"
+                      onPress={() => handleUpdateQty(item.id, true)}
+                    >
+                      <Feather name="plus" size={20} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View className="flex-row items-baseline px-2 justify-center">
+                    {currentStatus === "Created" ? (
+                      <Text
+                        className="text-lg font-bold"
+                        style={{ color: COLORS.primary }}
+                      >
+                        {item.quantity || 0}
+                      </Text>
+                    ) : (
+                      <>
+                        <Text
+                          className="text-lg font-bold"
+                          style={{
+                            color:
+                              currentStatus === "Completed"
+                                ? COLORS.success
+                                : COLORS.primary,
+                          }}
+                        >
+                          {Number(localQuantities[item.id]) || 0}
+                        </Text>
+                        <Text
+                          className="text-sm ml-1"
+                          style={{ color: COLORS.textMuted }}
+                        >
+                          / {item.quantity || 0}
+                        </Text>
+                      </>
+                    )}
+                  </View>
                 )}
-                {currentStatus === 'Completed' && (
-                    <View style={styles.completedBanner}>
-                        <Feather name="check-circle" size={20} color={COLORS.success} />
-                        <Text style={styles.completedBannerText}>Đơn xuất kho đã hoàn tất</Text>
-                    </View>
-                )}
+              </View>
             </View>
-        </View>
-    );
-}
+          );
+        })}
+      </ScrollView>
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F9FAFB',
-    },
-    header: {
-        backgroundColor: '#fff',
-        paddingBottom: 16,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: COLORS.text,
-    },
-    headerSubtitle: {
-        fontSize: 13,
-        color: COLORS.textMuted,
-        marginTop: 2,
-    },
-    content: {
-        flex: 1,
-    },
-    scrollContent: {
-        padding: 20,
-    },
-    infoCard: {
-        marginBottom: 16,
-        backgroundColor: '#fff',
-        gap: 8,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    infoText: {
-        fontSize: 14,
-        color: COLORS.textMuted,
-    },
-    boldText: {
-        fontWeight: '600',
-        color: COLORS.text,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        marginBottom: 12,
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: COLORS.text,
-    },
-    sectionSubtitle: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-    },
-    itemCard: {
-        marginBottom: 12,
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 12,
-    },
-    itemHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 16,
-    },
-    itemInfo: {
-        flex: 1,
-    },
-    productName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: COLORS.text,
-        marginBottom: 6,
-    },
-    skuRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    skuBadge: {
-        backgroundColor: '#F3F4F6',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    skuText: {
-        fontSize: 11,
-        color: COLORS.textMuted,
-        fontWeight: '600',
-    },
-    locationBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: COLORS.primary + '10',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: COLORS.primary + '30',
-    },
-    locationText: {
-        fontSize: 11,
-        color: COLORS.primary,
-        fontWeight: 'bold',
-    },
-    statusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-    },
-    statusBadgeText: {
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    counterRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    qtyLabelContainer: {
-        flex: 1,
-    },
-    qtyLabel: {
-        fontSize: 14,
-        color: COLORS.text,
-    },
-    counter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F3F4F6',
-        borderRadius: 10,
-        padding: 4,
-    },
-    counterBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 8,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 1,
-        elevation: 1,
-    },
-    qtyDisplay: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        paddingHorizontal: 16,
-        minWidth: 80,
-        justifyContent: 'center',
-    },
-    qtyValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: COLORS.primary,
-    },
-    qtyTotal: {
-        fontSize: 14,
-        color: COLORS.textMuted,
-        marginLeft: 4,
-    },
-    scanItemBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 10,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: COLORS.primary + '30',
-        backgroundColor: COLORS.primary + '08',
-    },
-    scanItemBtnText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: COLORS.primary,
-    },
-    footer: {
-        padding: 20,
-        backgroundColor: '#fff',
-        flexDirection: 'row',
-        gap: 12,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-    },
-    reportBtn: {
-        width: 56,
-        height: 56,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.danger + '30',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.danger + '05',
-    },
-    reportBtnText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: COLORS.danger,
-        marginTop: 2,
-    },
-    saveBtn: {
-        flex: 1,
-        height: 56,
-        backgroundColor: COLORS.primary,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    confirmBtn: {
-        flex: 1,
-        height: 56,
-        backgroundColor: COLORS.success,
-        borderRadius: 12,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 8,
-        shadowColor: COLORS.success,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    confirmBtnText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    itemCardVerified: {
-        borderColor: '#059669',
-        borderWidth: 1,
-    },
-    verificationPrompt: {
-        fontSize: 11,
-        color: COLORS.danger,
-        fontWeight: 'bold',
-        marginTop: 2,
-    },
-    disabledCounter: {
-        opacity: 0.5,
-    },
-    scanItemBtnSuccess: {
-        backgroundColor: '#05966910',
-        borderColor: '#059669',
-    },
-    saveBtnText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    disabledBtn: {
-        opacity: 0.6,
-    },
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    errorText: {
-        fontSize: 16,
-        color: COLORS.textMuted,
-        marginTop: 12,
-        marginBottom: 24,
-        textAlign: 'center',
-    },
-    backButton: {
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        backgroundColor: COLORS.primary,
-        borderRadius: 8,
-    },
-    backButtonText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
-    priceRow: {
-        flexDirection: 'row',
-        marginTop: 8,
-        paddingTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-    },
-    priceText: {
-        fontSize: 13,
-        color: COLORS.textMuted,
-    },
-    completedBanner: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        height: 56,
-        backgroundColor: COLORS.success + '15',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.success + '30',
-    },
-    completedBannerText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: COLORS.success,
-    },
-    warehouseCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        marginHorizontal: 0,
-        marginBottom: 16,
-        padding: 14,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: COLORS.borderLight,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    warehouseIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: COLORS.primary + '10',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    warehouseTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: COLORS.slate800,
-    },
-    warehouseSubtitle: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-        marginTop: 2,
-    },
-});
+      {/* Bottom Footer */}
+      <View
+        className="p-5 bg-white flex-row items-center border-t border-slate-200"
+        style={{ paddingBottom: getBottomSafePadding(insets.bottom, 20) }}
+      >
+        {canReportIssue && (
+          <TouchableOpacity
+            className={`w-14 h-14 rounded-xl border justify-center items-center mr-3 ${
+              isTransitioning ? "opacity-60" : ""
+            }`}
+            style={{
+              borderColor: COLORS.danger + "30",
+              backgroundColor: COLORS.danger + "05",
+            }}
+            onPress={handleReportIssue}
+            disabled={isTransitioning}
+          >
+            <Feather name="alert-triangle" size={20} color={COLORS.danger} />
+            <Text
+              className="text-[10px] font-bold mt-1"
+              style={{ color: COLORS.danger }}
+            >
+              Issue
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {prevAction && (
+          <TouchableOpacity
+            className={`flex-1 h-14 rounded-xl border justify-center items-center flex-row shadow-sm ${
+              isTransitioning ? "opacity-60" : ""
+            }`}
+            style={{
+              borderColor: COLORS.borderLight,
+              backgroundColor: "#f8fafc",
+            }}
+            onPress={handleRevertStatus}
+            disabled={isTransitioning}
+          >
+            <Feather
+              name="corner-up-left"
+              size={18}
+              color={COLORS.textMuted}
+              className="mr-2"
+            />
+            <Text
+              className="text-sm font-bold"
+              style={{ color: COLORS.textMuted }}
+            >
+              {prevAction.label}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {showSaveBtn && (
+          <TouchableOpacity
+            className={`flex-[1.5] h-14 rounded-xl justify-center items-center shadow-sm ml-3 ${
+              isSaving ? "opacity-60" : ""
+            }`}
+            style={{ backgroundColor: COLORS.primary }}
+            onPress={handleSaveItems}
+            disabled={isSaving}
+          >
+            <Text className="text-base font-bold text-white">
+              {isSaving ? "Saving..." : "Save Quantities"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {nextAction && (
+          <TouchableOpacity
+            className={`flex-[1.5] h-14 rounded-xl flex-row justify-center items-center shadow-sm ml-3 ${
+              isTransitioning ? "opacity-60" : ""
+            }`}
+            style={{ backgroundColor: nextAction.color }}
+            onPress={handleTransition}
+            disabled={isTransitioning}
+          >
+            <Feather
+              name="arrow-right-circle"
+              size={20}
+              color="#fff"
+              className="mr-2"
+            />
+            <Text className="text-base font-bold text-white">
+              {isTransitioning ? "Processing..." : nextAction.label}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {currentStatus === "LoadHandover" && (
+          <View
+            className="flex-1 h-14 rounded-xl flex-row justify-center items-center shadow-sm"
+            style={{ backgroundColor: COLORS.warning }}
+          >
+            <Feather name="clock" size={20} color="#fff" className="mr-2" />
+            <Text className="text-base font-bold text-white">
+              Awaiting Approval
+            </Text>
+          </View>
+        )}
+
+        {currentStatus === "Completed" && (
+          <View
+            className="flex-1 flex-row items-center justify-center h-14 rounded-xl border"
+            style={{
+              backgroundColor: COLORS.success + "15",
+              borderColor: COLORS.success + "30",
+            }}
+          >
+            <Feather
+              name="check-circle"
+              size={20}
+              color={COLORS.success}
+              className="mr-2"
+            />
+            <Text
+              className="text-base font-bold"
+              style={{ color: COLORS.success }}
+            >
+              Order Completed
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
