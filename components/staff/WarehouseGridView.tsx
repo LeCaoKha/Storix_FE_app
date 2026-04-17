@@ -1,15 +1,15 @@
-import { Shelf, WarehouseStructure, WarehouseZone } from '@/types/warehouse';
-import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { Shelf, WarehouseStructure, WarehouseZone } from "@/types/warehouse";
+import { Feather } from "@expo/vector-icons";
+import React, { useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import { COLORS } from '@/constants/color';
+import { COLORS } from "@/constants/color";
 
 interface WarehouseGridViewProps {
   structure: WarehouseStructure;
@@ -27,22 +27,38 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
   onShelfPress,
 }) => {
   const [selectedZone, setSelectedZone] = useState<string | null>(
-    (structure.zones ?? [])[0]?.id || null
+    (structure.zones ?? [])[0]?.id || null,
   );
 
-  const currentZone = (structure.zones ?? []).find((z) => z.id === selectedZone);
+  const currentZone = (structure.zones ?? []).find(
+    (z) => z.id === selectedZone,
+  );
 
   const renderBinGrid = (shelf: Shelf, zone: WarehouseZone) => {
     const levels = shelf.levels ?? [];
     const isRecommendedShelf = (recommendedShelves ?? []).includes(shelf.id);
-    
+
     if (levels.length === 0) {
       return (
-        <View style={[styles.rackCard, isRecommendedShelf && styles.rackCardRecommended]}>
+        <View
+          style={[
+            styles.rackCard,
+            isRecommendedShelf && styles.rackCardRecommended,
+          ]}
+        >
           {/* Rack header */}
           <View style={styles.rackHeader}>
-            <View style={[styles.rackIcon, isRecommendedShelf && { backgroundColor: COLORS.successLight }]}>
-              <Feather name="layers" size={16} color={isRecommendedShelf ? COLORS.success : "#475569"} />
+            <View
+              style={[
+                styles.rackIcon,
+                isRecommendedShelf && { backgroundColor: COLORS.successLight },
+              ]}
+            >
+              <Feather
+                name="layers"
+                size={16}
+                color={isRecommendedShelf ? COLORS.success : "#475569"}
+              />
             </View>
             <Text style={styles.rackTitle}>{shelf.code}</Text>
             {isRecommendedShelf && (
@@ -65,11 +81,25 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
     }
 
     return (
-      <View style={[styles.rackCard, isRecommendedShelf && styles.rackCardRecommended]}>
+      <View
+        style={[
+          styles.rackCard,
+          isRecommendedShelf && styles.rackCardRecommended,
+        ]}
+      >
         {/* Rack header */}
         <View style={styles.rackHeader}>
-          <View style={[styles.rackIcon, isRecommendedShelf && { backgroundColor: COLORS.successLight }]}>
-            <Feather name="layers" size={16} color={isRecommendedShelf ? COLORS.success : "#475569"} />
+          <View
+            style={[
+              styles.rackIcon,
+              isRecommendedShelf && { backgroundColor: COLORS.successLight },
+            ]}
+          >
+            <Feather
+              name="layers"
+              size={16}
+              color={isRecommendedShelf ? COLORS.success : "#475569"}
+            />
           </View>
           <Text style={styles.rackTitle}>{shelf.code}</Text>
           {isRecommendedShelf && (
@@ -79,7 +109,12 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
           )}
           <View style={styles.rackStats}>
             <Text style={styles.rackStatsText}>
-              {levels.length}L · {levels.reduce((acc, level) => acc + (level.bins?.length ?? 0), 0)}B
+              {levels.length}L ·{" "}
+              {levels.reduce(
+                (acc, level) => acc + (level.bins?.length ?? 0),
+                0,
+              )}
+              B
             </Text>
           </View>
           <TouchableOpacity
@@ -98,16 +133,19 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
               <View style={styles.levelLabel}>
                 <Text style={styles.levelLabelText}>{level.code}</Text>
               </View>
-              
+
               {/* Bins in this level */}
               <View style={styles.binRow}>
                 {(level.bins ?? []).map((bin) => {
                   const isHighlighted = highlightedShelf === shelf.id;
-                  const isRecommendedBin = (highlightedBins ?? []).some((code) => 
-                    String(code) === bin.code || String(code) === bin.id
+                  const isRecommendedBin = (highlightedBins ?? []).some(
+                    (code) =>
+                      String(code) === bin.code || String(code) === bin.id,
                   );
-                  
-                  const hasAnyRecommendations = (recommendedShelves?.length ?? 0) > 0 || (highlightedBins?.length ?? 0) > 0;
+
+                  const hasAnyRecommendations =
+                    (recommendedShelves?.length ?? 0) > 0 ||
+                    (highlightedBins?.length ?? 0) > 0;
                   const isSuggested = isRecommendedShelf || isRecommendedBin;
                   const isDimmed = hasAnyRecommendations && !isSuggested;
 
@@ -118,21 +156,23 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
                         styles.binSlot,
                         isDimmed && styles.binSlotDimmed,
                         isSuggested && styles.binSlotSuggested,
-                        isHighlighted && !isSuggested && styles.binSlotHighlighted,
+                        isHighlighted &&
+                          !isSuggested &&
+                          styles.binSlotHighlighted,
                       ]}
                       activeOpacity={0.7}
                       onPress={() => onShelfPress?.(shelf, zone)}
                     >
-                      <Text style={[
-                        styles.binCode,
-                        isSuggested && styles.binCodeSuggested,
-                        isDimmed && styles.binCodeDimmed
-                      ]}>
+                      <Text
+                        style={[
+                          styles.binCode,
+                          isSuggested && styles.binCodeSuggested,
+                          isDimmed && styles.binCodeDimmed,
+                        ]}
+                      >
                         {bin.code}
                       </Text>
-                      {isRecommendedBin && (
-                        <View style={styles.binRecDot} />
-                      )}
+                      {isRecommendedBin && <View style={styles.binRecDot} />}
                     </TouchableOpacity>
                   );
                 })}
@@ -182,7 +222,11 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
         <View style={styles.legendItem}>
           <Feather name="package" size={14} color="#64748B" />
           <Text style={styles.legendText}>
-            {currentZone?.shelves?.reduce((acc, s) => acc + (s.levels?.length ?? 0), 0) || 0} Levels
+            {currentZone?.shelves?.reduce(
+              (acc, s) => acc + (s.levels?.length ?? 0),
+              0,
+            ) || 0}{" "}
+            Levels
           </Text>
         </View>
         <View style={styles.legendDivider} />
@@ -190,9 +234,14 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
           <Feather name="grid" size={14} color="#64748B" />
           <Text style={styles.legendText}>
             {currentZone?.shelves?.reduce(
-              (acc, s) => acc + (s.levels ?? []).reduce((sum, l) => sum + (l.bins?.length ?? 0), 0),
-              0
-            ) || 0}{' '}
+              (acc, s) =>
+                acc +
+                (s.levels ?? []).reduce(
+                  (sum, l) => sum + (l.bins?.length ?? 0),
+                  0,
+                ),
+              0,
+            ) || 0}{" "}
             Bins
           </Text>
         </View>
@@ -222,12 +271,12 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
   },
   zoneTabs: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: "#E2E8F0",
     paddingVertical: 12,
   },
   zoneTabsContent: {
@@ -238,47 +287,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
   },
   zoneTabActive: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#2563EB',
+    backgroundColor: "#3B82F6",
+    borderColor: "#2563EB",
   },
   zoneTabText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
+    fontWeight: "700",
+    color: "#475569",
   },
   zoneTabTextActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   legend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: "#E2E8F0",
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   legendDivider: {
     width: 1,
     height: 14,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: "#CBD5E1",
   },
   legendText: {
     fontSize: 12,
-    color: '#64748B',
-    fontWeight: '600',
+    color: "#64748B",
+    fontWeight: "600",
   },
   scrollView: {
     flex: 1,
@@ -288,13 +337,13 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   rackCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
+    borderColor: "#E2E8F0",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
@@ -303,11 +352,11 @@ const styles = StyleSheet.create({
   rackCardRecommended: {
     borderColor: COLORS.success,
     borderWidth: 1.5,
-    backgroundColor: COLORS.success + '05',
+    backgroundColor: COLORS.success + "05",
   },
   rackHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
     gap: 10,
   },
@@ -315,14 +364,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
   },
   rackTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
   },
   shelfRecBadge: {
     backgroundColor: COLORS.success,
@@ -331,13 +380,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   shelfRecBadgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   binRecDot: {
-    position: 'absolute',
+    position: "absolute",
     top: 4,
     right: 4,
     width: 6,
@@ -348,21 +397,21 @@ const styles = StyleSheet.create({
   rackStats: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
     borderRadius: 8,
   },
   rackStatsText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
+    fontWeight: "600",
+    color: "#64748B",
   },
   infoButton: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
   },
   binGrid: {
     gap: 12,
@@ -373,30 +422,30 @@ const styles = StyleSheet.create({
   levelLabel: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    backgroundColor: '#3B82F6',
+    backgroundColor: "#3B82F6",
     borderRadius: 6,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   levelLabelText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontWeight: "700",
+    color: "#FFFFFF",
     letterSpacing: 0.5,
   },
   binRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
   },
   binSlot: {
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
     minWidth: 50,
   },
   binSlotHighlighted: {
@@ -416,34 +465,34 @@ const styles = StyleSheet.create({
   },
   binCode: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.slate600,
   },
   binCodeSuggested: {
     color: COLORS.successText,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   binCodeDimmed: {
     color: COLORS.slate400,
   },
   emptyRack: {
     paddingVertical: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyRackText: {
     fontSize: 13,
-    color: '#94A3B8',
-    fontStyle: 'italic',
+    color: "#94A3B8",
+    fontStyle: "italic",
   },
   emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 60,
   },
   emptyText: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: "#94A3B8",
     marginTop: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });

@@ -1,28 +1,47 @@
-import { COLORS } from '@/constants/color';
-import { NavigationNode, Shelf, WarehouseStructure, WarehouseZone } from '@/types/warehouse';
-import { Feather } from '@expo/vector-icons';
-import React, { useEffect, useMemo } from 'react';
+import { COLORS } from "@/constants/color";
 import {
-    Dimensions,
-    LayoutChangeEvent,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+  NavigationNode,
+  Shelf,
+  WarehouseStructure,
+  WarehouseZone,
+} from "@/types/warehouse";
+import { Feather } from "@expo/vector-icons";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Dimensions,
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withRepeat,
-    withSpring,
-    withTiming,
-} from 'react-native-reanimated';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Pattern, Rect, Stop, Text as SvgText } from 'react-native-svg';
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import Svg, {
+  Circle,
+  Defs,
+  G,
+  Line,
+  LinearGradient,
+  Pattern,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from "react-native-svg";
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+// ===== ADDED CODE START =====
+import { useAuthStore } from "@/stores/auth.store";
+// ===== ADDED CODE END =====
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const SCREEN_HEIGHT = Dimensions.get("window").height;
 const PADDING = 20;
 const FOOTER_HEIGHT = 72;
 
@@ -33,6 +52,10 @@ interface WarehouseLayoutProps {
   highlightedPath?: NavigationNode[];
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
   onZonePress?: (zone: WarehouseZone) => void;
+  // ===== UPDATED CODE START =====
+  status?: string;
+  outboundOrderId?: number; // Added to support API path optimization
+  // ===== UPDATED CODE END =====
 }
 
 export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
@@ -42,6 +65,10 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   highlightedPath,
   onShelfPress,
   onZonePress,
+  // ===== UPDATED CODE START =====
+  status,
+  outboundOrderId,
+  // ===== UPDATED CODE END =====
 }) => {
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -57,13 +84,117 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     height: SCREEN_HEIGHT * 0.55,
   });
 
+  // ===== ADDED CODE START =====
+  const token = useAuthStore((state) => state.token);
+  console.log("token", token);
+  const [optimizedPathIds, setOptimizedPathIds] = useState<string[]>([]);
+
+  // API Call for Optimized Path
+  useEffect(() => {
+    if (status === "path_optimization" && outboundOrderId && token) {
+      const fetchPath = async () => {
+        try {
+          const response = await fetch(
+            `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${outboundOrderId}/path-optimization`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+          const data = await response.json();
+          console.log("data: ", data);
+          if (data?.payload?.[0]?.fullOptimizedPath) {
+            setOptimizedPathIds(data.payload[0].fullOptimizedPath);
+          }
+        } catch (error) {
+          console.error("Path Optimization API Error:", error);
+        }
+      };
+      fetchPath();
+    }
+  }, [status, outboundOrderId, token]);
+
+  // Logic for Path Construction and Segment Counting
+  const optimizedSegments = useMemo(() => {
+    if (status !== "path_optimization" || optimizedPathIds.length < 2)
+      return [];
+
+    // Map for quick node coordinate lookup
+    const nodeLookup = new Map<string, { x: number; y: number }>();
+    structure.nodes?.forEach((n) => nodeLookup.set(n.id, { x: n.x, y: n.y }));
+
+    // Include access nodes from shelves into lookup
+    structure.zones?.forEach((z) => {
+      z.shelves?.forEach((s) => {
+        s.accessNodes?.forEach((an) =>
+          nodeLookup.set(an.id, { x: an.x, y: an.y }),
+        );
+      });
+    });
+
+    const segmentMap = new Map<string, number>();
+    const segments: {
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      count: number;
+      id: string;
+    }[] = [];
+
+    // First pass: Count undirected segments
+    for (let i = 0; i < optimizedPathIds.length - 1; i++) {
+      const idA = optimizedPathIds[i];
+      const idB = optimizedPathIds[i + 1];
+      const key = [idA, idB].sort().join("-"); // Undirected key
+      segmentMap.set(key, (segmentMap.get(key) || 0) + 1);
+    }
+
+    // Second pass: Create renderable data
+    for (let i = 0; i < optimizedPathIds.length - 1; i++) {
+      const idA = optimizedPathIds[i];
+      const idB = optimizedPathIds[i + 1];
+      const nodeA = nodeLookup.get(idA);
+      const nodeB = nodeLookup.get(idB);
+      const key = [idA, idB].sort().join("-");
+
+      if (nodeA && nodeB) {
+        segments.push({
+          id: `${key}-${i}`,
+          x1: nodeA.x,
+          y1: nodeA.y,
+          x2: nodeB.x,
+          y2: nodeB.y,
+          count: segmentMap.get(key) || 1,
+        });
+      }
+    }
+    return segments;
+  }, [optimizedPathIds, structure, status]);
+  // ===== ADDED CODE END =====
+
+  // Example: Tự động hiện Nodes nếu status là path_optimization
+  useEffect(() => {
+    if (status === "path_optimization") {
+      setShowNodes(true);
+    }
+  }, [status]);
+
   const contentBounds = useMemo(() => {
     let minX = Number.POSITIVE_INFINITY;
     let minY = Number.POSITIVE_INFINITY;
     let maxX = Number.NEGATIVE_INFINITY;
     let maxY = Number.NEGATIVE_INFINITY;
 
-    const includeRect = (x: number, y: number, width: number, height: number) => {
+    const includeRect = (
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+    ) => {
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + width);
@@ -80,13 +211,25 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     (structure.zones ?? []).forEach((zone) => {
       includeRect(zone.x, zone.y, zone.width, zone.height);
       (zone.shelves ?? []).forEach((shelf) => {
-        includeRect(zone.x + shelf.x, zone.y + shelf.y, shelf.width, shelf.height);
+        includeRect(
+          zone.x + shelf.x,
+          zone.y + shelf.y,
+          shelf.width,
+          shelf.height,
+        );
       });
     });
 
-    (structure.nodes ?? []).forEach((node) => includePoint(node.x, node.y, node.radius ?? 2));
+    (structure.nodes ?? []).forEach((node) =>
+      includePoint(node.x, node.y, node.radius ?? 2),
+    );
 
-    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    if (
+      !Number.isFinite(minX) ||
+      !Number.isFinite(minY) ||
+      !Number.isFinite(maxX) ||
+      !Number.isFinite(maxY)
+    ) {
       minX = 0;
       minY = 0;
       maxX = structure.width;
@@ -112,7 +255,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, NavigationNode>();
-    (structure.nodes ?? []).forEach(node => map.set(node.id, node));
+    (structure.nodes ?? []).forEach((node) => map.set(node.id, node));
     return map;
   }, [structure.nodes]);
 
@@ -126,7 +269,10 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   // Initial fit calculation
   const calculateInitialFit = () => {
     const availableWidth = Math.max(viewport.width - PADDING, 1);
-    const availableHeight = Math.max(viewport.height - FOOTER_HEIGHT - PADDING, 1);
+    const availableHeight = Math.max(
+      viewport.height - FOOTER_HEIGHT - PADDING,
+      1,
+    );
 
     const sX = availableWidth / contentBounds.width;
     const sY = availableHeight / contentBounds.height;
@@ -136,8 +282,12 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     const scaledHeight = contentBounds.height * initialScale;
 
     scale.value = withSpring(initialScale);
-    translateX.value = withSpring((viewport.width - scaledWidth) / 2 - contentBounds.minX * initialScale);
-    translateY.value = withSpring((availableHeight - scaledHeight) / 2 - contentBounds.minY * initialScale);
+    translateX.value = withSpring(
+      (viewport.width - scaledWidth) / 2 - contentBounds.minX * initialScale,
+    );
+    translateY.value = withSpring(
+      (availableHeight - scaledHeight) / 2 - contentBounds.minY * initialScale,
+    );
   };
 
   useEffect(() => {
@@ -178,42 +328,49 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     });
 
   // Tap to select shelf (Hit testing)
-  const singleTapGesture = Gesture.Tap()
-    .onStart((event) => {
-      // Find if a shelf was tapped
-      // Coordinates need to be adjusted based on the current scale and translation
-      const mapX = (event.x - translateX.value) / scale.value;
-      const mapY = (event.y - translateY.value) / scale.value;
+  const singleTapGesture = Gesture.Tap().onStart((event) => {
+    // Find if a shelf was tapped
+    // Coordinates need to be adjusted based on the current scale and translation
+    const mapX = (event.x - translateX.value) / scale.value;
+    const mapY = (event.y - translateY.value) / scale.value;
 
-      let hitSomething = false;
-      (structure.zones ?? []).forEach(zone => {
-        (zone.shelves ?? []).forEach(shelf => {
-          const absX = zone.x + shelf.x;
-          const absY = zone.y + shelf.y;
-          if (mapX >= absX && mapX <= absX + shelf.width &&
-            mapY >= absY && mapY <= absY + shelf.height) {
-            hitSomething = true;
-            if (onShelfPress) {
-              runOnJS(onShelfPress)(shelf, zone);
-            }
+    let hitSomething = false;
+    (structure.zones ?? []).forEach((zone) => {
+      (zone.shelves ?? []).forEach((shelf) => {
+        const absX = zone.x + shelf.x;
+        const absY = zone.y + shelf.y;
+        if (
+          mapX >= absX &&
+          mapX <= absX + shelf.width &&
+          mapY >= absY &&
+          mapY <= absY + shelf.height
+        ) {
+          hitSomething = true;
+          if (onShelfPress) {
+            runOnJS(onShelfPress)(shelf, zone);
           }
-        });
+        }
       });
-
-      if (!hitSomething && onZonePress) {
-        (structure.zones ?? []).forEach(zone => {
-          if (mapX >= zone.x && mapX <= zone.x + zone.width &&
-            mapY >= zone.y && mapY <= zone.y + zone.height) {
-            runOnJS(onZonePress)(zone);
-          }
-        });
-      }
     });
+
+    if (!hitSomething && onZonePress) {
+      (structure.zones ?? []).forEach((zone) => {
+        if (
+          mapX >= zone.x &&
+          mapX <= zone.x + zone.width &&
+          mapY >= zone.y &&
+          mapY <= zone.y + zone.height
+        ) {
+          runOnJS(onZonePress)(zone);
+        }
+      });
+    }
+  });
 
   const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
   const composedGesture = Gesture.Simultaneous(
     Gesture.Simultaneous(pinchGesture, panGesture),
-    tapGesture
+    tapGesture,
   );
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -235,11 +392,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   const pulse = useSharedValue(1);
 
   useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(1.2, { duration: 1000 }),
-      -1,
-      true
-    );
+    pulse.value = withRepeat(withTiming(1.2, { duration: 1000 }), -1, true);
   }, []);
 
   const renderShelf = (shelf: Shelf, zone: WarehouseZone) => {
@@ -254,9 +407,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       ? COLORS.primary
       : isRecommended
         ? COLORS.success
-        : isDimmed 
+        : isDimmed
           ? COLORS.slate200
-          : '#E2E8F0';
+          : "#E2E8F0";
 
     const faceColor = isHighlighted
       ? COLORS.primaryLight
@@ -264,14 +417,14 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         ? COLORS.successLight
         : isDimmed
           ? COLORS.slate50
-          : '#F8FAFC';
+          : "#F8FAFC";
 
-    const strokeColor = isHighlighted 
-      ? COLORS.primary 
-      : isRecommended 
-        ? COLORS.success 
+    const strokeColor = isHighlighted
+      ? COLORS.primary
+      : isRecommended
+        ? COLORS.success
         : isDimmed
-          ? COLORS.slate300 
+          ? COLORS.slate300
           : COLORS.slate400;
 
     const absX = zone.x + shelf.x;
@@ -347,7 +500,13 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             width={24}
             height={14}
             rx={7}
-            fill={isRecommended ? COLORS.successText : (isHighlighted ? COLORS.primary : "#1E293B")}
+            fill={
+              isRecommended
+                ? COLORS.successText
+                : isHighlighted
+                  ? COLORS.primary
+                  : "#1E293B"
+            }
             opacity={isDimmed ? 0.4 : 0.95}
           />
           <SvgText
@@ -405,7 +564,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             opacity={0.15}
           />
           <SvgText
-            x={zone.x + 12 + Math.max((zone.code?.length ?? 0) * 8 + 35, 65) / 2}
+            x={
+              zone.x + 12 + Math.max((zone.code?.length ?? 0) * 8 + 35, 65) / 2
+            }
             y={zone.y + 24}
             fontSize={11}
             fill={COLORS.primary}
@@ -413,7 +574,11 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             textAnchor="middle"
             alignmentBaseline="middle"
           >
-            {zone.code ? (zone.code.toLowerCase().includes('zone') ? zone.code : `Zone ${zone.code}`) : 'Khu vực'}
+            {zone.code
+              ? zone.code.toLowerCase().includes("zone")
+                ? zone.code
+                : `Zone ${zone.code}`
+              : "Khu vực"}
           </SvgText>
         </G>
 
@@ -432,18 +597,54 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       pathLines.push(
         <G key={`path-${i}`}>
           <Line
-            x1={start.x} y1={start.y} x2={end.x} y2={end.y}
-            stroke={COLORS.secondary} strokeWidth={8} opacity={0.2} strokeLinecap="round"
+            x1={start.x}
+            y1={start.y}
+            x2={end.x}
+            y2={end.y}
+            stroke={COLORS.secondary}
+            strokeWidth={8}
+            opacity={0.2}
+            strokeLinecap="round"
           />
           <Line
-            x1={start.x} y1={start.y} x2={end.x} y2={end.y}
-            stroke={COLORS.secondary} strokeWidth={3} strokeLinecap="round"
+            x1={start.x}
+            y1={start.y}
+            x2={end.x}
+            y2={end.y}
+            stroke={COLORS.secondary}
+            strokeWidth={3}
+            strokeLinecap="round"
           />
-        </G>
+        </G>,
       );
     }
     return <G>{pathLines}</G>;
   };
+
+  // ===== ADDED CODE START =====
+  const renderOptimizedPath = () => {
+    if (status !== "path_optimization" || optimizedSegments.length === 0)
+      return null;
+
+    return (
+      <G>
+        {optimizedSegments.map((seg) => (
+          <Line
+            key={seg.id}
+            x1={seg.x1}
+            y1={seg.y1}
+            x2={seg.x2}
+            y2={seg.y2}
+            stroke={COLORS.primary}
+            strokeWidth={seg.count >= 2 ? 4 : 2}
+            strokeDasharray={seg.count === 1 ? "5, 5" : "none"}
+            strokeLinecap="round"
+          />
+        ))}
+      </G>
+    );
+  };
+  // ===== ADDED CODE END =====
 
   return (
     <View style={styles.container}>
@@ -456,8 +657,19 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
               viewBox={`0 0 ${structure.width} ${structure.height}`}
             >
               <Defs>
-                <Pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <Circle cx="10" cy="10" r="0.8" fill="#CBD5E1" opacity={0.4} />
+                <Pattern
+                  id="grid"
+                  width="20"
+                  height="20"
+                  patternUnits="userSpaceOnUse"
+                >
+                  <Circle
+                    cx="10"
+                    cy="10"
+                    r="0.8"
+                    fill="#CBD5E1"
+                    opacity={0.4}
+                  />
                 </Pattern>
               </Defs>
 
@@ -466,17 +678,21 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
               {(structure.zones ?? []).map(renderZone)}
               {renderPath()}
 
+              {/* ===== ADDED CODE START ===== */}
+              {renderOptimizedPath()}
+              {/* ===== ADDED CODE END ===== */}
+
               {showNodes && (
                 <G>
                   {/* Các điểm mốc (Nodes) */}
                   {(structure.nodes ?? []).map((node) => (
-                    <Circle 
-                      key={`node-${node.id}`} 
-                      cx={node.x} 
-                      cy={node.y} 
-                      r={3.5} 
-                      fill={COLORS.info} 
-                      opacity={0.5} 
+                    <Circle
+                      key={`node-${node.id}`}
+                      cx={node.x}
+                      cy={node.y}
+                      r={3.5}
+                      fill={COLORS.info}
+                      opacity={0.5}
                     />
                   ))}
                 </G>
@@ -510,29 +726,54 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           <Feather name="maximize" size={20} color={COLORS.textMuted} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.glassButton, showNodes && { backgroundColor: COLORS.primary }]}
+          style={[
+            styles.glassButton,
+            showNodes && { backgroundColor: COLORS.primary },
+          ]}
           onPress={() => setShowNodes(!showNodes)}
           activeOpacity={0.7}
         >
-          <Feather name="navigation" size={20} color={showNodes ? '#FFF' : COLORS.textMuted} />
+          <Feather
+            name="navigation"
+            size={20}
+            color={showNodes ? "#FFF" : COLORS.textMuted}
+          />
         </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: COLORS.primary, opacity: 0.3 }]} />
+          <View
+            style={[
+              styles.legendDot,
+              { backgroundColor: COLORS.primary, opacity: 0.3 },
+            ]}
+          />
           <Text style={styles.legendLabel}>Khu vực</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: COLORS.success }]} />
+          <View
+            style={[styles.legendDot, { backgroundColor: COLORS.success }]}
+          />
           <Text style={styles.legendLabel}>Vị trí gợi ý</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#E2E8F0', borderWidth: 1, borderColor: '#CBD5E1' }]} />
+          <View
+            style={[
+              styles.legendDot,
+              {
+                backgroundColor: "#E2E8F0",
+                borderWidth: 1,
+                borderColor: "#CBD5E1",
+              },
+            ]}
+          />
           <Text style={styles.legendLabel}>Kệ hàng</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: COLORS.secondary }]} />
+          <View
+            style={[styles.legendDot, { backgroundColor: COLORS.secondary }]}
+          />
           <Text style={styles.legendLabel}>Đường đi</Text>
         </View>
       </View>
@@ -543,15 +784,15 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F1F5F9', // Subtle slate background
+    backgroundColor: "#F1F5F9", // Subtle slate background
     borderRadius: 32,
     marginHorizontal: 16,
     marginBottom: 20,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderWidth: 1.5,
-    borderColor: '#FFF',
+    borderColor: "#FFF",
     elevation: 8,
-    shadowColor: '#0F172A',
+    shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.15,
     shadowRadius: 24,
@@ -560,38 +801,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   floatingControls: {
-    position: 'absolute',
+    position: "absolute",
     top: 20,
     right: 20,
     gap: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   glassButton: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-    shadowColor: '#000',
+    borderColor: "rgba(255, 255, 255, 0.8)",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 4,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingVertical: 20,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: "#F1F5F9",
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   legendDot: {
@@ -601,7 +842,7 @@ const styles = StyleSheet.create({
   },
   legendLabel: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#64748B',
-  }
+    fontWeight: "700",
+    color: "#64748B",
+  },
 });

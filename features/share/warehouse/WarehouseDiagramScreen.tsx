@@ -1,25 +1,37 @@
-import { ScreenHeader } from '@/components';
-import { PathInstructionsModal, ShelfDetailModal, WarehouseGridView, WarehouseLayout } from '@/components/staff';
-import { COLORS } from '@/constants/color';
-import { useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
-import { useOutboundTicket, useUpdateOutboundTicketItems } from '@/hooks/outbound-orders.hooks';
-import { useWarehouses, useWarehouseStructure } from '@/hooks/warehouse.hooks';
-import { AlertService } from '@/stores/alert.store';
-import { useAuthStore } from '@/stores/auth.store';
-import { ShelfActionItem } from '@/components/staff/ShelfDetailModal';
-import { PathResult, Shelf, WarehouseZone } from '@/types/warehouse';
-import { findNearestNode, findShortestPath } from '@/utils/pathfinding';
-import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import { ScreenHeader } from "@/components";
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+  PathInstructionsModal,
+  ShelfDetailModal,
+  WarehouseGridView,
+  WarehouseLayout,
+} from "@/components/staff";
+import { ShelfActionItem } from "@/components/staff/ShelfDetailModal";
+import { COLORS } from "@/constants/color";
+import {
+  useInboundStorageRecommendations,
+  useInboundTicket,
+  useUpdateInboundTicketItems,
+} from "@/hooks";
+import {
+  useOutboundTicket,
+  useUpdateOutboundTicketItems,
+} from "@/hooks/outbound-orders.hooks";
+import { useWarehouses, useWarehouseStructure } from "@/hooks/warehouse.hooks";
+import { AlertService } from "@/stores/alert.store";
+import { useAuthStore } from "@/stores/auth.store";
+import { PathResult, Shelf, WarehouseZone } from "@/types/warehouse";
+import { findNearestNode, findShortestPath } from "@/utils/pathfinding";
+import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
+import React, { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function WarehouseDiagramScreen() {
   const params = useLocalSearchParams<{
@@ -29,39 +41,63 @@ export default function WarehouseDiagramScreen() {
     recommendedBins?: string;
     focusedBins?: string;
     focusedItemName?: string;
+    status?: string; // 1. THÊM DÒNG NÀY ĐỂ ĐỊNH NGHĨA KIỂU DỮ LIỆU
   }>();
-  const initialWarehouseId = params.warehouseId ? Number(params.warehouseId) : undefined;
-  const inboundOrderId = params.inboundOrderId ? Number(params.inboundOrderId) : undefined;
-  const outboundOrderId = params.outboundOrderId ? Number(params.outboundOrderId) : undefined;
+
+  const currentStatus = params.status; // 2. LẤY GIÁ TRỊ STATUS RA ĐÂY
+  const initialWarehouseId = params.warehouseId
+    ? Number(params.warehouseId)
+    : undefined;
+  const inboundOrderId = params.inboundOrderId
+    ? Number(params.inboundOrderId)
+    : undefined;
+  const outboundOrderId = params.outboundOrderId
+    ? Number(params.outboundOrderId)
+    : undefined;
   const isPicking = !!outboundOrderId;
   const operationId = inboundOrderId || outboundOrderId;
 
   const routeBins = useMemo(
-    () => (params.recommendedBins ? params.recommendedBins.split(',').map((code) => code.trim()).filter(Boolean) : []),
-    [params.recommendedBins]
+    () =>
+      params.recommendedBins
+        ? params.recommendedBins
+            .split(",")
+            .map((code) => code.trim())
+            .filter(Boolean)
+        : [],
+    [params.recommendedBins],
   );
   const focusedBinsArray = useMemo(
-    () => (params.focusedBins ? params.focusedBins.split(',').map((code) => code.trim()).filter(Boolean) : []),
-    [params.focusedBins]
+    () =>
+      params.focusedBins
+        ? params.focusedBins
+            .split(",")
+            .map((code) => code.trim())
+            .filter(Boolean)
+        : [],
+    [params.focusedBins],
   );
   const focusedItemName = params.focusedItemName;
 
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | undefined>();
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<
+    number | undefined
+  >();
   const [selectedShelf, setSelectedShelf] = useState<Shelf | null>(null);
   const [selectedZone, setSelectedZone] = useState<WarehouseZone | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [currentPath, setCurrentPath] = useState<PathResult | null>(null);
   const [pathModalVisible, setPathModalVisible] = useState(false);
   const [currentLocation] = useState<{ x: number; y: number } | null>(null);
-  const [viewMode, setViewMode] = useState<'map' | 'grid'>('map');
-  const user = useAuthStore(state => state.user);
+  const [viewMode, setViewMode] = useState<"map" | "grid">("map");
+  const user = useAuthStore((state) => state.user);
   const isStaff = user?.roleId === 4;
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
-  const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(inboundOrderId);
+  const { data: recommendationItems = [], isLoading: recommendationsLoading } =
+    useInboundStorageRecommendations(inboundOrderId);
   const { data: inboundTicket } = useInboundTicket(inboundOrderId);
   const { data: outboundOrder } = useOutboundTicket(outboundOrderId);
-  
+
   const {
     data: structure,
     isLoading: structureLoading,
@@ -81,23 +117,30 @@ export default function WarehouseDiagramScreen() {
     return Array.from(new Set([...routeBins, ...binsFromApi]));
   }, [recommendationItems, routeBins]);
 
-  const effectiveHighlightedBins = focusedBinsArray.length > 0 ? focusedBinsArray : recommendedBins;
+  const effectiveHighlightedBins =
+    focusedBinsArray.length > 0 ? focusedBinsArray : recommendedBins;
 
   const recommendationPreview = useMemo(() => {
     return recommendationItems
-      .flatMap((item) => (item.storageRecommendations || []).map((recommendation) => ({
-        itemName: item.name,
-        binIdCode: recommendation.binIdCode,
-        distanceInfo: recommendation.distanceInfo,
-        reason: recommendation.reason,
-      })))
+      .flatMap((item) =>
+        (item.storageRecommendations || []).map((recommendation) => ({
+          itemName: item.name,
+          binIdCode: recommendation.binIdCode,
+          distanceInfo: recommendation.distanceInfo,
+          reason: recommendation.reason,
+        })),
+      )
       .filter((entry) => !!entry.binIdCode)
       .slice(0, 4);
   }, [recommendationItems]);
 
   const recommendationResolution = useMemo(() => {
     if (!structure || effectiveHighlightedBins.length === 0) {
-      return { shelfIds: [] as string[], firstShelf: null as Shelf | null, firstZone: null as WarehouseZone | null };
+      return {
+        shelfIds: [] as string[],
+        firstShelf: null as Shelf | null,
+        firstZone: null as WarehouseZone | null,
+      };
     }
 
     const shelfIds = new Set<string>();
@@ -107,7 +150,11 @@ export default function WarehouseDiagramScreen() {
     for (const zone of structure.zones ?? []) {
       for (const shelf of zone.shelves ?? []) {
         const hasRecommendedBin = (shelf.levels ?? []).some((level) =>
-          (level.bins ?? []).some((bin) => effectiveHighlightedBins.some((code) => String(code) === bin.code || String(code) === bin.id))
+          (level.bins ?? []).some((bin) =>
+            effectiveHighlightedBins.some(
+              (code) => String(code) === bin.code || String(code) === bin.id,
+            ),
+          ),
         );
 
         if (hasRecommendedBin) {
@@ -125,12 +172,16 @@ export default function WarehouseDiagramScreen() {
 
   const recommendedShelvesForRender = recommendationResolution.shelfIds;
 
-  const activeHighlightedShelf = selectedShelf?.id || recommendationResolution.firstShelf?.id;
+  const activeHighlightedShelf =
+    selectedShelf?.id || recommendationResolution.firstShelf?.id;
 
   React.useEffect(() => {
     if (!warehouses || warehouses.length === 0 || selectedWarehouseId) return;
 
-    if (initialWarehouseId && warehouses.some((warehouse) => warehouse.id === initialWarehouseId)) {
+    if (
+      initialWarehouseId &&
+      warehouses.some((warehouse) => warehouse.id === initialWarehouseId)
+    ) {
       setSelectedWarehouseId(initialWarehouseId);
       return;
     }
@@ -163,12 +214,17 @@ export default function WarehouseDiagramScreen() {
     const endNode = findNearestNode(
       structure.nodes,
       targetAccessNode.x,
-      targetAccessNode.y
+      targetAccessNode.y,
     );
 
     if (!endNode) return;
 
-    const path = findShortestPath(structure.nodes, structure.edges, startNode.id, endNode.id);
+    const path = findShortestPath(
+      structure.nodes,
+      structure.edges,
+      startNode.id,
+      endNode.id,
+    );
 
     if (path) {
       setCurrentPath(path);
@@ -184,23 +240,26 @@ export default function WarehouseDiagramScreen() {
     handleFindPath(recommendationResolution.firstShelf);
   };
 
-  const handleConfirmOperationAtShelf = async (actionItems: ShelfActionItem[]) => {
+  const handleConfirmOperationAtShelf = async (
+    actionItems: ShelfActionItem[],
+  ) => {
     if (isProcessing) return;
     setIsProcessing(true);
 
     try {
       if (!isPicking && inboundOrderId) {
         // Inbound: Update receivedQuantity to match expectedQuantity for these items
-        const itemsToUpdate = actionItems.map(item => ({
+        const itemsToUpdate = actionItems.map((item) => ({
           id: item.id,
           productId: item.productId,
-          receivedQuantity: (item.currentQuantity || 0) + (item.targetQuantity || 0),
+          receivedQuantity:
+            (item.currentQuantity || 0) + (item.targetQuantity || 0),
           locations: [
             {
               binId: String(item.binId),
-              quantity: item.targetQuantity || 0
-            }
-          ]
+              quantity: item.targetQuantity || 0,
+            },
+          ],
         }));
 
         await updateInboundItems.mutateAsync({
@@ -208,19 +267,23 @@ export default function WarehouseDiagramScreen() {
           items: itemsToUpdate as any,
         });
 
-        AlertService.success('Thành công', `Đã xác nhận xếp ${actionItems.length} mặt hàng vào kệ ${selectedShelf?.code}`);
+        AlertService.success(
+          "Thành công",
+          `Đã xác nhận xếp ${actionItems.length} mặt hàng vào kệ ${selectedShelf?.code}`,
+        );
       } else if (isPicking && outboundOrderId) {
         // Outbound: Update quantity to match target for these items
-        const itemsToUpdate = actionItems.map(item => ({
+        const itemsToUpdate = actionItems.map((item) => ({
           id: item.id,
           productId: item.productId,
-          receivedQuantity: (item.currentQuantity || 0) + (item.targetQuantity || 0),
+          receivedQuantity:
+            (item.currentQuantity || 0) + (item.targetQuantity || 0),
           locations: [
             {
               binId: String(item.binId),
-              quantity: item.targetQuantity || 0
-            }
-          ]
+              quantity: item.targetQuantity || 0,
+            },
+          ],
         }));
 
         await updateOutboundItems.mutateAsync({
@@ -228,46 +291,65 @@ export default function WarehouseDiagramScreen() {
           items: itemsToUpdate as any,
         });
 
-        AlertService.success('Thành công', `Đã xác nhận nhặt ${actionItems.length} mặt hàng từ kệ ${selectedShelf?.code}`);
+        AlertService.success(
+          "Thành công",
+          `Đã xác nhận nhặt ${actionItems.length} mặt hàng từ kệ ${selectedShelf?.code}`,
+        );
       }
       setModalVisible(false);
     } catch {
-      AlertService.error('Lỗi', 'Không thể cập nhật trạng thái mặt hàng');
+      AlertService.error("Lỗi", "Không thể cập nhật trạng thái mặt hàng");
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleUpdateShelf = (shelf: Shelf) => {
-    AlertService.info('Thông tin', `Cập nhật thông tin kệ ${shelf.code}. Tính năng này sẽ sớm được hoàn thiện.`);
+    AlertService.info(
+      "Thông tin",
+      `Cập nhật thông tin kệ ${shelf.code}. Tính năng này sẽ sớm được hoàn thiện.`,
+    );
   };
 
   // Compute items available for the currently selected shelf
   const availableItemsForModal = useMemo(() => {
     if (!selectedShelf) return [];
-    
-    const shelfBinCodes = (selectedShelf.levels ?? []).flatMap(l => (l.bins ?? []).map(b => b.code));
+
+    const shelfBinCodes = (selectedShelf.levels ?? []).flatMap((l) =>
+      (l.bins ?? []).map((b) => b.code),
+    );
     const firstBin = selectedShelf.levels?.[0]?.bins?.[0];
-    
+
     if (!isPicking) {
       // Inbound: Filter from recommendationItems
       const recommended = recommendationItems
-        .filter(item => (item.storageRecommendations ?? []).some(r => shelfBinCodes.includes(r.binIdCode || '')))
-        .map(item => {
-          const matchedRec = item.storageRecommendations!.find(r => shelfBinCodes.includes(r.binIdCode || ''));
+        .filter((item) =>
+          (item.storageRecommendations ?? []).some((r) =>
+            shelfBinCodes.includes(r.binIdCode || ""),
+          ),
+        )
+        .map((item) => {
+          const matchedRec = item.storageRecommendations!.find((r) =>
+            shelfBinCodes.includes(r.binIdCode || ""),
+          );
           // Find quantities from ticket items
-          const ticketItem = inboundTicket?.inboundOrderItems?.find(ti => ti.id === item.inboundOrderItemId);
-          
+          const ticketItem = inboundTicket?.inboundOrderItems?.find(
+            (ti) => ti.id === item.inboundOrderItemId,
+          );
+
           return {
             id: item.inboundOrderItemId,
             productId: item.productId || 0,
-            name: item.name || '',
+            name: item.name || "",
             sku: item.sku,
             // For recommended items, we target the recommended quantity
-            targetQuantity: matchedRec?.distanceInfo || (ticketItem?.expectedQuantity ?? 0) - (ticketItem?.receivedQuantity ?? 0),
+            targetQuantity:
+              matchedRec?.distanceInfo ||
+              (ticketItem?.expectedQuantity ?? 0) -
+                (ticketItem?.receivedQuantity ?? 0),
             currentQuantity: ticketItem?.receivedQuantity || 0,
-            binCode: matchedRec?.binIdCode || '',
-            binId: matchedRec?.binId || matchedRec?.binIdCode || '',
+            binCode: matchedRec?.binIdCode || "",
+            binId: matchedRec?.binId || matchedRec?.binIdCode || "",
             isRecommended: true,
           };
         });
@@ -276,13 +358,20 @@ export default function WarehouseDiagramScreen() {
 
       // Manual fallback: allow placing all remaining quantity of pending items
       return (inboundTicket?.inboundOrderItems || [])
-        .filter(item => (item.expectedQuantity ?? 0) > (item.receivedQuantity ?? 0))
-        .map(item => ({
+        .filter(
+          (item) => (item.expectedQuantity ?? 0) > (item.receivedQuantity ?? 0),
+        )
+        .map((item) => ({
           id: item.id,
           productId: item.productId || item.product?.id || 0,
-          name: item.productName || item.product?.name || item.name || `SP #${item.productId}`,
+          name:
+            item.productName ||
+            item.product?.name ||
+            item.name ||
+            `SP #${item.productId}`,
           sku: item.sku || item.product?.sku,
-          targetQuantity: (item.expectedQuantity || 0) - (item.receivedQuantity || 0),
+          targetQuantity:
+            (item.expectedQuantity || 0) - (item.receivedQuantity || 0),
           currentQuantity: item.receivedQuantity || 0,
           binCode: firstBin?.code || selectedShelf.code,
           binId: firstBin?.id || firstBin?.code || selectedShelf.id,
@@ -290,17 +379,31 @@ export default function WarehouseDiagramScreen() {
         }));
     } else {
       // Outbound: Filter from outboundOrder items
-      const orderItems = outboundOrder?.items || outboundOrder?.outboundOrderItems || [];
+      const orderItems =
+        outboundOrder?.items || outboundOrder?.outboundOrderItems || [];
       const recommended = orderItems
-        .filter(item => effectiveHighlightedBins.some(code => shelfBinCodes.includes(String(code))))
-        .map(item => {
-          const binCode = shelfBinCodes.find(code => effectiveHighlightedBins.includes(String(code))) || shelfBinCodes[0];
-          const bin = (selectedShelf.levels ?? []).flatMap(l => l.bins ?? []).find(b => b.code === binCode);
-          
+        .filter((item) =>
+          effectiveHighlightedBins.some((code) =>
+            shelfBinCodes.includes(String(code)),
+          ),
+        )
+        .map((item) => {
+          const binCode =
+            shelfBinCodes.find((code) =>
+              effectiveHighlightedBins.includes(String(code)),
+            ) || shelfBinCodes[0];
+          const bin = (selectedShelf.levels ?? [])
+            .flatMap((l) => l.bins ?? [])
+            .find((b) => b.code === binCode);
+
           return {
             id: item.id,
             productId: item.productId || item.product?.id || 0,
-            name: item.productName || item.product?.name || item.name || `SP #${item.productId}`,
+            name:
+              item.productName ||
+              item.product?.name ||
+              item.name ||
+              `SP #${item.productId}`,
             sku: item.sku || item.product?.sku,
             targetQuantity: (item.quantity || 0) - (item.receivedQuantity || 0),
             currentQuantity: item.receivedQuantity || 0,
@@ -314,11 +417,15 @@ export default function WarehouseDiagramScreen() {
 
       // Manual fallback
       return orderItems
-        .filter(item => (item.quantity || 0) > (item.receivedQuantity || 0))
-        .map(item => ({
+        .filter((item) => (item.quantity || 0) > (item.receivedQuantity || 0))
+        .map((item) => ({
           id: item.id,
           productId: item.productId || item.product?.id || 0,
-          name: item.productName || item.product?.name || item.name || `SP #${item.productId}`,
+          name:
+            item.productName ||
+            item.product?.name ||
+            item.name ||
+            `SP #${item.productId}`,
           sku: item.sku || item.product?.sku,
           targetQuantity: (item.quantity ?? 0) - (item.receivedQuantity ?? 0),
           currentQuantity: item.receivedQuantity || 0,
@@ -327,7 +434,14 @@ export default function WarehouseDiagramScreen() {
           isRecommended: false,
         }));
     }
-  }, [selectedShelf, isPicking, recommendationItems, inboundTicket, outboundOrder, effectiveHighlightedBins]);
+  }, [
+    selectedShelf,
+    isPicking,
+    recommendationItems,
+    inboundTicket,
+    outboundOrder,
+    effectiveHighlightedBins,
+  ]);
 
   if (warehousesLoading) {
     return (
@@ -355,10 +469,14 @@ export default function WarehouseDiagramScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader 
-        title="Sơ đồ kho" 
-        subtitle={isStaff ? "Xem sơ đồ và tìm đường đi" : "Xem sơ đồ và thông tin kệ hàng"} 
-        showBackButton={true} 
+      <ScreenHeader
+        title="Sơ đồ kho"
+        subtitle={
+          isStaff
+            ? "Xem sơ đồ và tìm đường đi"
+            : "Xem sơ đồ và thông tin kệ hàng"
+        }
+        showBackButton={true}
       />
 
       {warehouses.length > 1 && (
@@ -374,7 +492,8 @@ export default function WarehouseDiagramScreen() {
                 key={warehouse.id}
                 style={[
                   styles.warehouseChip,
-                  selectedWarehouseId === warehouse.id && styles.warehouseChipActive,
+                  selectedWarehouseId === warehouse.id &&
+                    styles.warehouseChipActive,
                 ]}
                 onPress={() => setSelectedWarehouseId(warehouse.id)}
               >
@@ -412,39 +531,83 @@ export default function WarehouseDiagramScreen() {
       ) : structure ? (
         <>
           {!!operationId && (
-            <View style={[styles.recommendationPanel, isPicking && styles.pickingPanel]}>
+            <View
+              style={[
+                styles.recommendationPanel,
+                isPicking && styles.pickingPanel,
+              ]}
+            >
               <View style={styles.recommendationPanelHeader}>
-                <Feather name={isPicking ? "shopping-cart" : "map-pin"} size={14} color={isPicking ? COLORS.primary : COLORS.success} />
-                <Text style={[styles.recommendationPanelTitle, !isPicking && { color: COLORS.successText }]}>
-                  {focusedItemName ? `${isPicking ? 'Vị trí nhặt' : 'Kệ cần xếp'}: ${focusedItemName}` : (isPicking ? 'Gợi ý vị trí lấy hàng' : 'Gợi ý vị trí xếp hàng')}
+                <Feather
+                  name={isPicking ? "shopping-cart" : "map-pin"}
+                  size={14}
+                  color={isPicking ? COLORS.primary : COLORS.success}
+                />
+                <Text
+                  style={[
+                    styles.recommendationPanelTitle,
+                    !isPicking && { color: COLORS.successText },
+                  ]}
+                >
+                  {focusedItemName
+                    ? `${isPicking ? "Vị trí nhặt" : "Kệ cần xếp"}: ${focusedItemName}`
+                    : isPicking
+                      ? "Gợi ý vị trí lấy hàng"
+                      : "Gợi ý vị trí xếp hàng"}
                 </Text>
               </View>
 
               {recommendationsLoading ? (
-                <Text style={styles.recommendationPanelSubtle}>Đang tải gợi ý từ phiếu...</Text>
+                <Text style={styles.recommendationPanelSubtle}>
+                  Đang tải gợi ý từ phiếu...
+                </Text>
               ) : effectiveHighlightedBins.length === 0 ? (
-                <Text style={styles.recommendationPanelSubtle}>Chưa có gợi ý từ hệ thống cho phiếu này.</Text>
+                <Text style={styles.recommendationPanelSubtle}>
+                  Chưa có gợi ý từ hệ thống cho phiếu này.
+                </Text>
               ) : (
                 <>
                   {recommendationPreview.length > 0 ? (
                     recommendationPreview.map((entry, index) => (
-                      <View key={`preview-${index}`} style={styles.recommendationRow}>
-                        <Text style={styles.recommendationItemName} numberOfLines={1}>
+                      <View
+                        key={`preview-${index}`}
+                        style={styles.recommendationRow}
+                      >
+                        <Text
+                          style={styles.recommendationItemName}
+                          numberOfLines={1}
+                        >
                           {entry.itemName || `Mặt hàng ${index + 1}`}
                         </Text>
-                        <Text style={[styles.recommendationChip, !isPicking && styles.successChip]}>{entry.binIdCode}</Text>
+                        <Text
+                          style={[
+                            styles.recommendationChip,
+                            !isPicking && styles.successChip,
+                          ]}
+                        >
+                          {entry.binIdCode}
+                        </Text>
                       </View>
                     ))
                   ) : (
                     <Text style={styles.recommendationPanelSubtle}>
-                      Tìm thấy {effectiveHighlightedBins.length} vị trí {isPicking ? 'lấy hàng' : 'đề xuất'} trong sơ đồ.
+                      Tìm thấy {effectiveHighlightedBins.length} vị trí{" "}
+                      {isPicking ? "lấy hàng" : "đề xuất"} trong sơ đồ.
                     </Text>
                   )}
 
                   {recommendationResolution.firstShelf && (
-                    <TouchableOpacity style={[styles.recommendationCta, !isPicking && { backgroundColor: COLORS.success }]} onPress={handleFindPathToRecommended}>
+                    <TouchableOpacity
+                      style={[
+                        styles.recommendationCta,
+                        !isPicking && { backgroundColor: COLORS.success },
+                      ]}
+                      onPress={handleFindPathToRecommended}
+                    >
                       <Feather name="navigation" size={14} color="#fff" />
-                      <Text style={styles.recommendationCtaText}>Tìm đường đến vị trí gợi ý</Text>
+                      <Text style={styles.recommendationCtaText}>
+                        Tìm đường đến vị trí gợi ý
+                      </Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -469,43 +632,51 @@ export default function WarehouseDiagramScreen() {
               <Text style={styles.infoText}>
                 {structure.zones?.reduce(
                   (acc, zone) => acc + (zone.shelves?.length || 0),
-                  0
-                ) || 0}{' '}
+                  0,
+                ) || 0}{" "}
                 kệ hàng
               </Text>
             </View>
             <View style={styles.infoDivider} />
             <View style={styles.viewToggle}>
               <TouchableOpacity
-                style={[styles.viewButton, viewMode === 'map' && styles.viewButtonActive]}
-                onPress={() => setViewMode('map')}
+                style={[
+                  styles.viewButton,
+                  viewMode === "map" && styles.viewButtonActive,
+                ]}
+                onPress={() => setViewMode("map")}
               >
-                <Feather 
-                  name="map" 
-                  size={16} 
-                  color={viewMode === 'map' ? '#FFFFFF' : '#64748B'} 
+                <Feather
+                  name="map"
+                  size={16}
+                  color={viewMode === "map" ? "#FFFFFF" : "#64748B"}
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.viewButton, viewMode === 'grid' && styles.viewButtonActive]}
-                onPress={() => setViewMode('grid')}
+                style={[
+                  styles.viewButton,
+                  viewMode === "grid" && styles.viewButtonActive,
+                ]}
+                onPress={() => setViewMode("grid")}
               >
-                <Feather 
-                  name="grid" 
-                  size={16} 
-                  color={viewMode === 'grid' ? '#FFFFFF' : '#64748B'} 
+                <Feather
+                  name="grid"
+                  size={16}
+                  color={viewMode === "grid" ? "#FFFFFF" : "#64748B"}
                 />
               </TouchableOpacity>
             </View>
           </View>
 
-          {viewMode === 'map' ? (
+          {viewMode === "map" ? (
             <WarehouseLayout
               structure={structure}
               highlightedShelf={activeHighlightedShelf}
               recommendedShelves={recommendedShelvesForRender}
               highlightedPath={currentPath?.path}
               onShelfPress={handleShelfPress}
+              status={currentStatus} // Thêm dòng này để truyền status xuống
+              outboundOrderId={outboundOrderId}
               onZonePress={handleZonePress}
             />
           ) : (
@@ -533,7 +704,7 @@ export default function WarehouseDiagramScreen() {
         recommendedItems={availableItemsForModal}
         onConfirmOperation={handleConfirmOperationAtShelf}
         onUpdateShelf={handleUpdateShelf}
-        operationType={isPicking ? 'outbound' : 'inbound'}
+        operationType={isPicking ? "outbound" : "inbound"}
         isProcessing={isProcessing}
         onClose={() => {
           setModalVisible(false);
@@ -545,7 +716,7 @@ export default function WarehouseDiagramScreen() {
       <PathInstructionsModal
         visible={pathModalVisible}
         pathResult={currentPath}
-        toLocation={selectedShelf?.code || 'Kệ hàng'}
+        toLocation={selectedShelf?.code || "Kệ hàng"}
         onClose={() => {
           setPathModalVisible(false);
         }}
@@ -561,18 +732,18 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   selectorWrap: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
   warehouseSelector: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   warehouseSelectorContent: {
     paddingHorizontal: 20,
@@ -594,27 +765,27 @@ const styles = StyleSheet.create({
   warehouseChipText: {
     fontSize: 13,
     color: COLORS.slate600,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   warehouseChipTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   infoBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginHorizontal: 12,
     marginBottom: 10,
     marginTop: 2,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.borderLight,
   },
   infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     flex: 1,
   },
@@ -623,8 +794,8 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 7,
     backgroundColor: COLORS.infoLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   infoDivider: {
     width: 1,
@@ -633,10 +804,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   viewToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
     borderRadius: 10,
     padding: 4,
   },
@@ -644,13 +815,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
   },
   viewButtonActive: {
-    backgroundColor: '#3B82F6',
-    shadowColor: '#3B82F6',
+    backgroundColor: "#3B82F6",
+    shadowColor: "#3B82F6",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -659,7 +830,7 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 13,
     color: COLORS.slate700,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   recommendationPanel: {
     marginHorizontal: 12,
@@ -668,22 +839,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: COLORS.success + '20',
+    borderColor: COLORS.success + "20",
   },
   pickingPanel: {
-    borderColor: COLORS.primary + '20',
+    borderColor: COLORS.primary + "20",
   },
   recommendationPanelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginBottom: 8,
   },
   recommendationPanelTitle: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.slate800,
   },
   recommendationPanelSubtle: {
@@ -692,9 +863,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   recommendationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
@@ -704,38 +875,38 @@ const styles = StyleSheet.create({
     marginRight: 8,
     fontSize: 12,
     color: COLORS.text,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   recommendationChip: {
     fontSize: 11,
     color: COLORS.primary,
     backgroundColor: COLORS.primaryLight,
     borderWidth: 1,
-    borderColor: COLORS.primary + '20',
+    borderColor: COLORS.primary + "20",
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 2,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   successChip: {
     color: COLORS.successText,
     backgroundColor: COLORS.successLight,
-    borderColor: COLORS.success + '20',
+    borderColor: COLORS.success + "20",
   },
   recommendationCta: {
     marginTop: 10,
     height: 34,
     borderRadius: 8,
     backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
   },
   recommendationCtaText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   loadingText: {
     marginTop: 12,
@@ -744,7 +915,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.slate600,
     marginTop: 16,
   },
@@ -752,11 +923,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSubtle,
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.slate800,
     marginTop: 16,
   },
@@ -764,7 +935,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textMuted,
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   retryButton: {
     marginTop: 20,
@@ -775,7 +946,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#fff",
   },
 });

@@ -1,14 +1,18 @@
-import { UserWarehouseAssignment } from '@/types/auth.types';
-import { WarehouseStructure, WarehouseSummary } from '@/types/warehouse';
-import { api } from './axios.instance';
-import { getInboundOrdersByStaff } from './inbound-order.api';
-import { getOutboundOrdersByStaff } from './outbound-order.api';
+import { UserWarehouseAssignment } from "@/types/auth.types";
+import { WarehouseStructure, WarehouseSummary } from "@/types/warehouse";
+import { api } from "./axios.instance";
+import { getInboundOrdersByStaff } from "./inbound-order.api";
+import { getOutboundOrdersByStaff } from "./outbound-order.api";
 
 /**
  * Lấy danh sách warehouses của company
  */
-export const getWarehouses = async (companyId: number): Promise<WarehouseSummary[]> => {
-  const response = await api.get(`/api/company-warehouses/${companyId}/warehouses`);
+export const getWarehouses = async (
+  companyId: number,
+): Promise<WarehouseSummary[]> => {
+  const response = await api.get(
+    `/api/company-warehouses/${companyId}/warehouses`,
+  );
   return response.data;
 };
 
@@ -20,25 +24,29 @@ export const getAccessibleWarehouses = async (
   roleId: number,
   staffId?: number,
   fallbackWarehouse?: { id?: number; name?: string },
-  fallbackAssignments?: UserWarehouseAssignment[]
+  fallbackAssignments?: UserWarehouseAssignment[],
 ): Promise<WarehouseSummary[]> => {
-  console.log('[getAccessibleWarehouses] start', {
+  console.log("[getAccessibleWarehouses] start", {
     companyId,
     roleId,
     staffId,
     fallbackWarehouse,
-    fallbackAssignments: fallbackAssignments?.map((assignment) => ({
-      warehouseId: assignment.warehouseId,
-      warehouseName: assignment.warehouse?.name || null,
-    })) || [],
+    fallbackAssignments:
+      fallbackAssignments?.map((assignment) => ({
+        warehouseId: assignment.warehouseId,
+        warehouseName: assignment.warehouse?.name || null,
+      })) || [],
   });
 
   // Company Admin: dùng endpoint chuẩn từ backend
   if (roleId === 2) {
     const warehouses = await getWarehouses(companyId);
-    console.log('[getAccessibleWarehouses] role 2 backend list', {
+    console.log("[getAccessibleWarehouses] role 2 backend list", {
       count: warehouses.length,
-      warehouses: warehouses.map((warehouse) => ({ id: warehouse.id, name: warehouse.name })),
+      warehouses: warehouses.map((warehouse) => ({
+        id: warehouse.id,
+        name: warehouse.name,
+      })),
     });
     return warehouses;
   }
@@ -47,13 +55,18 @@ export const getAccessibleWarehouses = async (
   const assignedWarehouses = new Map<number, WarehouseSummary>();
 
   fallbackAssignments?.forEach((assignment) => {
-    if (!assignment?.warehouseId || assignedWarehouses.has(assignment.warehouseId)) return;
+    if (
+      !assignment?.warehouseId ||
+      assignedWarehouses.has(assignment.warehouseId)
+    )
+      return;
 
     assignedWarehouses.set(assignment.warehouseId, {
       id: assignment.warehouseId,
       companyId,
-      name: assignment.warehouse?.name || `Warehouse #${assignment.warehouseId}`,
-      status: 'Active',
+      name:
+        assignment.warehouse?.name || `Warehouse #${assignment.warehouseId}`,
+      status: "Active",
     });
   });
 
@@ -62,22 +75,27 @@ export const getAccessibleWarehouses = async (
       id: fallbackWarehouse.id,
       companyId,
       name: fallbackWarehouse.name || `Warehouse #${fallbackWarehouse.id}`,
-      status: 'Active',
+      status: "Active",
     });
   }
 
   if (assignedWarehouses.size > 0) {
     const warehouses = Array.from(assignedWarehouses.values());
-    console.log('[getAccessibleWarehouses] using fallback assignments', {
+    console.log("[getAccessibleWarehouses] using fallback assignments", {
       count: warehouses.length,
-      warehouses: warehouses.map((warehouse) => ({ id: warehouse.id, name: warehouse.name })),
+      warehouses: warehouses.map((warehouse) => ({
+        id: warehouse.id,
+        name: warehouse.name,
+      })),
     });
     return warehouses;
   }
 
   // Staff: suy ra kho từ các inbound/outbound orders được gán
   if (!staffId) {
-    console.log('[getAccessibleWarehouses] no staffId and no fallback warehouses');
+    console.log(
+      "[getAccessibleWarehouses] no staffId and no fallback warehouses",
+    );
     return [];
   }
 
@@ -88,7 +106,7 @@ export const getAccessibleWarehouses = async (
 
   const warehousesMap = new Map<number, WarehouseSummary>();
 
-  if (inboundResult.status === 'fulfilled') {
+  if (inboundResult.status === "fulfilled") {
     inboundResult.value.forEach((order) => {
       const id = order.warehouse?.id ?? order.warehouseId;
       if (!id || warehousesMap.has(id)) return;
@@ -96,12 +114,12 @@ export const getAccessibleWarehouses = async (
         id,
         companyId,
         name: order.warehouse?.name || `Warehouse #${id}`,
-        status: 'Active',
+        status: "Active",
       });
     });
   }
 
-  if (outboundResult.status === 'fulfilled') {
+  if (outboundResult.status === "fulfilled") {
     outboundResult.value.forEach((order: any) => {
       const id = order.warehouse?.id ?? order.warehouseId;
       if (!id || warehousesMap.has(id)) return;
@@ -109,18 +127,21 @@ export const getAccessibleWarehouses = async (
         id,
         companyId,
         name: order.warehouse?.name || `Warehouse #${id}`,
-        status: 'Active',
+        status: "Active",
       });
     });
   }
 
   const warehouses = Array.from(warehousesMap.values());
 
-  console.log('[getAccessibleWarehouses] inferred from orders', {
+  console.log("[getAccessibleWarehouses] inferred from orders", {
     inboundStatus: inboundResult.status,
     outboundStatus: outboundResult.status,
     count: warehouses.length,
-    warehouses: warehouses.map((warehouse) => ({ id: warehouse.id, name: warehouse.name })),
+    warehouses: warehouses.map((warehouse) => ({
+      id: warehouse.id,
+      name: warehouse.name,
+    })),
   });
 
   return warehouses;
@@ -132,25 +153,40 @@ export const getAccessibleWarehouses = async (
  */
 export const getWarehouseStructure = async (
   companyId: number,
-  warehouseId: number
+  warehouseId: number,
 ): Promise<WarehouseStructure> => {
   try {
     const response = await api.get<WarehouseStructure>(
-      `/api/get-warehouse-structure/${companyId}/${warehouseId}`
+      `/api/get-warehouse-structure/${companyId}/${warehouseId}`,
     );
+
+    // ===== ADDED CODE START =====
+    // Log toàn bộ dữ liệu trả về dưới dạng JSON format dễ đọc
+    // console.log(
+    //   `[getWarehouseStructure] Response for companyId: ${companyId}, warehouseId: ${warehouseId}:`,
+    //   JSON.stringify(response.data, null, 2),
+    // );
+    // ===== ADDED CODE END =====
+
     return response.data;
   } catch (error: any) {
     const status = error?.response?.status;
-    const message = String(error?.response?.data?.message || '');
+    const message = String(error?.response?.data?.message || "");
 
     // Graceful fallback for known backend schema mismatch cases.
-    if (status === 400 && /column\s+.*isvulnerable\s+does not exist/i.test(message)) {
-      console.warn('[getWarehouseStructure] fallback empty structure due to schema mismatch', {
-        companyId,
-        warehouseId,
-        status,
-        message,
-      });
+    if (
+      status === 400 &&
+      /column\s+.*isvulnerable\s+does not exist/i.test(message)
+    ) {
+      console.warn(
+        "[getWarehouseStructure] fallback empty structure due to schema mismatch",
+        {
+          companyId,
+          warehouseId,
+          status,
+          message,
+        },
+      );
 
       return {
         width: 1,
