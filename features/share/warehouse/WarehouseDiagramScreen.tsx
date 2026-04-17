@@ -29,7 +29,7 @@ import { PathResult, Shelf, WarehouseZone } from "@/types/warehouse";
 import { findNearestNode, findShortestPath } from "@/utils/pathfinding";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -48,7 +48,9 @@ export default function WarehouseDiagramScreen() {
     focusedBins?: string;
     focusedItemId?: string;
     focusedItemName?: string;
+    status?: string;
   }>();
+
   const initialWarehouseId = params.warehouseId
     ? Number(params.warehouseId)
     : undefined;
@@ -66,6 +68,9 @@ export default function WarehouseDiagramScreen() {
   const isCounting = !!inventoryCountTicketId;
   const operationId =
     inboundOrderId || outboundOrderId || inventoryCountTicketId;
+
+  const [optimizedPath, setOptimizedPath] = useState<string[]>([]);
+  const [isFetchingPath, setIsFetchingPath] = useState(false);
 
   const routeBins = useMemo(
     () =>
@@ -103,7 +108,13 @@ export default function WarehouseDiagramScreen() {
   const [currentLocation] = useState<{ x: number; y: number } | null>(null);
   const [viewMode, setViewMode] = useState<"map" | "grid">("map");
   const [, setLocalReceivedByItemId] = useState<Record<number, number>>({});
+
+  // Get token and user from auth store
   const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token); // LẤY TOKEN Ở ĐÂY
+
+  console.log("token day: ", token);
+
   const isStaff = user?.roleId === 4;
   const companyId = user?.companyId ?? 0;
   const staffId = user?.id ?? 0;
@@ -132,6 +143,70 @@ export default function WarehouseDiagramScreen() {
     refetch: refetchStructure,
   } = useWarehouseStructure(selectedWarehouseId);
 
+  // ===== PATH OPTIMIZATION FETCH EFFECT =====
+  useEffect(() => {
+    const fetchOptimizedPath = async () => {
+      const currentStatus = params.status;
+      const currentOutboundId = params.outboundOrderId;
+
+      if (currentStatus !== "path_optimization" || !currentOutboundId) return;
+
+      setIsFetchingPath(true);
+      try {
+        console.log(`[PathOptimization] Fetching path with token...`);
+        const response = await fetch(
+          `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${currentOutboundId}/path-optimization`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              // ĐÍNH KÈM TOKEN VÀO HEADER TẠI ĐÂY
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Extracting path array safely
+        const pathArray = data?.payload?.[0]?.fullOptimizedPath;
+
+        if (pathArray && Array.isArray(pathArray) && pathArray.length > 0) {
+          console.log(
+            "[PathOptimization] Path extracted successfully. Nodes:",
+            pathArray.length,
+          );
+          setOptimizedPath(pathArray);
+          setViewMode("map");
+          AlertService.success(
+            "Path Found",
+            "Optimized picking path loaded successfully on the map.",
+          );
+        } else {
+          AlertService.warning(
+            "Path Not Found",
+            "Could not generate an optimized path for this ticket.",
+          );
+        }
+      } catch (err) {
+        console.error("[PathOptimization] Error fetching path:", err);
+        AlertService.error(
+          "Error",
+          "Failed to connect to path optimization service.",
+        );
+      } finally {
+        setIsFetchingPath(false);
+      }
+    };
+
+    fetchOptimizedPath();
+  }, [params.status, params.outboundOrderId, token]); // Added token to dependencies
+  // ===== END PATH OPTIMIZATION EFFECT =====
+
   const updateOutboundItems = useUpdateOutboundTicketItems();
   const { refetch: refetchWarehouses } = useWarehouses();
   const stagedTickets = useInboundStagingStore((state) => state.tickets);
@@ -151,7 +226,6 @@ export default function WarehouseDiagramScreen() {
   const syncLocalReceivedByItemId = React.useCallback(
     (ticket: any) => {
       if (!ticket?.inboundOrderItems) return;
-
       const nextMap: Record<number, number> = {};
       ticket.inboundOrderItems.forEach((item: any) => {
         const baseReceived = Number(item.receivedQuantity || 0);
@@ -160,7 +234,6 @@ export default function WarehouseDiagramScreen() {
           : 0;
         nextMap[item.id] = baseReceived + stagedReceived;
       });
-
       setLocalReceivedByItemId(nextMap);
     },
     [getItemStagedQuantity, inboundOrderId],
@@ -190,6 +263,7 @@ export default function WarehouseDiagramScreen() {
       inventoryCountTicketId ? refetchStockCountTicket() : Promise.resolve(),
     ]);
   };
+
   const [isProcessing, setIsProcessing] = useState(false);
   const { clearShelfPending } = usePendingQuantitiesStore();
 
@@ -198,7 +272,6 @@ export default function WarehouseDiagramScreen() {
       .flatMap((item) => item.storageRecommendations || [])
       .map((recommendation) => recommendation.binIdCode)
       .filter((binCode): binCode is string => !!binCode);
-
     return Array.from(new Set([...routeBins, ...binsFromApi]));
   }, [recommendationItems, routeBins]);
 
@@ -223,7 +296,6 @@ export default function WarehouseDiagramScreen() {
 
   const suggestedBins = useMemo(() => {
     if (suggestedInventory.length === 0) return [];
-
     const bins: string[] = [];
     suggestedInventory.forEach((item) => {
       item.binDetails?.forEach((bin) => {
@@ -235,9 +307,8 @@ export default function WarehouseDiagramScreen() {
 
   const effectiveHighlightedBins = useMemo(() => {
     if (focusedBinsArray.length > 0) return focusedBinsArray;
-    if (isCounting) {
+    if (isCounting)
       return Array.from(new Set([...inventoryBins, ...suggestedBins]));
-    }
     return recommendedBins;
   }, [
     focusedBinsArray,
@@ -248,10 +319,7 @@ export default function WarehouseDiagramScreen() {
   ]);
 
   const scopedInboundRecommendationItems = useMemo(() => {
-    if (!inboundOrderId || !focusedItemId) {
-      return recommendationItems;
-    }
-
+    if (!inboundOrderId || !focusedItemId) return recommendationItems;
     return recommendationItems.filter(
       (item) => item.inboundOrderItemId === focusedItemId,
     );
@@ -264,14 +332,11 @@ export default function WarehouseDiagramScreen() {
       distanceInfo?: number;
       reason?: string;
     }[] = [];
-
     scopedInboundRecommendationItems.forEach((item) => {
       const recs = (item.storageRecommendations || []).filter(
         (recommendation) => !!recommendation.binIdCode,
       );
       if (recs.length === 0) return;
-
-      // Prefer the shortest-distance recommendation when distance info exists.
       const best = recs.reduce((currentBest, current) => {
         const bestDistance =
           typeof currentBest.distanceInfo === "number"
@@ -283,7 +348,6 @@ export default function WarehouseDiagramScreen() {
             : Number.POSITIVE_INFINITY;
         return currentDistance < bestDistance ? current : currentBest;
       }, recs[0]);
-
       preview.push({
         itemName: item.name,
         binIdCode: String(best.binIdCode),
@@ -291,7 +355,6 @@ export default function WarehouseDiagramScreen() {
         reason: best.reason,
       });
     });
-
     return preview.slice(0, 4);
   }, [scopedInboundRecommendationItems]);
 
@@ -303,11 +366,9 @@ export default function WarehouseDiagramScreen() {
         firstZone: null as WarehouseZone | null,
       };
     }
-
     const shelfIds = new Set<string>();
     let firstShelf: Shelf | null = null;
     let firstZone: WarehouseZone | null = null;
-
     for (const zone of structure.zones ?? []) {
       for (const shelf of zone.shelves ?? []) {
         const hasRecommendedBin = (shelf.levels ?? []).some((level) =>
@@ -317,7 +378,6 @@ export default function WarehouseDiagramScreen() {
             ),
           ),
         );
-
         if (hasRecommendedBin) {
           shelfIds.add(shelf.id);
           if (!firstShelf) {
@@ -327,27 +387,22 @@ export default function WarehouseDiagramScreen() {
         }
       }
     }
-
     return { shelfIds: Array.from(shelfIds), firstShelf, firstZone };
   }, [effectiveHighlightedBins, structure]);
 
   const recommendedShelvesForRender = recommendationResolution.shelfIds;
-
   const activeHighlightedShelf = selectedShelf?.id;
 
   React.useEffect(() => {
     if (!warehouses || warehouses.length === 0) return;
-
     if (
       initialWarehouseId &&
       warehouses.some((warehouse) => warehouse.id === initialWarehouseId)
     ) {
-      if (selectedWarehouseId !== initialWarehouseId) {
+      if (selectedWarehouseId !== initialWarehouseId)
         setSelectedWarehouseId(initialWarehouseId);
-      }
       return;
     }
-
     if (
       !selectedWarehouseId ||
       !warehouses.some((warehouse) => warehouse.id === selectedWarehouseId)
@@ -360,9 +415,7 @@ export default function WarehouseDiagramScreen() {
     const fromTicket =
       inboundTicket?.warehouseId || inboundTicket?.warehouse?.id;
     if (fromTicket) return fromTicket;
-
     if (!inboundOrderId) return undefined;
-
     const fromStaffOrders = staffInboundOrders.find(
       (order) => order.id === inboundOrderId,
     );
@@ -370,17 +423,18 @@ export default function WarehouseDiagramScreen() {
   }, [inboundTicket, staffInboundOrders, inboundOrderId]);
 
   React.useEffect(() => {
-    if (isPicking) return;
-    if (!ticketWarehouseId) return;
-    if (selectedWarehouseId === ticketWarehouseId) return;
-
+    if (
+      isPicking ||
+      !ticketWarehouseId ||
+      selectedWarehouseId === ticketWarehouseId
+    )
+      return;
     if (warehouses?.some((warehouse) => warehouse.id === ticketWarehouseId)) {
       setSelectedWarehouseId(ticketWarehouseId);
     }
   }, [isPicking, ticketWarehouseId, selectedWarehouseId, warehouses]);
 
   React.useEffect(() => {
-    // Prevent stale shelf selection/modal when switching to another warehouse structure.
     setModalVisible(false);
     setSelectedShelf(null);
     setSelectedZone(null);
@@ -406,27 +460,21 @@ export default function WarehouseDiagramScreen() {
     const startNode = currentLocation
       ? findNearestNode(structure.nodes, currentLocation.x, currentLocation.y)
       : structure.nodes?.[0];
-
     if (!startNode) return;
-
     const targetAccessNode = shelf.accessNodes?.[0];
     if (!targetAccessNode) return;
-
     const endNode = findNearestNode(
       structure.nodes,
       targetAccessNode.x,
       targetAccessNode.y,
     );
-
     if (!endNode) return;
-
     const path = findShortestPath(
       structure.nodes,
       structure.edges,
       startNode.id,
       endNode.id,
     );
-
     if (path) {
       setCurrentPath(path);
       setPathModalVisible(true);
@@ -435,7 +483,6 @@ export default function WarehouseDiagramScreen() {
 
   const handleFindPathToRecommended = () => {
     if (!recommendationResolution.firstShelf) return;
-
     setSelectedShelf(recommendationResolution.firstShelf);
     setSelectedZone(recommendationResolution.firstZone);
     handleFindPath(recommendationResolution.firstShelf);
@@ -445,7 +492,6 @@ export default function WarehouseDiagramScreen() {
     actionItems: ShelfActionItem[],
   ) => {
     if (isProcessing) return;
-
     if (!selectedShelf) {
       AlertService.warning(
         "Missing shelf information",
@@ -453,7 +499,6 @@ export default function WarehouseDiagramScreen() {
       );
       return;
     }
-
     const refreshedStructureResult = await refetchStructure();
     const refreshedStructure = refreshedStructureResult.data ?? structure;
     const currentSelectedShelf =
@@ -461,7 +506,6 @@ export default function WarehouseDiagramScreen() {
         ?.flatMap((zone) => zone.shelves ?? [])
         ?.find((shelf) => shelf.id === selectedShelf.id) ?? selectedShelf;
 
-    // Block if the warehouse for this inbound ticket is unknown or mismatched
     if (!isPicking && inboundOrderId) {
       if (!ticketWarehouseId) {
         AlertService.warning(
@@ -503,26 +547,19 @@ export default function WarehouseDiagramScreen() {
     const normalizedActionItems = actionItems.map((item) => {
       const rawBinId = String(item.binId || "").trim();
       const rawBinCode = String(item.binCode || "").trim();
-
-      // Always resolve to a bin that exists on currently selected shelf.
       const resolvedBin =
         binById.get(rawBinId) ||
         binById.get(rawBinCode) ||
         binByCode.get(rawBinCode) ||
         selectedShelfBins[0];
-
-      const resolvedBinIdCode = String(
-        resolvedBin.id || resolvedBin.code || item.binCode || "",
-      ).trim();
-      const resolvedBinCode = String(
-        resolvedBin.code || resolvedBin.id || item.binCode || "",
-      ).trim();
-
       return {
         ...item,
-        // BE expects ShelfLevelBin.IdCode in locations.binId.
-        binId: resolvedBinIdCode,
-        binCode: resolvedBinCode,
+        binId: String(
+          resolvedBin.id || resolvedBin.code || item.binCode || "",
+        ).trim(),
+        binCode: String(
+          resolvedBin.code || resolvedBin.id || item.binCode || "",
+        ).trim(),
       };
     });
 
@@ -530,7 +567,6 @@ export default function WarehouseDiagramScreen() {
       String(value ?? "")
         .trim()
         .toLowerCase();
-
     const resolveRecommendationBinIdCode = (
       inboundOrderItemId: number,
       preferredBinValues: (string | number | undefined)[],
@@ -540,7 +576,6 @@ export default function WarehouseDiagramScreen() {
           (item) => item.inboundOrderItemId === inboundOrderItemId,
         )?.storageRecommendations || [];
       if (recs.length === 0) return undefined;
-
       const preferred = preferredBinValues
         .map((value) => normalizeBinValue(value))
         .filter(Boolean);
@@ -548,7 +583,6 @@ export default function WarehouseDiagramScreen() {
         const recValue = normalizeBinValue(rec.binIdCode ?? rec.binId);
         return recValue.length > 0 && preferred.includes(recValue);
       });
-
       return (
         String(matched?.binIdCode || recs[0]?.binIdCode || "").trim() ||
         undefined
@@ -556,10 +590,8 @@ export default function WarehouseDiagramScreen() {
     };
 
     setIsProcessing(true);
-
     try {
       if (!isPicking && inboundOrderId) {
-        // Inbound: Update only the user-selected quantity in this shelf.
         const validItems = normalizedActionItems.filter((item) => {
           const productId = Number(item.productId || 0);
           const quantity = Number(
@@ -570,45 +602,12 @@ export default function WarehouseDiagramScreen() {
         });
 
         if (validItems.length === 0) {
-          console.warn(
-            "[WarehouseDiagramScreen] inbound confirm blocked: no valid items",
-            {
-              inboundOrderId,
-              selectedWarehouseId,
-              ticketWarehouseId,
-              availableShelfBins: selectedShelfBins.map((bin) => ({
-                id: String(bin.id),
-                code: String(bin.code),
-              })),
-              rawItems: normalizedActionItems,
-            },
-          );
           AlertService.warning(
             "Invalid data",
             "No valid items to update (missing productId/binId or quantity).",
           );
           return;
         }
-
-        console.log(
-          "[WarehouseDiagramScreen] stage inbound placements (no API call)",
-          {
-            inboundOrderId,
-            selectedWarehouseId,
-            ticketWarehouseId,
-            selectedShelfId: selectedShelf.id,
-            selectedShelfCode: selectedShelf.code,
-            staged: validItems.map((item) => ({
-              itemId: item.id,
-              productId: item.productId,
-              binId: String(item.binId),
-              binCode: String(item.binCode || ""),
-              quantity: Number(
-                item.pendingQuantity ?? item.targetQuantity ?? 0,
-              ),
-            })),
-          },
-        );
 
         validItems.forEach((item) => {
           const quantity = Number(
@@ -621,28 +620,18 @@ export default function WarehouseDiagramScreen() {
           const safeBinId = String(
             item.binId || fallbackBinIdCode || "",
           ).trim();
-
-          if (safeBinId && quantity > 0) {
+          if (safeBinId && quantity > 0)
             setStagedPlacement(inboundOrderId, item.id, safeBinId, quantity);
-          }
         });
 
-        // UX: Show success message IMMEDIATELY (Optimistic UI)
-        const shelfCode = selectedShelf.code || "shelf";
         AlertService.success(
           "Recorded successfully",
-          `Items saved to ${shelfCode}. You can select another Bin to continue.`,
+          `Items saved to ${selectedShelf.code || "shelf"}. You can select another Bin to continue.`,
         );
-
-        // Sync immediately so quantity/progress updates without waiting for idle frame.
         syncLocalReceivedByItemId(inboundTicket);
-
-        // Clear the draft for this shelf right away after successful confirm.
-        if (selectedShelf && inboundOrderId) {
+        if (selectedShelf && inboundOrderId)
           clearShelfPending(inboundOrderId, selectedShelf.id);
-        }
       } else if (isPicking && outboundOrderId) {
-        // Outbound: Update quantity to match target for these items
         const validItems = normalizedActionItems.filter(
           (item) =>
             Number(item.pendingQuantity ?? item.targetQuantity ?? 0) > 0,
@@ -681,48 +670,31 @@ export default function WarehouseDiagramScreen() {
           const next = { ...prev };
           validItems.forEach((item) => {
             const stagedQty = getItemStagedQuantity(outboundOrderId, item.id);
-            // DO NOT use Math.min here, we want to reflect the actual total even if it exceeds target
             next[item.id] = (item.currentQuantity ?? 0) + stagedQty;
           });
           return next;
         });
 
         await refetchOutboundOrder();
-
-        // Clear the draft for this shelf now that it's confirmed
         if (selectedShelf && outboundOrderId)
           clearShelfPending(outboundOrderId, selectedShelf.id);
       }
-      // Only close if it's picking (usually pick whole shelf) or user manually closes
-      if (isPicking) {
-        setModalVisible(false);
-      }
+
+      if (isPicking) setModalVisible(false);
     } catch (error: any) {
-      console.error("[WarehouseDiagramScreen] confirm operation failed", {
-        inboundOrderId,
-        outboundOrderId,
-        selectedWarehouseId,
-        ticketWarehouseId,
-        selectedShelfId: selectedShelf?.id,
-        selectedShelfCode: selectedShelf?.code,
-        refreshedShelfCode: currentSelectedShelf?.code,
-        errorMessage: error?.message,
-        errorData: error?.response?.data,
-      });
-      const backendMessage = String(
-        error?.response?.data?.message || "",
-      ).trim();
+      console.error("[WarehouseDiagramScreen] confirm operation failed", error);
       AlertService.error(
         "Error",
-        backendMessage || "Cannot update item status",
+        String(error?.response?.data?.message || "").trim() ||
+          "Cannot update item status",
       );
     } finally {
       setIsProcessing(false);
     }
-  }; // Compute items available for the currently selected shelf
+  };
+
   const availableItemsForModal = useMemo(() => {
     if (!selectedShelf) return [];
-
     const shelfBins = (selectedShelf.levels ?? []).flatMap(
       (level) => level.bins ?? [],
     );
@@ -733,7 +705,6 @@ export default function WarehouseDiagramScreen() {
     const firstBin = selectedShelf.levels?.[0]?.bins?.[0];
 
     if (!isPicking) {
-      // Inbound: Filter from recommendationItems
       const recommended = scopedInboundRecommendationItems
         .filter((item) =>
           (item.storageRecommendations ?? []).some((r) =>
@@ -744,11 +715,11 @@ export default function WarehouseDiagramScreen() {
           const ticketItem = inboundTicket?.inboundOrderItems?.find(
             (ti) => ti.id === item.inboundOrderItemId,
           );
-          const totalExpected = Number(ticketItem?.expectedQuantity ?? 0);
-          const totalReceived = getInboundCurrentReceived(
-            item.inboundOrderItemId,
+          return (
+            Number(ticketItem?.expectedQuantity ?? 0) -
+              getInboundCurrentReceived(item.inboundOrderItemId) >
+            0
           );
-          return totalExpected - totalReceived > 0;
         })
         .map((item) => {
           const matchedRec = item.storageRecommendations!.find((r) =>
@@ -762,34 +733,22 @@ export default function WarehouseDiagramScreen() {
                 String(bin.id) ===
                   String(matchedRec?.binIdCode ?? matchedRec?.binId),
             );
-          // Find quantities from ticket items
           const ticketItem = inboundTicket?.inboundOrderItems?.find(
             (ti) => ti.id === item.inboundOrderItemId,
           );
-          const currentReceived = getInboundCurrentReceived(
-            item.inboundOrderItemId,
-          );
-
-          // USER REQUEST: targetQuantity is the TOTAL expected (e.g. 20), not just for this shelf
-          const totalExpected = Number(ticketItem?.expectedQuantity ?? 0);
-          const recommendedQuantity = Number(matchedRec?.quantity ?? 0);
-
-          const resolvedProductId =
-            item.productId ||
-            ticketItem?.productId ||
-            ticketItem?.product?.id ||
-            0;
-
           return {
             id: item.inboundOrderItemId,
-            productId: resolvedProductId,
+            productId:
+              item.productId ||
+              ticketItem?.productId ||
+              ticketItem?.product?.id ||
+              0,
             name: item.name || "",
             sku: item.sku,
-            targetQuantity: totalExpected,
-            recommendedQuantity: recommendedQuantity,
-            currentQuantity: currentReceived,
+            targetQuantity: Number(ticketItem?.expectedQuantity ?? 0),
+            recommendedQuantity: Number(matchedRec?.quantity ?? 0),
+            currentQuantity: getInboundCurrentReceived(item.inboundOrderItemId),
             binCode: matchedBin?.code || firstBin?.code || selectedShelf.code,
-            // BE expects ShelfLevelBin.IdCode
             binId: matchedBin?.id || firstBin?.id || "",
             isRecommended: true,
           };
@@ -797,34 +756,29 @@ export default function WarehouseDiagramScreen() {
 
       if (recommended.length > 0) return recommended;
 
-      // Manual fallback: allow placing all remaining quantity of pending items
       return (inboundTicket?.inboundOrderItems || [])
         .filter((item) => !focusedItemId || item.id === focusedItemId)
-        .filter((item) => {
-          const totalRemaining =
-            (item.expectedQuantity ?? 0) - getInboundCurrentReceived(item.id);
-          return totalRemaining > 0;
-        })
-        .map((item) => {
-          const targetQty = item.expectedQuantity || 0; // Use total expected
-          return {
-            id: item.id,
-            productId: item.productId || item.product?.id || 0,
-            name:
-              item.productName ||
-              item.product?.name ||
-              item.name ||
-              `Item #${item.productId}`,
-            sku: item.sku || item.product?.sku,
-            targetQuantity: targetQty,
-            currentQuantity: getInboundCurrentReceived(item.id),
-            binCode: firstBin?.code || selectedShelf.code,
-            binId: firstBin?.id || "",
-            isRecommended: false,
-          };
-        });
+        .filter(
+          (item) =>
+            (item.expectedQuantity ?? 0) - getInboundCurrentReceived(item.id) >
+            0,
+        )
+        .map((item) => ({
+          id: item.id,
+          productId: item.productId || item.product?.id || 0,
+          name:
+            item.productName ||
+            item.product?.name ||
+            item.name ||
+            `Item #${item.productId}`,
+          sku: item.sku || item.product?.sku,
+          targetQuantity: item.expectedQuantity || 0,
+          currentQuantity: getInboundCurrentReceived(item.id),
+          binCode: firstBin?.code || selectedShelf.code,
+          binId: firstBin?.id || "",
+          isRecommended: false,
+        }));
     } else {
-      // Outbound: Filter from outboundOrder items
       const orderItems =
         outboundOrder?.items || outboundOrder?.outboundOrderItems || [];
       const recommended = orderItems
@@ -841,7 +795,6 @@ export default function WarehouseDiagramScreen() {
           const bin = (selectedShelf.levels ?? [])
             .flatMap((l) => l.bins ?? [])
             .find((b) => b.code === binCode);
-
           return {
             id: item.id,
             productId: item.productId || item.product?.id || 0,
@@ -861,7 +814,6 @@ export default function WarehouseDiagramScreen() {
 
       if (recommended.length > 0) return recommended;
 
-      // Manual fallback
       return orderItems
         .filter((item) => (item.quantity || 0) > (item.receivedQuantity || 0))
         .map((item) => ({
@@ -921,7 +873,6 @@ export default function WarehouseDiagramScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: COLORS.background }}>
-      {/* Fixed header - always visible when scrolling */}
       <ScreenHeader
         title="Warehouse Diagram"
         subtitle={
@@ -937,8 +888,9 @@ export default function WarehouseDiagramScreen() {
                   "Clear all progress?",
                   "Are you sure you want to clear all placed quantities for all items in this inbound ticket?",
                   () => {
-                    const { clearTicket } = useInboundStagingStore.getState();
-                    clearTicket(inboundOrderId);
+                    useInboundStagingStore
+                      .getState()
+                      .clearTicket(inboundOrderId);
                     setLocalReceivedByItemId({});
                     AlertService.success(
                       "Cleared",
@@ -992,13 +944,14 @@ export default function WarehouseDiagramScreen() {
         </View>
       )}
 
-      {/* Scrollable content area */}
       <RefreshContainer className="flex-1" onRefresh={handleRefresh}>
-        {structureLoading ? (
+        {structureLoading || isFetchingPath ? (
           <View className="flex-1 justify-center items-center p-5">
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="mt-3 text-sm" style={{ color: COLORS.textMuted }}>
-              Loading warehouse diagram...
+              {isFetchingPath
+                ? "Calculating optimized path..."
+                : "Loading warehouse diagram..."}
             </Text>
           </View>
         ) : structureError ? (
@@ -1095,7 +1048,6 @@ export default function WarehouseDiagramScreen() {
                         : "Suggested stow locations"}
                   </Text>
                 </View>
-
                 {recommendationsLoading ? (
                   <Text
                     className="text-xs leading-[18px]"
@@ -1156,7 +1108,6 @@ export default function WarehouseDiagramScreen() {
                         diagram.
                       </Text>
                     )}
-
                     {recommendationResolution.firstShelf && (
                       <TouchableOpacity
                         className="mt-2.5 h-[34px] rounded-lg flex-row items-center justify-center gap-1.5"
@@ -1246,6 +1197,7 @@ export default function WarehouseDiagramScreen() {
                 highlightedShelf={activeHighlightedShelf}
                 recommendedShelves={recommendedShelvesForRender}
                 highlightedPath={currentPath?.path}
+                optimizedPath={optimizedPath}
                 onShelfPress={handleShelfPress}
                 onZonePress={handleZonePress}
               />
@@ -1289,9 +1241,7 @@ export default function WarehouseDiagramScreen() {
           visible={pathModalVisible}
           pathResult={currentPath}
           toLocation={selectedShelf?.code || "Shelf"}
-          onClose={() => {
-            setPathModalVisible(false);
-          }}
+          onClose={() => setPathModalVisible(false)}
         />
       </RefreshContainer>
     </View>

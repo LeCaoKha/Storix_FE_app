@@ -48,6 +48,7 @@ interface WarehouseLayoutProps {
   highlightedPath?: NavigationNode[];
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
   onZonePress?: (zone: WarehouseZone) => void;
+  optimizedPath?: string[];
 }
 
 export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
@@ -57,6 +58,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   highlightedPath,
   onShelfPress,
   onZonePress,
+  optimizedPath = [],
 }) => {
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -72,13 +74,40 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     height: SCREEN_HEIGHT * 0.55,
   });
 
+  // ===== DATA PROCESSING (SEGMENT COUNTING) =====
+  const segmentMap = useMemo(() => {
+    const map = new Map<string, number>();
+
+    if (optimizedPath.length < 2) {
+      return map;
+    }
+
+    for (let i = 0; i < optimizedPath.length - 1; i++) {
+      const nodeA = optimizedPath[i];
+      const nodeB = optimizedPath[i + 1];
+
+      // Treat segments as undirected
+      const segmentKey = [nodeA, nodeB].sort().join("|");
+
+      const currentCount = map.get(segmentKey) || 0;
+      map.set(segmentKey, currentCount + 1);
+    }
+
+    return map;
+  }, [optimizedPath]);
+
+  // LƯU Ý SỬA ĐỔI: Dùng shelf.length thay vì shelf.height
   const resolveShelfAbsolutePosition = useCallback(
     (shelf: Shelf, zone: WarehouseZone) => {
+      // Fallback an toàn nếu length bị null/undefined (mặc định lấy width)
+      const shelfLength = shelf.length ?? shelf.width;
+      const zoneLength = zone.length ?? zone.height ?? zone.width; // Fallback cho zone nếu thiếu length
+
       const isRelativeToZone =
         shelf.x >= -1 &&
         shelf.y >= -1 &&
         shelf.x + shelf.width <= zone.width + 1 &&
-        shelf.y + shelf.height <= zone.height + 1;
+        shelf.y + shelfLength <= zoneLength + 1;
 
       if (isRelativeToZone) {
         return {
@@ -97,9 +126,10 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     return (structure.zones ?? []).map((zone) => {
       const seen = new Set<string>();
       const uniqueShelves = (zone.shelves ?? []).filter((shelf) => {
+        const shelfLength = shelf.length ?? shelf.width;
         const dedupeKey = String(
           shelf.id ||
-            `${shelf.code}-${shelf.x}-${shelf.y}-${shelf.width}-${shelf.height}`,
+            `${shelf.code}-${shelf.x}-${shelf.y}-${shelf.width}-${shelfLength}`,
         );
         if (seen.has(dedupeKey)) return false;
         seen.add(dedupeKey);
@@ -110,11 +140,14 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         const aPos = resolveShelfAbsolutePosition(a, zone);
         const bPos = resolveShelfAbsolutePosition(b, zone);
 
+        const aLength = a.length ?? a.width;
+        const bLength = b.length ?? b.width;
+
         return (
           aPos.x < bPos.x + b.width &&
           aPos.x + a.width > bPos.x &&
-          aPos.y < bPos.y + b.height &&
-          aPos.y + a.height > bPos.y
+          aPos.y < bPos.y + bLength &&
+          aPos.y + aLength > bPos.y
         );
       };
 
@@ -127,7 +160,6 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         return numericId + structureScore;
       };
 
-      // Collapse overlapping duplicates in the same zone when they share the same shelf code.
       const resolvedShelves: Shelf[] = [];
       uniqueShelves.forEach((candidate) => {
         const sameCodeIndex = resolvedShelves.findIndex((existing) => {
@@ -167,12 +199,12 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       x: number,
       y: number,
       width: number,
-      height: number,
+      h: number, // tham số h ở đây sẽ nhận vào length
     ) => {
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + width);
-      maxY = Math.max(maxY, y + height);
+      maxY = Math.max(maxY, y + h);
     };
 
     const includePoint = (x: number, y: number, r = 0) => {
@@ -183,20 +215,23 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     };
 
     normalizedZones.forEach((zone) => {
-      includeRect(zone.x, zone.y, zone.width, zone.height);
+      const zoneLength = zone.length ?? zone.height ?? zone.width;
+      includeRect(zone.x, zone.y, zone.width, zoneLength);
+
       (zone.shelves ?? []).forEach((shelf) => {
         const { x, y } = resolveShelfAbsolutePosition(shelf, zone);
-        includeRect(x, y, shelf.width, shelf.height);
+        const shelfLength = shelf.length ?? shelf.width;
+        includeRect(x, y, shelf.width, shelfLength);
       });
     });
 
-    // Ignore navigation nodes that are too far outside warehouse content.
-    // Outlier nodes can make the initial fit scale extremely small, causing
-    // the map to look blank on first open.
     const nodeXMin = -100;
     const nodeYMin = -100;
     const nodeXMax = Math.max(structure.width + 100, 100);
-    const nodeYMax = Math.max(structure.height + 100, 100);
+    // Dùng structure.length nếu có, nếu không lấy structure.height
+    const mapYMax = (structure as any).length ?? structure.height;
+    const nodeYMax = Math.max(mapYMax + 100, 100);
+
     (structure.nodes ?? []).forEach((node) => {
       if (
         node.x < nodeXMin ||
@@ -218,10 +253,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       minX = 0;
       minY = 0;
       maxX = structure.width;
-      maxY = structure.height;
+      maxY = mapYMax;
     }
 
-    // Keep a bit of breathing space around the drawn content
     const contentPadding = 30;
     minX = minX - contentPadding;
     minY = minY - contentPadding;
@@ -236,13 +270,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       width: Math.max(maxX - minX, 1),
       height: Math.max(maxY - minY, 1),
     };
-  }, [
-    normalizedZones,
-    resolveShelfAbsolutePosition,
-    structure.height,
-    structure.nodes,
-    structure.width,
-  ]);
+  }, [normalizedZones, resolveShelfAbsolutePosition, structure]);
 
   const onMapLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -251,7 +279,6 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     }
   };
 
-  // Initial fit calculation
   const calculateInitialFit = useCallback(() => {
     const availableWidth = Math.max(viewport.width - PADDING, 1);
     const availableHeight = Math.max(
@@ -289,7 +316,6 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     calculateInitialFit();
   }, [calculateInitialFit]);
 
-  // Gestures
   const pinchGesture = Gesture.Pinch()
     .onStart(() => {
       startScale.value = scale.value;
@@ -316,13 +342,11 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         runOnJS(calculateInitialFit)();
       } else {
         scale.value = withSpring(2.5);
-        // Zoom into the tap position
         translateX.value = withSpring(viewport.width / 2 - event.x * 2.5);
         translateY.value = withSpring(viewport.height / 2 - event.y * 2.5);
       }
     });
 
-  // Tap to select shelf (Hit testing)
   const composedGesture = Gesture.Simultaneous(
     Gesture.Simultaneous(pinchGesture, panGesture),
     doubleTapGesture,
@@ -349,106 +373,6 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1.2, { duration: 1000 }), -1, true);
   }, [pulse]);
-
-  useEffect(() => {
-    const zones = normalizedZones;
-    const shelfRects: {
-      zoneId: string;
-      zoneCode: string;
-      shelfId: string;
-      shelfCode: string;
-      x: number;
-      y: number;
-      coordinateMode: "relative" | "absolute";
-      width: number;
-      height: number;
-    }[] = [];
-
-    zones.forEach((zone) => {
-      (zone.shelves ?? []).forEach((shelf) => {
-        shelfRects.push({
-          zoneId: String(zone.id),
-          zoneCode: String(zone.code ?? ""),
-          shelfId: String(shelf.id),
-          shelfCode: String(shelf.code ?? ""),
-          ...resolveShelfAbsolutePosition(shelf, zone),
-          width: shelf.width,
-          height: shelf.height,
-        });
-      });
-    });
-
-    console.log("[WarehouseLayout] structure summary", {
-      warehouseSize: { width: structure.width, height: structure.height },
-      zoneCount: zones.length,
-      shelfCount: shelfRects.length,
-    });
-
-    console.log(
-      "[WarehouseLayout] zones",
-      zones.map((zone) => ({
-        id: zone.id,
-        code: zone.code,
-        x: zone.x,
-        y: zone.y,
-        width: zone.width,
-        height: zone.height,
-        shelfCount: (zone.shelves ?? []).length,
-      })),
-    );
-
-    console.log(
-      "[WarehouseLayout] shelves (absolute)",
-      shelfRects.map((shelf) => ({
-        zoneId: shelf.zoneId,
-        zoneCode: shelf.zoneCode,
-        shelfId: shelf.shelfId,
-        shelfCode: shelf.shelfCode,
-        x: shelf.x,
-        y: shelf.y,
-        coordinateMode: shelf.coordinateMode,
-        width: shelf.width,
-        height: shelf.height,
-      })),
-    );
-
-    const overlaps: { a: string; b: string; zoneA: string; zoneB: string }[] =
-      [];
-    for (let i = 0; i < shelfRects.length; i++) {
-      for (let j = i + 1; j < shelfRects.length; j++) {
-        const a = shelfRects[i];
-        const b = shelfRects[j];
-
-        const isOverlap =
-          a.x < b.x + b.width &&
-          a.x + a.width > b.x &&
-          a.y < b.y + b.height &&
-          a.y + a.height > b.y;
-
-        if (isOverlap) {
-          overlaps.push({
-            a: `${a.shelfCode} (${a.shelfId}) @ [${a.x}, ${a.y}, ${a.width}, ${a.height}]`,
-            b: `${b.shelfCode} (${b.shelfId}) @ [${b.x}, ${b.y}, ${b.width}, ${b.height}]`,
-            zoneA: `${a.zoneCode} (${a.zoneId})`,
-            zoneB: `${b.zoneCode} (${b.zoneId})`,
-          });
-        }
-      }
-    }
-
-    if (overlaps.length > 0) {
-      console.warn("[WarehouseLayout] detected shelf overlaps", overlaps);
-    } else {
-      console.log(
-        "[WarehouseLayout] no shelf overlap detected from data rectangles",
-      );
-    }
-  }, [
-    normalizedZones,
-    resolveShelfAbsolutePosition,
-    structure.height,
-    structure.width,
-  ]);
 
   const renderShelf = (
     shelf: Shelf,
@@ -487,22 +411,23 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           : COLORS.slate400;
 
     const { x: absX, y: absY } = resolveShelfAbsolutePosition(shelf, zone);
+    const shelfLength = shelf.length ?? shelf.width; // Sử dụng length cho chiều Y
+
     const hitX = absX - SHELF_HIT_PADDING;
     const hitY = absY - SHELF_HIT_PADDING;
     const hitWidth = shelf.width + SHELF_HIT_PADDING * 2;
-    const hitHeight = shelf.height + SHELF_HIT_PADDING * 2;
+    const hitHeight = shelfLength + SHELF_HIT_PADDING * 2;
 
     return (
       <G
         key={`shelf-${zone.id}-${shelf.id}-${shelfIndex}`}
         opacity={isDimmed ? 0.4 : 1}
       >
-        {/* Expanded invisible hit area so tiny shelves are easy to tap */}
         <Rect
           x={hitX}
           y={hitY}
           width={hitWidth}
-          height={hitHeight}
+          height={hitHeight} // 2D Y-axis = length
           fill="#000"
           opacity={0.001}
           onPress={() => onShelfPress?.(shelf, zone)}
@@ -515,13 +440,12 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           </LinearGradient>
         </Defs>
 
-        {/* Pulse Effect for Recommended */}
         {isRecommended && (
           <Rect
             x={absX - 2}
             y={absY - 2}
             width={shelf.width + 4}
-            height={shelf.height + 4}
+            height={shelfLength + 4}
             rx={5}
             ry={5}
             fill={COLORS.success}
@@ -529,13 +453,12 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           />
         )}
 
-        {/* Rack Shadow */}
         {!isDimmed && (
           <Rect
             x={absX}
             y={absY + 2}
             width={shelf.width}
-            height={shelf.height}
+            height={shelfLength}
             rx={3}
             ry={3}
             fill="#000"
@@ -543,12 +466,11 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           />
         )}
 
-        {/* Rack Body */}
         <Rect
           x={absX}
           y={absY}
           width={shelf.width}
-          height={shelf.height}
+          height={shelfLength}
           rx={2}
           ry={2}
           fill={`url(#${gradientId})`}
@@ -556,23 +478,21 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           strokeWidth={isRecommended || isHighlighted ? 1.2 : 0.5}
         />
 
-        {/* Top Face */}
         <Rect
           x={absX + 1}
           y={absY + 1}
-          width={shelf.width - 2}
-          height={shelf.height - 4}
+          width={Math.max(shelf.width - 2, 0)}
+          height={Math.max(shelfLength - 4, 0)}
           rx={1}
           ry={1}
           fill={faceColor}
           opacity={0.7}
         />
 
-        {/* Label Badge */}
         <G pointerEvents="none">
           <Rect
             x={absX + (shelf.width - 24) / 2}
-            y={absY + (shelf.height - 14) / 2}
+            y={absY + (shelfLength - 14) / 2}
             width={24}
             height={14}
             rx={7}
@@ -587,7 +507,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           />
           <SvgText
             x={absX + shelf.width / 2}
-            y={absY + shelf.height / 2 + 1}
+            y={absY + shelfLength / 2 + 1}
             fontSize={8}
             fill="#FFFFFF"
             fontWeight="900"
@@ -602,13 +522,15 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   };
 
   const renderZone = (zone: WarehouseZone, zoneIndex: number) => {
+    const zoneLength = zone.length ?? zone.height ?? zone.width;
+
     return (
       <G key={`zone-${zone.id}-${zoneIndex}`}>
         <Rect
           x={zone.x}
           y={zone.y}
           width={zone.width}
-          height={zone.height}
+          height={zoneLength}
           rx={12}
           ry={12}
           fill={COLORS.primary}
@@ -620,7 +542,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           x={zone.x}
           y={zone.y}
           width={zone.width}
-          height={zone.height}
+          height={zoneLength}
           rx={12}
           ry={12}
           fill="none"
@@ -700,6 +622,55 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     return <G>{pathLines}</G>;
   };
 
+  const renderOptimizedPath = () => {
+    if (!structure.nodes || optimizedPath.length < 2) return null;
+
+    const pathLines = [];
+
+    for (let i = 0; i < optimizedPath.length - 1; i++) {
+      const nodeAId = optimizedPath[i];
+      const nodeBId = optimizedPath[i + 1];
+
+      const nodeA = structure.nodes?.find((n) => n.id === nodeAId);
+      const nodeB = structure.nodes?.find((n) => n.id === nodeBId);
+
+      if (nodeA && nodeB) {
+        const currentSegment = [nodeAId, nodeBId].sort().join("|");
+        const traversalCount = segmentMap.get(currentSegment) || 1;
+        const isSingleTraversal = traversalCount === 1;
+
+        pathLines.push(
+          <G key={`opt-path-segment-${i}`}>
+            <Line
+              x1={nodeA.x}
+              y1={nodeA.y}
+              x2={nodeB.x}
+              y2={nodeB.y}
+              stroke={"#EC4899"}
+              strokeWidth={10}
+              opacity={0.15}
+              strokeLinecap="round"
+            />
+            <Line
+              x1={nodeA.x}
+              y1={nodeA.y}
+              x2={nodeB.x}
+              y2={nodeB.y}
+              stroke={"#EC4899"}
+              strokeWidth={4}
+              strokeLinecap="round"
+              strokeDasharray={isSingleTraversal ? "8, 8" : undefined}
+            />
+          </G>,
+        );
+      }
+    }
+
+    return <G>{pathLines}</G>;
+  };
+
+  const mapYMax = (structure as any).length ?? structure.height;
+
   return (
     <View className="flex-1 bg-slate-100 rounded-[32px] mx-4 mb-5 overflow-hidden border-[1.5px] border-white shadow-[0_12px_24px_rgba(15,23,42,0.15)] elevation-8">
       <GestureDetector gesture={composedGesture}>
@@ -707,8 +678,8 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           <Animated.View style={animatedStyle}>
             <Svg
               width={structure.width}
-              height={structure.height}
-              viewBox={`0 0 ${structure.width} ${structure.height}`}
+              height={mapYMax}
+              viewBox={`0 0 ${structure.width} ${mapYMax}`}
             >
               <Defs>
                 <Pattern
@@ -734,9 +705,10 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
               )}
               {renderPath()}
 
+              {renderOptimizedPath()}
+
               {showNodes && (
                 <G>
-                  {/* Nodes */}
                   {(structure.nodes ?? []).map((node) => (
                     <Circle
                       key={`node-${node.id}`}
@@ -754,7 +726,6 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         </Animated.View>
       </GestureDetector>
 
-      {/* Modern Floating UI */}
       <View className="absolute top-5 right-5 gap-2.5 items-center">
         <TouchableOpacity
           className="w-11 h-11 rounded-[14px] bg-white/95 justify-center items-center border border-white/80 shadow-[0_4px_10px_rgba(0,0,0,0.08)] elevation-4"
@@ -819,9 +790,11 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         <View className="flex-row items-center gap-2">
           <View
             className="w-[14px] h-[14px] rounded-[5px]"
-            style={{ backgroundColor: COLORS.secondary }}
+            style={{ backgroundColor: "#EC4899" }}
           />
-          <Text className="text-[13px] font-bold text-slate-500">Path</Text>
+          <Text className="text-[13px] font-bold text-slate-500">
+            Opt. Path
+          </Text>
         </View>
       </View>
     </View>

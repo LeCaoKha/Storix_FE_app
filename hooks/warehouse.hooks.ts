@@ -133,10 +133,10 @@ export const useWarehouseStructure = (warehouseId?: number) => {
         warehouseId!,
       );
 
-      console.log(
-        `[useWarehouseStructure] Result for warehouseId ${warehouseId}:`,
-        JSON.stringify(structureData, null, 2),
-      );
+      // console.log(
+      //   `[useWarehouseStructure] Result for warehouseId ${warehouseId}:`,
+      //   JSON.stringify(structureData, null, 2),
+      // );
 
       return structureData;
     },
