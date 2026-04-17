@@ -1,5 +1,5 @@
 import { COLORS } from '@/constants/color';
-import { Task, TaskPriority, TaskStatus } from '@/types/order';
+import { Task, TaskStatus } from '@/types/order';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -15,16 +15,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onPress,
 }) => {
   const router = useRouter();
-
-  const getPriorityColor = (priority: TaskPriority) => {
-    switch (priority) {
-      case TaskPriority.LOW: return COLORS.success;
-      case TaskPriority.MEDIUM: return COLORS.warning;
-      case TaskPriority.HIGH: return COLORS.danger;
-      case TaskPriority.URGENT: return '#7C3AED'; // Deep Purple
-      default: return COLORS.slate500;
-    }
-  };
 
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {
@@ -47,19 +37,49 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     // Default navigation based on task type
     switch (task.type) {
       case 'inbound':
-        router.push(`/(staff-tabs)/tasks/inbound/${task.relatedOrderId || task.id}` as any);
+        router.push({
+          pathname: '/(staff-tabs)/tasks/inbound/[id]',
+          params: {
+            id: String(task.relatedOrderId || task.id),
+            from: '/(staff-tabs)/tasks',
+          },
+        } as any);
         break;
       case 'outbound':
-        router.push(`/(staff-tabs)/tasks/outbound/${task.relatedOrderId || task.id}` as any);
+        router.push({
+          pathname: '/(staff-tabs)/tasks/outbound/[id]',
+          params: {
+            id: String(task.relatedOrderId || task.id),
+            from: '/(staff-tabs)/tasks',
+          },
+        } as any);
         break;
       case 'putaway':
-        router.push(`/(staff-tabs)/tasks/putaway/${task.relatedOrderId || task.id}` as any);
+        router.push({
+          pathname: '/(staff-tabs)/tasks/inbound/[id]',
+          params: {
+            id: String(task.relatedOrderId || task.id),
+            from: '/(staff-tabs)/tasks',
+          },
+        } as any);
         break;
       case 'count':
-        router.push(`/(staff-tabs)/tasks/count/${task.id}` as any);
+        router.push({
+          pathname: '/(staff-tabs)/tasks/count/[id]',
+          params: {
+            id: String(task.relatedOrderId || task.id),
+            from: '/(staff-tabs)/tasks',
+          },
+        } as any);
         break;
       case 'transfer':
-        router.push(`/(staff-tabs)/tasks/transfer/${task.relatedOrderId || task.id}` as any);
+        router.push({
+          pathname: '/(staff-tabs)/tasks/transfer/[id]',
+          params: {
+            id: String(task.relatedOrderId || task.id),
+            from: '/(staff-tabs)/tasks',
+          },
+        } as any);
         break;
       default:
         console.log('No route for task type:', task.type);

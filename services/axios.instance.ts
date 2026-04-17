@@ -93,6 +93,30 @@ api.interceptors.response.use(
       console.warn(`[AXIOS WARN] ${requestUrl}`, logPayload);
     } else {
       console.error(`[AXIOS ERROR] ${requestUrl}`, logPayload);
+
+      if (requestUrl.includes('/api/InventoryInbound/update-tickets/') && requestUrl.includes('/items')) {
+        try {
+          const rawData = error.config?.data;
+          const parsedData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+
+          const binPayload = Array.isArray(parsedData)
+            ? parsedData.map((item: any) => ({
+                itemId: item?.id,
+                productId: item?.productId,
+                bins: Array.isArray(item?.locations)
+                  ? item.locations.map((location: any) => ({
+                      binId: location?.binId,
+                      quantity: location?.quantity,
+                    }))
+                  : [],
+              }))
+            : parsedData;
+
+          console.log('[INBOUND UPDATE BIN PAYLOAD]', binPayload);
+        } catch (parseError) {
+          console.warn('[INBOUND UPDATE BIN PAYLOAD] unable to parse request payload', parseError);
+        }
+      }
     }
 
     const originalRequest = error.config as (typeof error.config & { _retry?: boolean }) | undefined;

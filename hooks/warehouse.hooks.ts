@@ -117,6 +117,12 @@ export const useWarehouses = () => {
 export const useWarehouseStructure = (warehouseId?: number) => {
   const user = useAuthStore((state) => state.user);
   const companyId = user?.companyId;
+  const normalizedWarehouseId = Number(warehouseId);
+  const canFetchStructure =
+    typeof companyId === "number" &&
+    companyId > 0 &&
+    Number.isFinite(normalizedWarehouseId) &&
+    normalizedWarehouseId > 0;
 
   return useQuery({
     queryKey: ["warehouse-structure", companyId, warehouseId],

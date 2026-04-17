@@ -1,4 +1,4 @@
-import { TabScreenHeader, TransferCard } from '@/components';
+import { RefreshContainer, TabScreenHeader, TransferCard } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useTransferOrders } from '@/hooks/transfer.hooks';
 import { useAuthStore } from '@/stores/auth.store';
@@ -21,7 +21,7 @@ export default function TransferListScreen() {
     const router = useRouter();
     const roleId = useAuthStore((state) => state.user?.roleId);
     const canAccessTransfers = roleId === 3 || roleId === 4;
-    const { data: transfers = [], isLoading } = useTransferOrders({}, canAccessTransfers);
+    const { data: transfers = [], isLoading, refetch } = useTransferOrders({}, canAccessTransfers);
     const [activeTab, setActiveTab] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -49,6 +49,10 @@ export default function TransferListScreen() {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
     }, [transfers, searchQuery, activeTab]);
+
+    const handleRefresh = async () => {
+        await refetch();
+    };
 
     const handleCreateNew = () => {
         router.push('/(manager-tabs)/transfers/create' as any);
@@ -102,7 +106,11 @@ export default function TransferListScreen() {
                 </ScrollView>
             </TabScreenHeader>
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={styles.contentContainer}
+                onRefresh={handleRefresh}
+            >
                 {!canAccessTransfers ? (
                     <View style={styles.emptyState}>
                         <Feather name="lock" size={64} color={COLORS.border} />
@@ -146,7 +154,7 @@ export default function TransferListScreen() {
                 )}
 
                 <View style={{ height: 20 }} />
-            </ScrollView>
+            </RefreshContainer>
         </View>
     );
 }

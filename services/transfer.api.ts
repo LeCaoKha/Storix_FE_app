@@ -33,6 +33,15 @@ const normalizeTransferOrder = (payload: any): TransferOrder => ({
             quantity: item.quantity,
         }))
         : [],
+    timeline: Array.isArray(payload.timeline)
+        ? payload.timeline.map((row: any) => ({
+            id: row.id,
+            action: row.action,
+            timestamp: row.timestamp,
+            userId: row.userId,
+            userName: row.userName,
+        }))
+        : [],
 });
 
 /**

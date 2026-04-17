@@ -1,19 +1,36 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundOrdersByStaff, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { AlertService } from '@/stores/alert.store';
+import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function StaffInboundDetailScreen() {
-    const router = useRouter();
-    const goBack = useAppBack('/(staff-tabs)/tasks');
-    const { id } = useLocalSearchParams<{ id: string }>();
-    const { data: order, isLoading, error } = useInboundTicket(id);
+    const { id, from } = useLocalSearchParams<{ id: string; from?: string | string[] }>();
+    const user = useAuthStore((state) => state.user);
+    const companyId = user?.companyId ?? 0;
+    const staffId = user?.id ?? 0;
+    const orderId = parseInt(id || '0', 10);
+    const fromPath = Array.isArray(from) ? from[0] : from;
+    const goBack = useAppBack(fromPath || '/(staff-tabs)/orders');
+    const { data: staffOrders, isLoading, error, refetch: refetchStaffOrders } = useInboundOrdersByStaff(companyId, staffId);
+    const { data: inboundTicket, refetch: refetchInboundTicket } = useInboundTicket(orderId);
+    const order = useMemo(() => {
+        if (inboundTicket?.id === orderId) return inboundTicket;
+        return staffOrders?.find((ticket) => ticket.id === orderId) ?? null;
+    }, [inboundTicket, staffOrders, orderId]);
+
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchStaffOrders(),
+            orderId > 0 ? refetchInboundTicket() : Promise.resolve(),
+        ]);
+    };
     const updateItems = useUpdateInboundTicketItems();
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
     const [localItemData, setLocalItemData] = useState<Record<number, { batch: string, expiry: string, qc: 'good' | 'damaged' | 'returned' }>>({});
@@ -111,9 +128,14 @@ export default function StaffInboundDetailScreen() {
             <ScreenHeader
                 title="Nhập Kho"
                 subtitle={order.referenceCode || `INB-${order.id}`}
+                onBack={goBack}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={styles.scrollContent}
+                onRefresh={handleRefresh}
+            >
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
@@ -218,7 +240,7 @@ export default function StaffInboundDetailScreen() {
                         </TouchableOpacity>
                     </Card>
                 ))}
-            </ScrollView>
+            </RefreshContainer>
 
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.reportBtn}>

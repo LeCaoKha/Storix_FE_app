@@ -1,4 +1,4 @@
-import { Button, Card, ScreenHeader } from '@/components';
+import { Button, Card, RefreshContainer, ScreenHeader } from '@/components';
 import { AddTransferItemModal } from '@/components/manager/AddTransferItemModal';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
@@ -19,7 +19,7 @@ import { TransferAvailability, TransferOrderItem } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TransferDetailScreen() {
@@ -29,9 +29,13 @@ export default function TransferDetailScreen() {
     const insets = useSafeAreaInsets();
     const goBack = useAppBack();
 
-    const { data: transfer, isLoading } = useTransferOrder(transferId);
+    const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
     const { data: availability = [], isLoading: isCheckingAvailability } = useCheckTransferAvailability(transferId);
     
+    const handleRefresh = async () => {
+        await refetch();
+    };
+
     // Mutations
     const submitMutation = useSubmitTransferOrder();
     const approveMutation = useApproveTransferOrder();
@@ -49,7 +53,7 @@ export default function TransferDetailScreen() {
     if (isLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Đang tải...</Text>
+                <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
         );
     }
@@ -261,7 +265,11 @@ export default function TransferDetailScreen() {
                 subtitle={transfer.referenceCode || `Phiếu #${transfer.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={handleRefresh}
+            >
                 {/* Header Card */}
                 <Card style={styles.card}>
                     <View style={styles.statusRow}>
@@ -417,7 +425,7 @@ export default function TransferDetailScreen() {
                         </View>
                     </Card>
                 )}
-            </ScrollView>
+            </RefreshContainer>
 
             {/* Actions Footer */}
             {!showReasonInput && (

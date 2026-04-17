@@ -1,16 +1,17 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
-import { useInboundOrdersByStaff, useInboundStorageRecommendations, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { useInboundStagingStore } from '@/stores/inbound-staging.store';
 import type { InboundItemStorageRecommendations, InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InboundDetailScreen() {
@@ -24,11 +25,17 @@ export default function InboundDetailScreen() {
 
     // Dùng endpoint staff-specific (filter theo Warehouse.CompanyId — đúng)
     // thay vì GET /tickets/{companyId}/{id} (filter theo CreatedByNavigation.CompanyId — sai, gây 404)
-    const { data: staffOrders, isLoading } = useInboundOrdersByStaff(companyId, staffId);
+    const { data: staffOrders, isLoading, refetch: refetchOrders } = useInboundOrdersByStaff(companyId, staffId);
     const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
-    const order = useMemo(() => staffOrders?.find(t => t.id === numericId) ?? null, [staffOrders, numericId]);
+    const { data: inboundTicket, refetch: refetchTicket } = useInboundTicket(numericId);
+    const order = useMemo(() => {
+        if (inboundTicket?.id === numericId) return inboundTicket;
+        return staffOrders?.find((t) => t.id === numericId) ?? null;
+    }, [inboundTicket, staffOrders, numericId]);
     const error = !isLoading && !order;
-    const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(order?.id);
+    const { data: recommendationItems = [], isLoading: recommendationsLoading, refetch: refetchRecs } = useInboundStorageRecommendations(order?.id);
+
+    const normalizeBinCode = (value?: string | null) => (value || '').trim().toLowerCase();
 
     const updateItems = useUpdateInboundTicketItems();
     const recommendationByItemId = useMemo(() => {
@@ -48,7 +55,7 @@ export default function InboundDetailScreen() {
     }, [recommendationItems]);
 
     const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
-    const { data: warehouseStructure } = useWarehouseStructure(warehouseId);
+    const { data: warehouseStructure, refetch: refetchStructure } = useWarehouseStructure(warehouseId);
 
     const validBinCodes = useMemo(() => {
         if (!warehouseStructure?.zones) return new Set<string>();
@@ -61,7 +68,27 @@ export default function InboundDetailScreen() {
             )
         );
 
-        return new Set(bins.map((code) => code.trim()).filter(Boolean));
+        return new Set(bins.map((code) => normalizeBinCode(code)).filter(Boolean));
+    }, [warehouseStructure]);
+
+    const binIdCodeByInput = useMemo(() => {
+        const map = new Map<string, string>();
+        if (!warehouseStructure?.zones) return map;
+
+        warehouseStructure.zones.forEach((zone) => {
+            (zone.shelves || []).forEach((shelf) => {
+                (shelf.levels || []).forEach((level) => {
+                    (level.bins || []).forEach((bin) => {
+                        const normalizedCode = normalizeBinCode(bin.code);
+                        const normalizedId = normalizeBinCode(bin.id);
+                        if (normalizedCode) map.set(normalizedCode, bin.id);
+                        if (normalizedId) map.set(normalizedId, bin.id);
+                    });
+                });
+            });
+        });
+
+        return map;
     }, [warehouseStructure]);
 
     const openWarehouseForItem = (item: InboundOrderItem) => {
@@ -71,110 +98,79 @@ export default function InboundDetailScreen() {
             ?.map((recommendation) => recommendation.binIdCode)
             .filter((binCode): binCode is string => !!binCode) || [];
 
-        if (bins.length === 0) {
-            AlertService.warning('Chưa có gợi ý', 'Sản phẩm này chưa có vị trí gợi ý từ hệ thống.');
-            return;
-        }
-
         router.push({
             pathname: '/warehouse-view',
             params: {
                 warehouseId: String(order?.warehouse?.id || order?.warehouseId || ''),
                 inboundOrderId: String(order?.id || ''),
                 focusedBins: bins.join(','),
+                focusedItemId: String(item.id),
                 focusedItemName: item.name || item.product?.name || `SP #${item.productId}`,
             },
         } as any);
     };
 
     const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
-    const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-    const [isAutoSaving, setIsAutoSaving] = useState(false);
-    const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const stagedTickets = useInboundStagingStore((state) => state.tickets);
+    const getItemStagedQuantity = useInboundStagingStore((state) => state.getItemStagedQuantity);
+    const getItemStagedBins = useInboundStagingStore((state) => state.getItemStagedBins);
+    const clearStagedTicket = useInboundStagingStore((state) => state.clearTicket);
 
-    // Initialize receivedQuantity from existing data
-    useEffect(() => {
-        if (order?.inboundOrderItems) {
-            setLocalQuantities(
-                order.inboundOrderItems.reduce((acc: Record<number, number>, item: InboundOrderItem) => ({ ...acc, [item.id]: item.receivedQuantity || 0 }), {})
-            );
-            setHasUnsavedChanges(false);
-        }
-    }, [order]);
+    const getReceivedQuantity = React.useCallback((item: InboundOrderItem) => {
+        if (!order?.id) return Number(item.receivedQuantity || 0);
+        const expected = Math.max(0, Number(item.expectedQuantity ?? 0));
+        const baseReceived = Number(item.receivedQuantity ?? 0);
+        const stagedReceived = Number(getItemStagedQuantity(order.id, item.id) || 0);
+        const total = baseReceived + stagedReceived;
+        return expected > 0 ? Math.min(total, expected) : total;
+    }, [order?.id, getItemStagedQuantity, stagedTickets]);
 
-    useEffect(() => {
-        return () => {
-            if (autoSaveTimerRef.current) {
-                clearTimeout(autoSaveTimerRef.current);
-            }
-        };
-    }, []);
+    const isItemReceivedEnough = React.useCallback((item: InboundOrderItem) => {
+        const expected = Math.max(0, Number(item.expectedQuantity ?? 0));
+        if (expected <= 0) return false;
+        const actualReceived = getReceivedQuantity(item);
+        return actualReceived >= expected;
+    }, [getReceivedQuantity]);
+
+    const syncLocalQuantitiesFromOrder = React.useCallback((nextOrder: any) => {
+        if (!nextOrder?.inboundOrderItems) return;
+
+        const nextQuantities = nextOrder.inboundOrderItems.reduce((acc: Record<number, number>, item: InboundOrderItem) => {
+            const baseReceived = Number(item.receivedQuantity || 0);
+            const stagedReceived = Number(getItemStagedQuantity(nextOrder.id, item.id) || 0);
+            acc[item.id] = baseReceived + stagedReceived;
+            return acc;
+        }, {});
+
+        setLocalQuantities(nextQuantities);
+    }, [getItemStagedQuantity]);
+
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchOrders(),
+            numericId > 0 ? refetchTicket() : Promise.resolve(undefined),
+            refetchRecs(),
+            refetchStructure(),
+        ]);
+    };
+
+    useFocusEffect(
+        React.useCallback(() => {
+            // Keep list/detail in sync after returning from warehouse view.
+            void Promise.all([
+                refetchOrders(),
+                numericId > 0 ? refetchTicket() : Promise.resolve(),
+                refetchRecs(),
+                refetchStructure(),
+            ]);
+        }, [numericId, refetchOrders, refetchTicket, refetchRecs, refetchStructure])
+    );
+
 
     // Keep status flags before any early return to preserve hook call order.
     const isCompleted = order?.status === 'Completed';
-    const isPartiallyCompleted = order?.status === 'Partially Completed';
     const canEdit = !!order && !isCompleted;
-
-    useEffect(() => {
-        if (!order || !canEdit || !hasUnsavedChanges || isSaving || isConfirming) return;
-
-        if (autoSaveTimerRef.current) {
-            clearTimeout(autoSaveTimerRef.current);
-        }
-
-        autoSaveTimerRef.current = setTimeout(async () => {
-            if (!order || isSaving || isConfirming) return;
-
-            setIsAutoSaving(true);
-            try {
-                const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
-                    const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
-                    const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
-                    const recommendedBin = topRecommendation?.binIdCode;
-                    const canUseRecommendationBin = !!recommendedBin && validBinCodes.has(recommendedBin);
-
-                    return {
-                        id: item.id,
-                        productId: item.productId || 0,
-                        expectedQuantity: item.expectedQuantity,
-                        receivedQuantity: quantity,
-                        locations: canUseRecommendationBin && quantity > 0
-                            ? [{ binId: recommendedBin as string, quantity }]
-                            : undefined,
-                    };
-                });
-
-                await updateItems.mutateAsync({
-                    ticketId: order.id,
-                    items: updatedItems,
-                });
-
-                setHasUnsavedChanges(false);
-            } catch {
-                // Keep unsaved flag so user can retry by manual save.
-            } finally {
-                setIsAutoSaving(false);
-            }
-        }, 800);
-
-        return () => {
-            if (autoSaveTimerRef.current) {
-                clearTimeout(autoSaveTimerRef.current);
-            }
-        };
-    }, [
-        canEdit,
-        hasUnsavedChanges,
-        isConfirming,
-        isSaving,
-        localQuantities,
-        order,
-        recommendationByItemId,
-        updateItems,
-        validBinCodes,
-    ]);
 
     if (isLoading) {
         return (
@@ -199,59 +195,9 @@ export default function InboundDetailScreen() {
         );
     }
 
-    const handleUpdateQty = (itemId: number, increment: boolean) => {
-        if (!canEdit) return;
-        setLocalQuantities(prev => {
-            const current = prev[itemId] || 0;
-            const item = order?.inboundOrderItems.find((i: InboundOrderItem) => i.id === itemId);
-            const newValue = increment
-                ? Math.min(current + 1, item?.expectedQuantity || 9999)
-                : Math.max(current - 1, 0);
-            return { ...prev, [itemId]: newValue };
-        });
-        setHasUnsavedChanges(true);
-    };
-
-
-
-    const handleSave = async () => {
-        if (!order) return;
-        setIsSaving(true);
-        try {
-            // Update items with received quantities
-            const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
-                const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
-                const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
-                const recommendedBin = topRecommendation?.binIdCode;
-                const canUseRecommendationBin = !!recommendedBin && validBinCodes.has(recommendedBin);
-
-                return {
-                    id: item.id,
-                    productId: item.productId || 0,
-                    expectedQuantity: item.expectedQuantity,
-                    receivedQuantity: quantity,
-                    locations: canUseRecommendationBin && quantity > 0
-                        ? [{ binId: recommendedBin as string, quantity }]
-                        : undefined,
-                };
-            });
-
-            await updateItems.mutateAsync({
-                ticketId: order.id,
-                items: updatedItems,
-            });
-
-            AlertService.success('Thành công', 'Đã lưu thông tin nhận hàng');
-        } catch {
-            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
     // Check if all items are received
     const allItemsReceived = order?.inboundOrderItems?.every(
-        (item: InboundOrderItem) => (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)
+        (item: InboundOrderItem) => isItemReceivedEnough(item)
     ) ?? false;
 
     const handleConfirmComplete = async () => {
@@ -263,31 +209,42 @@ export default function InboundDetailScreen() {
             async () => {
                 setIsConfirming(true);
                 try {
-                    // Update items with final quantities
+                    // Update items with final quantities and staged locations.
                     const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
-                        const topRecommendation = recommendationByItemId.get(item.id)?.storageRecommendations?.[0];
-                        const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
-                        const recommendedBin = topRecommendation?.binIdCode;
-                        const canUseRecommendationBin = !!recommendedBin && validBinCodes.has(recommendedBin);
+                        const baseReceived = Math.max(0, Number(item.receivedQuantity || 0));
+                        const stagedBins = getItemStagedBins(order.id, item.id);
+                        const locations = Object.entries(stagedBins)
+                            .map(([binId, qty]) => ({ binId: String(binId), quantity: Math.max(0, Number(qty || 0)) }))
+                            .filter((loc) => loc.quantity > 0);
+                        
+                        // FIX: receivedQuantity should be ALREADY DONE + NEWLY STAGED SUM
+                        // Do not use target clamp here because it causes sum mismatch error in backend
+                        const currentSessionStagedTotal = locations.reduce((sum, loc) => sum + loc.quantity, 0);
+                        const finalReceived = baseReceived + currentSessionStagedTotal;
 
                         return {
                             id: item.id,
                             productId: item.productId || 0,
                             expectedQuantity: item.expectedQuantity,
-                            receivedQuantity: quantity,
-                            locations: canUseRecommendationBin && quantity > 0
-                                ? [{ binId: recommendedBin as string, quantity }]
-                                : undefined,
+                            receivedQuantity: finalReceived,
+                            locations: locations.length > 0 ? locations : undefined,
                         };
                     });
+
+                    console.log('[InboundDetailScreen] Final PUT payload', {
+                        ticketId: order.id,
+                        items: updatedItems,
+                    });
+
+                    // LOG PAYLOAD FOR DEBUGGING
+                    console.log('[InboundDetail] Updating ticket items payload:', JSON.stringify(updatedItems, null, 2));
 
                     await updateItems.mutateAsync({
                         ticketId: order.id,
                         items: updatedItems,
                     });
 
-                    // Update ticket status to Completed (assuming Backend supports this)
-                    // ... call status update API if available
+                    clearStagedTicket(order.id);
 
                     AlertService.success('Hoàn thành', 'Phiếu nhập kho đã được xác nhận hoàn tất. Hàng hóa đã được ghi nhận vào tồn kho.', () => {
                         goBack();
@@ -308,7 +265,11 @@ export default function InboundDetailScreen() {
                 subtitle={order.referenceCode || `INB-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={handleRefresh}
+            >
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
@@ -386,47 +347,28 @@ export default function InboundDetailScreen() {
                                 <Text style={styles.skuText}>SKU: {item.sku || item.product?.sku || 'N/A'}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
-                                backgroundColor: (isCompleted || (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)) ? COLORS.success + '20' : COLORS.warning + '20'
+                                backgroundColor: (isCompleted || isItemReceivedEnough(item)) ? COLORS.success + '20' : COLORS.warning + '20'
                             }]}>
                                 <Text style={[styles.statusBadgeText, {
-                                    color: (isCompleted || (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)) ? COLORS.success : COLORS.warning
+                                    color: (isCompleted || isItemReceivedEnough(item)) ? COLORS.success : COLORS.warning
                                 }]}>
-                                    {(isCompleted || (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0)) ? 'Đủ' : 'Chờ'}
+                                    {(isCompleted || isItemReceivedEnough(item)) ? 'Đủ' : 'Chờ'}
                                 </Text>
                             </View>
                         </View>
 
                         <View style={styles.counterRow}>
                             <Text style={styles.qtyLabel}>Số lượng đã nhận:</Text>
-                            {canEdit ? (
-                                <View style={styles.counter}>
-                                    <TouchableOpacity
-                                        style={styles.counterBtn}
-                                        onPress={() => handleUpdateQty(item.id, false)}
-                                    >
-                                        <Feather name="minus" size={20} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                    <View style={styles.qtyDisplay}>
-                                        <Text style={styles.qtyValue}>{localQuantities[item.id] || 0}</Text>
-                                        <Text style={styles.qtyTotal}>/ {item.expectedQuantity || 0}</Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        style={styles.counterBtn}
-                                        onPress={() => handleUpdateQty(item.id, true)}
-                                    >
-                                        <Feather name="plus" size={20} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                            ) : (
-                                <View style={styles.qtyDisplay}>
-                                    <Text style={[styles.qtyValue, isCompleted && { color: COLORS.success }]}>
-                                        {isCompleted
-                                            ? (item.receivedQuantity || item.expectedQuantity || 0)
-                                            : (item.receivedQuantity || 0)}
-                                    </Text>
-                                    <Text style={styles.qtyTotal}>/ {item.expectedQuantity || 0}</Text>
-                                </View>
-                            )}
+                            <View style={styles.qtyDisplay}>
+                                <Text style={[
+                                    styles.qtyValue, 
+                                    isCompleted && { color: COLORS.success },
+                                    isItemReceivedEnough(item) && !isCompleted && { color: COLORS.success }
+                                ]}>
+                                    {getReceivedQuantity(item)}
+                                </Text>
+                                <Text style={styles.qtyTotal}>/ {item.expectedQuantity || 0}</Text>
+                            </View>
                         </View>
 
                         <TouchableOpacity
@@ -434,13 +376,28 @@ export default function InboundDetailScreen() {
                             onPress={() => openWarehouseForItem(item)}
                         >
                             <Feather name="map-pin" size={14} color={COLORS.primary} />
-                            <Text style={styles.itemActionText}>Xem kệ cần xếp cho sản phẩm này</Text>
+                            <Text style={styles.itemActionText}>
+                                {(() => {
+                                    const hasRecommendation = (recommendationByItemId.get(item.id)?.storageRecommendations?.length ?? 0) > 0;
+                                    const isItemCompleted = isCompleted || isItemReceivedEnough(item);
+
+                                    if (isItemCompleted) {
+                                        return hasRecommendation
+                                            ? 'Xem kệ đã xếp cho sản phẩm này'
+                                            : 'Xem kệ đã xếp hàng';
+                                    }
+
+                                    return hasRecommendation
+                                        ? 'Xem kệ cần xếp cho sản phẩm này'
+                                        : 'Xem kệ để xếp hàng';
+                                })()}
+                            </Text>
                         </TouchableOpacity>
 
 
                     </Card>
                 ))}
-            </ScrollView>
+            </RefreshContainer>
 
             {isCompleted ? (
                 <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
@@ -451,33 +408,33 @@ export default function InboundDetailScreen() {
                 </View>
             ) : (
                 <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
-                    <TouchableOpacity style={[styles.reportBtn, { opacity: 0.6 }]} disabled={true}>
+                    <TouchableOpacity 
+                        style={styles.reportBtn} 
+                        onPress={() => AlertService.info('Hỗ trợ', 'Tính năng báo lỗi đang được phát triển.')}
+                    >
                         <Feather name="alert-triangle" size={20} color={COLORS.danger} />
                         <Text style={styles.reportBtnText}>Báo lỗi</Text>
                     </TouchableOpacity>
 
-                    {!allItemsReceived ? (
-                        <TouchableOpacity
-                            style={[styles.saveBtn, (isSaving || isAutoSaving) && styles.disabledBtn]}
-                            onPress={handleSave}
-                            disabled={isSaving || isAutoSaving}
-                        >
-                            <Text style={styles.saveBtnText}>
-                                {isSaving ? 'Đang lưu...' : isAutoSaving ? 'Tự động lưu...' : 'Lưu tiến độ'}
-                            </Text>
-                        </TouchableOpacity>
-                    ) : (
-                        <TouchableOpacity
-                            style={[styles.confirmBtn, isConfirming && styles.disabledBtn]}
-                            onPress={handleConfirmComplete}
-                            disabled={isConfirming}
-                        >
-                            <Feather name="check-circle" size={20} color="#fff" />
-                            <Text style={styles.confirmBtnText}>
-                                {isConfirming ? 'Đang xử lý...' : 'Xác nhận hoàn tất'}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                        style={[
+                            styles.confirmBtn, 
+                            (isConfirming || !allItemsReceived) && styles.disabledBtn,
+                            !allItemsReceived && { backgroundColor: COLORS.slate300, shadowOpacity: 0, elevation: 0 }
+                        ]}
+                        onPress={handleConfirmComplete}
+                        disabled={isConfirming || !allItemsReceived}
+                        activeOpacity={0.8}
+                    >
+                        <Feather 
+                            name={allItemsReceived ? "check-circle" : "lock"} 
+                            size={20} 
+                            color={allItemsReceived ? "#fff" : COLORS.slate500} 
+                        />
+                        <Text style={[styles.confirmBtnText, !allItemsReceived && { color: COLORS.slate500 }]}>
+                            {isConfirming ? 'Đang xử lý...' : allItemsReceived ? 'Xác nhận hoàn tất' : 'Chưa đủ số lượng'}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             )}
         </View>

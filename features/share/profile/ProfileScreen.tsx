@@ -1,9 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Card, SafeAreaHeader } from '@/components';
+import { Card, RefreshContainer, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useLogout } from '@/hooks/auth.hooks';
 import { useTasks } from '@/hooks/task.hooks';
@@ -32,9 +32,16 @@ export default function ProfileScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
     const { mutateAsync: logout } = useLogout();
-    const { data: profile, isLoading: isFetchingProfile } = useProfile(user?.id);
     const isStaff = user?.roleId === 4;
-    const { data: tasks = [], isLoading: isFetchingTasks } = useTasks();
+    const { data: profile, isLoading: isFetchingProfile, refetch: refetchProfile } = useProfile(user?.id);
+    const { data: tasks = [], isLoading: isFetchingTasks, refetch: refetchTasks } = useTasks();
+
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchProfile(),
+            isStaff ? refetchTasks() : Promise.resolve()
+        ]);
+    };
 
     const handleLogout = () => {
         AlertService.confirm(
@@ -93,7 +100,11 @@ export default function ProfileScreen() {
                 <Text style={styles.headerTitle}>Tài khoản</Text>
             </SafeAreaHeader>
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <RefreshContainer 
+                contentContainerStyle={styles.scrollContent} 
+                showsVerticalScrollIndicator={false}
+                onRefresh={handleRefresh}
+            >
                 <View style={styles.content}>
                     {/* Profile Card */}
                     <Card style={styles.profileCard}>
@@ -219,7 +230,7 @@ export default function ProfileScreen() {
                         <Text style={styles.logoutText}>Đăng xuất</Text>
                     </TouchableOpacity>
                 </View>
-            </ScrollView>
+            </RefreshContainer>
         </View>
     );
 }

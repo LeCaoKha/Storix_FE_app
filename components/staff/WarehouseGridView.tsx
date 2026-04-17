@@ -1,13 +1,7 @@
 import { Shelf, WarehouseStructure, WarehouseZone } from "@/types/warehouse";
 import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 import { COLORS } from "@/constants/color";
 
@@ -37,176 +31,271 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
   const renderBinGrid = (shelf: Shelf, zone: WarehouseZone) => {
     const levels = shelf.levels ?? [];
     const isRecommendedShelf = (recommendedShelves ?? []).includes(shelf.id);
+    const isHighlighted = highlightedShelf === shelf.id;
+    const totalBins = levels.reduce(
+      (acc, level) => acc + (level.bins?.length ?? 0),
+      0,
+    );
 
-    if (levels.length === 0) {
-      return (
+    return (
+      <TouchableOpacity
+        activeOpacity={0.92}
+        onPress={() => onShelfPress?.(shelf, zone)}
+        className="bg-white rounded-2xl border-[1.5px] overflow-hidden shadow-sm elevation-2"
+        style={[
+          {
+            borderColor: COLORS.borderLight,
+            shadowColor: COLORS.slate900,
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+          },
+          isRecommendedShelf && {
+            borderColor: COLORS.success + "60",
+            backgroundColor: "#FBFFFE",
+            shadowColor: COLORS.success,
+            shadowOpacity: 0.08,
+            elevation: 3,
+          },
+          isHighlighted &&
+            !isRecommendedShelf && {
+              borderColor: COLORS.primary + "50",
+              backgroundColor: "#FAFFFE",
+              shadowColor: COLORS.primary,
+              shadowOpacity: 0.08,
+            },
+        ]}
+      >
+        {/* Rack Header */}
         <View
-          style={[
-            styles.rackCard,
-            isRecommendedShelf && styles.rackCardRecommended,
-          ]}
+          className="flex-row items-center justify-between px-[14px] py-3 border-b"
+          style={{ borderBottomColor: COLORS.borderLight }}
         >
-          {/* Rack header */}
-          <View style={styles.rackHeader}>
+          <View className="flex-row items-center gap-2.5 flex-1">
             <View
+              className="w-[34px] h-[34px] rounded-lg bg-slate-100 items-center justify-center"
               style={[
-                styles.rackIcon,
-                isRecommendedShelf && { backgroundColor: COLORS.successLight },
+                isRecommendedShelf && {
+                  backgroundColor: COLORS.success + "18",
+                },
+                isHighlighted &&
+                  !isRecommendedShelf && {
+                    backgroundColor: COLORS.primaryLight,
+                  },
               ]}
             >
               <Feather
                 name="layers"
                 size={16}
-                color={isRecommendedShelf ? COLORS.success : "#475569"}
+                color={
+                  isRecommendedShelf
+                    ? COLORS.success
+                    : isHighlighted
+                      ? COLORS.primary
+                      : COLORS.slate500
+                }
               />
             </View>
-            <Text style={styles.rackTitle}>{shelf.code}</Text>
+            <View>
+              <Text
+                className="text-base font-extrabold tracking-[-0.3px]"
+                style={[
+                  { color: COLORS.slate800 },
+                  isRecommendedShelf && { color: COLORS.successText },
+                  isHighlighted &&
+                    !isRecommendedShelf && { color: COLORS.primary },
+                ]}
+              >
+                {shelf.code}
+              </Text>
+              <Text className="text-[11px] text-slate-400 font-medium mt-px">
+                {levels.length} levels · {totalBins} bins
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row items-center gap-2">
             {isRecommendedShelf && (
-              <View style={styles.shelfRecBadge}>
-                <Text style={styles.shelfRecBadgeText}>Gợi ý</Text>
+              <View
+                className="flex-row items-center gap-1 px-2 py-1 rounded-lg border"
+                style={{
+                  backgroundColor: COLORS.success + "18",
+                  borderColor: COLORS.success + "30",
+                }}
+              >
+                <Feather name="star" size={10} color={COLORS.success} />
+                <Text
+                  className="text-[11px] font-extrabold tracking-[0.3px]"
+                  style={{ color: COLORS.success }}
+                >
+                  Recommended
+                </Text>
               </View>
             )}
-            <TouchableOpacity
-              style={styles.infoButton}
-              onPress={() => onShelfPress?.(shelf, zone)}
+            <View
+              className="w-7 h-7 rounded-lg bg-slate-100 items-center justify-center"
+              style={[
+                isRecommendedShelf && {
+                  backgroundColor: COLORS.success + "18",
+                },
+                isHighlighted &&
+                  !isRecommendedShelf && {
+                    backgroundColor: COLORS.primaryLight,
+                  },
+              ]}
             >
-              <Feather name="info" size={16} color="#3B82F6" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.emptyRack}>
-            <Text style={styles.emptyRackText}>No bins configured</Text>
+              <Feather
+                name="chevron-right"
+                size={16}
+                color={
+                  isRecommendedShelf
+                    ? COLORS.success
+                    : isHighlighted
+                      ? COLORS.primary
+                      : COLORS.slate400
+                }
+              />
+            </View>
           </View>
         </View>
-      );
-    }
 
-    return (
-      <View
-        style={[
-          styles.rackCard,
-          isRecommendedShelf && styles.rackCardRecommended,
-        ]}
-      >
-        {/* Rack header */}
-        <View style={styles.rackHeader}>
-          <View
-            style={[
-              styles.rackIcon,
-              isRecommendedShelf && { backgroundColor: COLORS.successLight },
-            ]}
-          >
-            <Feather
-              name="layers"
-              size={16}
-              color={isRecommendedShelf ? COLORS.success : "#475569"}
-            />
-          </View>
-          <Text style={styles.rackTitle}>{shelf.code}</Text>
-          {isRecommendedShelf && (
-            <View style={styles.shelfRecBadge}>
-              <Text style={styles.shelfRecBadgeText}>Gợi ý</Text>
-            </View>
-          )}
-          <View style={styles.rackStats}>
-            <Text style={styles.rackStatsText}>
-              {levels.length}L ·{" "}
-              {levels.reduce(
-                (acc, level) => acc + (level.bins?.length ?? 0),
-                0,
-              )}
-              B
+        {levels.length === 0 ? (
+          <View className="flex-row items-center justify-center gap-2 py-4 px-[14px] bg-slate-50">
+            <Feather name="inbox" size={20} color={COLORS.slate300} />
+            <Text className="text-[13px] text-slate-400 font-medium">
+              No bins available
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.infoButton}
-            onPress={() => onShelfPress?.(shelf, zone)}
-          >
-            <Feather name="info" size={16} color="#3B82F6" />
-          </TouchableOpacity>
-        </View>
+        ) : (
+          <View className="px-[14px] py-3 gap-2.5">
+            {levels.map((level, levelIndex) => (
+              <View key={level.id} className="flex-row items-start gap-2.5">
+                {/* Level tag */}
+                <View
+                  className="min-w-[36px] px-2 py-1.25 rounded-lg bg-slate-100 border items-center justify-center mt-px"
+                  style={[
+                    { borderColor: COLORS.borderLight },
+                    isRecommendedShelf && {
+                      backgroundColor: COLORS.success + "18",
+                      borderColor: COLORS.success + "30",
+                    },
+                  ]}
+                >
+                  <Text
+                    className="text-[11px] font-bold tracking-[0.3px]"
+                    style={[
+                      { color: COLORS.slate500 },
+                      isRecommendedShelf && { color: COLORS.success },
+                    ]}
+                  >
+                    {level.code}
+                  </Text>
+                </View>
 
-        {/* Bin grid - using actual API data */}
-        <View style={styles.binGrid}>
-          {levels.map((level) => (
-            <View key={level.id} style={styles.levelContainer}>
-              {/* Level label */}
-              <View style={styles.levelLabel}>
-                <Text style={styles.levelLabelText}>{level.code}</Text>
-              </View>
+                {/* Bins */}
+                <View className="flex-1 flex-row flex-wrap gap-1.5">
+                  {(level.bins ?? []).map((bin) => {
+                    const isRecommendedBin = (highlightedBins ?? []).some(
+                      (code) =>
+                        String(code) === bin.code || String(code) === bin.id,
+                    );
+                    const hasAnyRecommendations =
+                      (recommendedShelves?.length ?? 0) > 0 ||
+                      (highlightedBins?.length ?? 0) > 0;
+                    const isSuggested = isRecommendedShelf || isRecommendedBin;
+                    const isDimmed = hasAnyRecommendations && !isSuggested;
 
-              {/* Bins in this level */}
-              <View style={styles.binRow}>
-                {(level.bins ?? []).map((bin) => {
-                  const isHighlighted = highlightedShelf === shelf.id;
-                  const isRecommendedBin = (highlightedBins ?? []).some(
-                    (code) =>
-                      String(code) === bin.code || String(code) === bin.id,
-                  );
-
-                  const hasAnyRecommendations =
-                    (recommendedShelves?.length ?? 0) > 0 ||
-                    (highlightedBins?.length ?? 0) > 0;
-                  const isSuggested = isRecommendedShelf || isRecommendedBin;
-                  const isDimmed = hasAnyRecommendations && !isSuggested;
-
-                  return (
-                    <TouchableOpacity
-                      key={bin.id}
-                      style={[
-                        styles.binSlot,
-                        isDimmed && styles.binSlotDimmed,
-                        isSuggested && styles.binSlotSuggested,
-                        isHighlighted &&
-                          !isSuggested &&
-                          styles.binSlotHighlighted,
-                      ]}
-                      activeOpacity={0.7}
-                      onPress={() => onShelfPress?.(shelf, zone)}
-                    >
-                      <Text
+                    return (
+                      <View
+                        key={bin.id}
+                        className={`px-2.5 py-1.5 rounded-lg border-[1.5px] items-center justify-center min-w-[44px] ${isDimmed ? "opacity-30" : ""}`}
                         style={[
-                          styles.binCode,
-                          isSuggested && styles.binCodeSuggested,
-                          isDimmed && styles.binCodeDimmed,
+                          {
+                            borderColor: COLORS.slate200,
+                            backgroundColor: COLORS.slate50,
+                          },
+                          isSuggested && {
+                            borderColor: COLORS.success + "70",
+                            backgroundColor: COLORS.success + "10",
+                          },
+                          isHighlighted &&
+                            !isSuggested &&
+                            !isDimmed && {
+                              borderColor: COLORS.primary + "60",
+                              backgroundColor: COLORS.primaryLight,
+                            },
                         ]}
                       >
-                        {bin.code}
-                      </Text>
-                      {isRecommendedBin && <View style={styles.binRecDot} />}
-                    </TouchableOpacity>
-                  );
-                })}
+                        <Text
+                          className={`text-xs tracking-[0.2px] ${isSuggested || (isHighlighted && !isDimmed) ? "font-bold" : "font-semibold"}`}
+                          style={[
+                            { color: COLORS.slate600 },
+                            isSuggested && { color: COLORS.successText },
+                            isDimmed && { color: COLORS.slate300 },
+                            isHighlighted &&
+                              !isSuggested &&
+                              !isDimmed && { color: COLORS.primary },
+                          ]}
+                        >
+                          {bin.code}
+                        </Text>
+                        {isRecommendedBin && (
+                          <View
+                            className="absolute top-[3px] right-[3px] w-[5px] h-[5px] rounded-full"
+                            style={{ backgroundColor: COLORS.success }}
+                          />
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
-          ))}
-        </View>
-      </View>
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
     );
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1" style={{ backgroundColor: COLORS.background }}>
       {/* Zone tabs */}
       {structure.zones && structure.zones.length > 1 && (
-        <View style={styles.zoneTabs}>
+        <View
+          className="bg-white border-b"
+          style={{ borderBottomColor: COLORS.borderLight }}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.zoneTabsContent}
+            contentContainerClassName="px-4 py-2.5 flex-row gap-2"
           >
             {(structure.zones ?? []).map((zone) => (
               <TouchableOpacity
                 key={zone.id}
+                className="flex-row items-center gap-1.5 px-4 py-2 rounded-full border-[1.5px]"
                 style={[
-                  styles.zoneTab,
-                  selectedZone === zone.id && styles.zoneTabActive,
+                  {
+                    backgroundColor: COLORS.slate100,
+                    borderColor: "transparent",
+                  },
+                  selectedZone === zone.id && {
+                    backgroundColor: COLORS.primary + "15",
+                    borderColor: COLORS.primary + "40",
+                  },
                 ]}
                 onPress={() => setSelectedZone(zone.id)}
+                activeOpacity={0.8}
               >
+                {selectedZone === zone.id && (
+                  <View
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: COLORS.primary }}
+                  />
+                )}
                 <Text
+                  className={`text-[13px] tracking-[0.2px] ${selectedZone === zone.id ? "font-bold" : "font-semibold text-slate-500"}`}
                   style={[
-                    styles.zoneTabText,
-                    selectedZone === zone.id && styles.zoneTabTextActive,
+                    selectedZone === zone.id && { color: COLORS.primary },
                   ]}
                 >
                   {zone.code}
@@ -217,22 +306,28 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
         </View>
       )}
 
-      {/* Legend - simplified */}
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <Feather name="package" size={14} color="#64748B" />
-          <Text style={styles.legendText}>
+      {/* Stats bar */}
+      <View
+        className="flex-row items-center justify-center py-2.5 px-5 bg-white border-b"
+        style={{ borderBottomColor: COLORS.borderLight }}
+      >
+        <View className="flex-row items-center justify-center gap-1 flex-1">
+          <Feather name="package" size={13} color={COLORS.slate400} />
+          <Text className="text-xs text-slate-500 font-semibold">
             {currentZone?.shelves?.reduce(
               (acc, s) => acc + (s.levels?.length ?? 0),
               0,
             ) || 0}{" "}
-            Levels
+            levels
           </Text>
         </View>
-        <View style={styles.legendDivider} />
-        <View style={styles.legendItem}>
-          <Feather name="grid" size={14} color="#64748B" />
-          <Text style={styles.legendText}>
+        <View
+          className="w-px h-4"
+          style={{ backgroundColor: COLORS.borderLight }}
+        />
+        <View className="flex-row items-center justify-center gap-1 flex-1">
+          <Feather name="grid" size={13} color={COLORS.slate400} />
+          <Text className="text-xs text-slate-500 font-semibold">
             {currentZone?.shelves?.reduce(
               (acc, s) =>
                 acc +
@@ -242,257 +337,42 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
                 ),
               0,
             ) || 0}{" "}
-            Bins
+            bins
+          </Text>
+        </View>
+        <View
+          className="w-px h-4"
+          style={{ backgroundColor: COLORS.borderLight }}
+        />
+        <View className="flex-row items-center justify-center gap-1 flex-1">
+          <Feather name="layers" size={13} color={COLORS.slate400} />
+          <Text className="text-xs text-slate-500 font-semibold">
+            {currentZone?.shelves?.length || 0} shelves
           </Text>
         </View>
       </View>
 
       {/* Racks grid */}
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.gridContent}
+        className="flex-1"
+        contentContainerClassName="p-[14px] gap-2.5 pb-8"
         showsVerticalScrollIndicator={false}
       >
         {currentZone?.shelves?.map((shelf) => (
           <View key={shelf.id}>{renderBinGrid(shelf, currentZone)}</View>
         ))}
 
-        {!currentZone?.shelves || currentZone.shelves.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather name="inbox" size={48} color="#CBD5E1" />
-            <Text style={styles.emptyText}>No racks in this zone</Text>
+        {(!currentZone?.shelves || currentZone.shelves.length === 0) && (
+          <View className="items-center justify-center py-[60px] gap-3">
+            <View className="w-16 h-16 rounded-[20px] bg-slate-100 items-center justify-center">
+              <Feather name="inbox" size={32} color={COLORS.slate300} />
+            </View>
+            <Text className="text-sm text-slate-400 font-medium">
+              No shelves in this zone
+            </Text>
           </View>
-        ) : null}
+        )}
       </ScrollView>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  zoneTabs: {
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    paddingVertical: 12,
-  },
-  zoneTabsContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  zoneTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "#F1F5F9",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-  },
-  zoneTabActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#2563EB",
-  },
-  zoneTabText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#475569",
-  },
-  zoneTabTextActive: {
-    color: "#FFFFFF",
-  },
-  legend: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  legendDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: "#CBD5E1",
-  },
-  legendText: {
-    fontSize: 12,
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  gridContent: {
-    padding: 16,
-    gap: 16,
-  },
-  rackCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  rackCardRecommended: {
-    borderColor: COLORS.success,
-    borderWidth: 1.5,
-    backgroundColor: COLORS.success + "05",
-  },
-  rackHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-    gap: 10,
-  },
-  rackIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rackTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  shelfRecBadge: {
-    backgroundColor: COLORS.success,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  shelfRecBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  binRecDot: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.success,
-  },
-  rackStats: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 8,
-  },
-  rackStatsText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  infoButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  binGrid: {
-    gap: 12,
-  },
-  levelContainer: {
-    gap: 6,
-  },
-  levelLabel: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: "#3B82F6",
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
-  levelLabelText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.5,
-  },
-  binRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  binSlot: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: "#CBD5E1",
-    backgroundColor: "#F8FAFC",
-    minWidth: 50,
-  },
-  binSlotHighlighted: {
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
-  },
-  binSlotSuggested: {
-    borderWidth: 2,
-    borderColor: COLORS.success,
-    backgroundColor: COLORS.successLight,
-  },
-  binSlotDimmed: {
-    opacity: 0.4,
-    backgroundColor: COLORS.slate50,
-    borderColor: COLORS.slate200,
-  },
-  binCode: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: COLORS.slate600,
-  },
-  binCodeSuggested: {
-    color: COLORS.successText,
-    fontWeight: "800",
-  },
-  binCodeDimmed: {
-    color: COLORS.slate400,
-  },
-  emptyRack: {
-    paddingVertical: 20,
-    alignItems: "center",
-  },
-  emptyRackText: {
-    fontSize: 13,
-    color: "#94A3B8",
-    fontStyle: "italic",
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#94A3B8",
-    marginTop: 12,
-    fontWeight: "500",
-  },
-});

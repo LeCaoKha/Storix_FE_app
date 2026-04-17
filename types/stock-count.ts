@@ -23,6 +23,7 @@ export interface StockCountItem {
     discrepancy?: number;
     status?: string;
     description?: string;
+    locationId?: number;
 }
 
 export interface StockCountTicketDetail extends StockCountTicket {
@@ -33,6 +34,8 @@ export interface UpdateStockCountItemPayload {
     countedQuantity: number;
     description?: string;
     status?: string;
+    productId?: number;
+    locationId?: number | null;
 }
 
 /**

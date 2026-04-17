@@ -1,4 +1,4 @@
-import { Button, Card, ScreenHeader } from '@/components';
+import { Button, Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useReceiveTransfer, useTransferOrder } from '@/hooks/transfer.hooks';
@@ -8,7 +8,7 @@ import { ReceiveTransferItemRequest, ReceiveTransferOrderRequest } from '@/types
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReceiveTransferScreen() {
@@ -18,7 +18,11 @@ export default function ReceiveTransferScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const transferId = parseInt(id || '0', 10);
 
-    const { data: transfer, isLoading } = useTransferOrder(transferId);
+    const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
+
+    const handleRefresh = async () => {
+        await refetch();
+    };
     const receiveMutation = useReceiveTransfer();
 
     const [note, setNote] = useState('');
@@ -136,7 +140,11 @@ export default function ReceiveTransferScreen() {
                 subtitle={`Phiếu #${transfer.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={handleRefresh}
+            >
                 <Card style={styles.card}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={20} color={COLORS.primary} />
@@ -170,7 +178,7 @@ export default function ReceiveTransferScreen() {
                         numberOfLines={3}
                     />
                 </Card>
-            </ScrollView>
+            </RefreshContainer>
 
             <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
                 <Button 

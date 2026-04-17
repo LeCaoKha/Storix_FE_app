@@ -6,11 +6,10 @@ import {
   WarehouseZone,
 } from "@/types/warehouse";
 import { Feather } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import {
   Dimensions,
   LayoutChangeEvent,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -36,14 +35,11 @@ import Svg, {
   Text as SvgText,
 } from "react-native-svg";
 
-// ===== ADDED CODE START =====
-import { useAuthStore } from "@/stores/auth.store";
-// ===== ADDED CODE END =====
-
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const PADDING = 20;
 const FOOTER_HEIGHT = 72;
+const SHELF_HIT_PADDING = 16;
 
 interface WarehouseLayoutProps {
   structure: WarehouseStructure;
@@ -52,10 +48,6 @@ interface WarehouseLayoutProps {
   highlightedPath?: NavigationNode[];
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
   onZonePress?: (zone: WarehouseZone) => void;
-  // ===== UPDATED CODE START =====
-  status?: string;
-  outboundOrderId?: number; // Added to support API path optimization
-  // ===== UPDATED CODE END =====
 }
 
 export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
@@ -65,10 +57,6 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   highlightedPath,
   onShelfPress,
   onZonePress,
-  // ===== UPDATED CODE START =====
-  status,
-  outboundOrderId,
-  // ===== UPDATED CODE END =====
 }) => {
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -84,104 +72,90 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     height: SCREEN_HEIGHT * 0.55,
   });
 
-  // ===== ADDED CODE START =====
-  const token = useAuthStore((state) => state.token);
-  console.log("token", token);
-  const [optimizedPathIds, setOptimizedPathIds] = useState<string[]>([]);
+  const resolveShelfAbsolutePosition = useCallback(
+    (shelf: Shelf, zone: WarehouseZone) => {
+      const isRelativeToZone =
+        shelf.x >= -1 &&
+        shelf.y >= -1 &&
+        shelf.x + shelf.width <= zone.width + 1 &&
+        shelf.y + shelf.height <= zone.height + 1;
 
-  // API Call for Optimized Path
-  useEffect(() => {
-    if (status === "path_optimization" && outboundOrderId && token) {
-      const fetchPath = async () => {
-        try {
-          const response = await fetch(
-            `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${outboundOrderId}/path-optimization`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
-          const data = await response.json();
-          console.log("data: ", data);
-          if (data?.payload?.[0]?.fullOptimizedPath) {
-            setOptimizedPathIds(data.payload[0].fullOptimizedPath);
-          }
-        } catch (error) {
-          console.error("Path Optimization API Error:", error);
-        }
-      };
-      fetchPath();
-    }
-  }, [status, outboundOrderId, token]);
-
-  // Logic for Path Construction and Segment Counting
-  const optimizedSegments = useMemo(() => {
-    if (status !== "path_optimization" || optimizedPathIds.length < 2)
-      return [];
-
-    // Map for quick node coordinate lookup
-    const nodeLookup = new Map<string, { x: number; y: number }>();
-    structure.nodes?.forEach((n) => nodeLookup.set(n.id, { x: n.x, y: n.y }));
-
-    // Include access nodes from shelves into lookup
-    structure.zones?.forEach((z) => {
-      z.shelves?.forEach((s) => {
-        s.accessNodes?.forEach((an) =>
-          nodeLookup.set(an.id, { x: an.x, y: an.y }),
-        );
-      });
-    });
-
-    const segmentMap = new Map<string, number>();
-    const segments: {
-      x1: number;
-      y1: number;
-      x2: number;
-      y2: number;
-      count: number;
-      id: string;
-    }[] = [];
-
-    // First pass: Count undirected segments
-    for (let i = 0; i < optimizedPathIds.length - 1; i++) {
-      const idA = optimizedPathIds[i];
-      const idB = optimizedPathIds[i + 1];
-      const key = [idA, idB].sort().join("-"); // Undirected key
-      segmentMap.set(key, (segmentMap.get(key) || 0) + 1);
-    }
-
-    // Second pass: Create renderable data
-    for (let i = 0; i < optimizedPathIds.length - 1; i++) {
-      const idA = optimizedPathIds[i];
-      const idB = optimizedPathIds[i + 1];
-      const nodeA = nodeLookup.get(idA);
-      const nodeB = nodeLookup.get(idB);
-      const key = [idA, idB].sort().join("-");
-
-      if (nodeA && nodeB) {
-        segments.push({
-          id: `${key}-${i}`,
-          x1: nodeA.x,
-          y1: nodeA.y,
-          x2: nodeB.x,
-          y2: nodeB.y,
-          count: segmentMap.get(key) || 1,
-        });
+      if (isRelativeToZone) {
+        return {
+          x: zone.x + shelf.x,
+          y: zone.y + shelf.y,
+          coordinateMode: "relative" as const,
+        };
       }
-    }
-    return segments;
-  }, [optimizedPathIds, structure, status]);
-  // ===== ADDED CODE END =====
 
-  // Example: Tự động hiện Nodes nếu status là path_optimization
-  useEffect(() => {
-    if (status === "path_optimization") {
-      setShowNodes(true);
-    }
-  }, [status]);
+      return { x: shelf.x, y: shelf.y, coordinateMode: "absolute" as const };
+    },
+    [],
+  );
+
+  const normalizedZones = useMemo(() => {
+    return (structure.zones ?? []).map((zone) => {
+      const seen = new Set<string>();
+      const uniqueShelves = (zone.shelves ?? []).filter((shelf) => {
+        const dedupeKey = String(
+          shelf.id ||
+            `${shelf.code}-${shelf.x}-${shelf.y}-${shelf.width}-${shelf.height}`,
+        );
+        if (seen.has(dedupeKey)) return false;
+        seen.add(dedupeKey);
+        return true;
+      });
+
+      const overlaps = (a: Shelf, b: Shelf) => {
+        const aPos = resolveShelfAbsolutePosition(a, zone);
+        const bPos = resolveShelfAbsolutePosition(b, zone);
+
+        return (
+          aPos.x < bPos.x + b.width &&
+          aPos.x + a.width > bPos.x &&
+          aPos.y < bPos.y + b.height &&
+          aPos.y + a.height > bPos.y
+        );
+      };
+
+      const scoreShelfQuality = (shelf: Shelf) => {
+        const id = String(shelf.id ?? "");
+        const numericId = /^s-\d{8,}/.test(id) ? 2 : 0;
+        const structureScore =
+          ((shelf.levels?.length ?? 0) > 0 ? 1 : 0) +
+          ((shelf.accessNodes?.length ?? 0) > 0 ? 1 : 0);
+        return numericId + structureScore;
+      };
+
+      // Collapse overlapping duplicates in the same zone when they share the same shelf code.
+      const resolvedShelves: Shelf[] = [];
+      uniqueShelves.forEach((candidate) => {
+        const sameCodeIndex = resolvedShelves.findIndex((existing) => {
+          const hasSameCode =
+            String(existing.code ?? "") === String(candidate.code ?? "");
+          return hasSameCode && overlaps(existing, candidate);
+        });
+
+        if (sameCodeIndex === -1) {
+          resolvedShelves.push(candidate);
+          return;
+        }
+
+        const existing = resolvedShelves[sameCodeIndex];
+        const existingScore = scoreShelfQuality(existing);
+        const candidateScore = scoreShelfQuality(candidate);
+
+        if (candidateScore > existingScore) {
+          resolvedShelves[sameCodeIndex] = candidate;
+        }
+      });
+
+      return {
+        ...zone,
+        shelves: resolvedShelves,
+      };
+    });
+  }, [resolveShelfAbsolutePosition, structure.zones]);
 
   const contentBounds = useMemo(() => {
     let minX = Number.POSITIVE_INFINITY;
@@ -208,21 +182,32 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       maxY = Math.max(maxY, y + r);
     };
 
-    (structure.zones ?? []).forEach((zone) => {
+    normalizedZones.forEach((zone) => {
       includeRect(zone.x, zone.y, zone.width, zone.height);
       (zone.shelves ?? []).forEach((shelf) => {
-        includeRect(
-          zone.x + shelf.x,
-          zone.y + shelf.y,
-          shelf.width,
-          shelf.height,
-        );
+        const { x, y } = resolveShelfAbsolutePosition(shelf, zone);
+        includeRect(x, y, shelf.width, shelf.height);
       });
     });
 
-    (structure.nodes ?? []).forEach((node) =>
-      includePoint(node.x, node.y, node.radius ?? 2),
-    );
+    // Ignore navigation nodes that are too far outside warehouse content.
+    // Outlier nodes can make the initial fit scale extremely small, causing
+    // the map to look blank on first open.
+    const nodeXMin = -100;
+    const nodeYMin = -100;
+    const nodeXMax = Math.max(structure.width + 100, 100);
+    const nodeYMax = Math.max(structure.height + 100, 100);
+    (structure.nodes ?? []).forEach((node) => {
+      if (
+        node.x < nodeXMin ||
+        node.x > nodeXMax ||
+        node.y < nodeYMin ||
+        node.y > nodeYMax
+      ) {
+        return;
+      }
+      includePoint(node.x, node.y, node.radius ?? 2);
+    });
 
     if (
       !Number.isFinite(minX) ||
@@ -251,13 +236,13 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       width: Math.max(maxX - minX, 1),
       height: Math.max(maxY - minY, 1),
     };
-  }, [structure]);
-
-  const nodeMap = useMemo(() => {
-    const map = new Map<string, NavigationNode>();
-    (structure.nodes ?? []).forEach((node) => map.set(node.id, node));
-    return map;
-  }, [structure.nodes]);
+  }, [
+    normalizedZones,
+    resolveShelfAbsolutePosition,
+    structure.height,
+    structure.nodes,
+    structure.width,
+  ]);
 
   const onMapLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -267,7 +252,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   };
 
   // Initial fit calculation
-  const calculateInitialFit = () => {
+  const calculateInitialFit = useCallback(() => {
     const availableWidth = Math.max(viewport.width - PADDING, 1);
     const availableHeight = Math.max(
       viewport.height - FOOTER_HEIGHT - PADDING,
@@ -288,11 +273,21 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     translateY.value = withSpring(
       (availableHeight - scaledHeight) / 2 - contentBounds.minY * initialScale,
     );
-  };
+  }, [
+    contentBounds.height,
+    contentBounds.minX,
+    contentBounds.minY,
+    contentBounds.width,
+    scale,
+    translateX,
+    translateY,
+    viewport.height,
+    viewport.width,
+  ]);
 
   useEffect(() => {
     calculateInitialFit();
-  }, [structure, viewport.width, viewport.height, contentBounds]);
+  }, [calculateInitialFit]);
 
   // Gestures
   const pinchGesture = Gesture.Pinch()
@@ -304,7 +299,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     });
 
   const panGesture = Gesture.Pan()
-    .minDistance(3)
+    .minDistance(12)
     .onStart(() => {
       startTranslateX.value = translateX.value;
       startTranslateY.value = translateY.value;
@@ -328,49 +323,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     });
 
   // Tap to select shelf (Hit testing)
-  const singleTapGesture = Gesture.Tap().onStart((event) => {
-    // Find if a shelf was tapped
-    // Coordinates need to be adjusted based on the current scale and translation
-    const mapX = (event.x - translateX.value) / scale.value;
-    const mapY = (event.y - translateY.value) / scale.value;
-
-    let hitSomething = false;
-    (structure.zones ?? []).forEach((zone) => {
-      (zone.shelves ?? []).forEach((shelf) => {
-        const absX = zone.x + shelf.x;
-        const absY = zone.y + shelf.y;
-        if (
-          mapX >= absX &&
-          mapX <= absX + shelf.width &&
-          mapY >= absY &&
-          mapY <= absY + shelf.height
-        ) {
-          hitSomething = true;
-          if (onShelfPress) {
-            runOnJS(onShelfPress)(shelf, zone);
-          }
-        }
-      });
-    });
-
-    if (!hitSomething && onZonePress) {
-      (structure.zones ?? []).forEach((zone) => {
-        if (
-          mapX >= zone.x &&
-          mapX <= zone.x + zone.width &&
-          mapY >= zone.y &&
-          mapY <= zone.y + zone.height
-        ) {
-          runOnJS(onZonePress)(zone);
-        }
-      });
-    }
-  });
-
-  const tapGesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
   const composedGesture = Gesture.Simultaneous(
     Gesture.Simultaneous(pinchGesture, panGesture),
-    tapGesture,
+    doubleTapGesture,
   );
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -393,15 +348,119 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1.2, { duration: 1000 }), -1, true);
-  }, []);
+  }, [pulse]);
 
-  const renderShelf = (shelf: Shelf, zone: WarehouseZone) => {
+  useEffect(() => {
+    const zones = normalizedZones;
+    const shelfRects: {
+      zoneId: string;
+      zoneCode: string;
+      shelfId: string;
+      shelfCode: string;
+      x: number;
+      y: number;
+      coordinateMode: "relative" | "absolute";
+      width: number;
+      height: number;
+    }[] = [];
+
+    zones.forEach((zone) => {
+      (zone.shelves ?? []).forEach((shelf) => {
+        shelfRects.push({
+          zoneId: String(zone.id),
+          zoneCode: String(zone.code ?? ""),
+          shelfId: String(shelf.id),
+          shelfCode: String(shelf.code ?? ""),
+          ...resolveShelfAbsolutePosition(shelf, zone),
+          width: shelf.width,
+          height: shelf.height,
+        });
+      });
+    });
+
+    console.log("[WarehouseLayout] structure summary", {
+      warehouseSize: { width: structure.width, height: structure.height },
+      zoneCount: zones.length,
+      shelfCount: shelfRects.length,
+    });
+
+    console.log(
+      "[WarehouseLayout] zones",
+      zones.map((zone) => ({
+        id: zone.id,
+        code: zone.code,
+        x: zone.x,
+        y: zone.y,
+        width: zone.width,
+        height: zone.height,
+        shelfCount: (zone.shelves ?? []).length,
+      })),
+    );
+
+    console.log(
+      "[WarehouseLayout] shelves (absolute)",
+      shelfRects.map((shelf) => ({
+        zoneId: shelf.zoneId,
+        zoneCode: shelf.zoneCode,
+        shelfId: shelf.shelfId,
+        shelfCode: shelf.shelfCode,
+        x: shelf.x,
+        y: shelf.y,
+        coordinateMode: shelf.coordinateMode,
+        width: shelf.width,
+        height: shelf.height,
+      })),
+    );
+
+    const overlaps: { a: string; b: string; zoneA: string; zoneB: string }[] =
+      [];
+    for (let i = 0; i < shelfRects.length; i++) {
+      for (let j = i + 1; j < shelfRects.length; j++) {
+        const a = shelfRects[i];
+        const b = shelfRects[j];
+
+        const isOverlap =
+          a.x < b.x + b.width &&
+          a.x + a.width > b.x &&
+          a.y < b.y + b.height &&
+          a.y + a.height > b.y;
+
+        if (isOverlap) {
+          overlaps.push({
+            a: `${a.shelfCode} (${a.shelfId}) @ [${a.x}, ${a.y}, ${a.width}, ${a.height}]`,
+            b: `${b.shelfCode} (${b.shelfId}) @ [${b.x}, ${b.y}, ${b.width}, ${b.height}]`,
+            zoneA: `${a.zoneCode} (${a.zoneId})`,
+            zoneB: `${b.zoneCode} (${b.zoneId})`,
+          });
+        }
+      }
+    }
+
+    if (overlaps.length > 0) {
+      console.warn("[WarehouseLayout] detected shelf overlaps", overlaps);
+    } else {
+      console.log(
+        "[WarehouseLayout] no shelf overlap detected from data rectangles",
+      );
+    }
+  }, [
+    normalizedZones,
+    resolveShelfAbsolutePosition,
+    structure.height,
+    structure.width,
+  ]);
+
+  const renderShelf = (
+    shelf: Shelf,
+    zone: WarehouseZone,
+    shelfIndex: number,
+  ) => {
     const isHighlighted = highlightedShelf === shelf.id;
     const hasAnyRecommendations = (recommendedShelves?.length ?? 0) > 0;
     const isRecommended = (recommendedShelves ?? []).includes(shelf.id);
     const isDimmed = hasAnyRecommendations && !isRecommended && !isHighlighted;
 
-    const gradientId = `gradient-${shelf.id}`;
+    const gradientId = `gradient-${zone.id}-${shelf.id}-${shelfIndex}`;
 
     const baseColor = isHighlighted
       ? COLORS.primary
@@ -427,11 +486,28 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           ? COLORS.slate300
           : COLORS.slate400;
 
-    const absX = zone.x + shelf.x;
-    const absY = zone.y + shelf.y;
+    const { x: absX, y: absY } = resolveShelfAbsolutePosition(shelf, zone);
+    const hitX = absX - SHELF_HIT_PADDING;
+    const hitY = absY - SHELF_HIT_PADDING;
+    const hitWidth = shelf.width + SHELF_HIT_PADDING * 2;
+    const hitHeight = shelf.height + SHELF_HIT_PADDING * 2;
 
     return (
-      <G key={shelf.id} opacity={isDimmed ? 0.4 : 1}>
+      <G
+        key={`shelf-${zone.id}-${shelf.id}-${shelfIndex}`}
+        opacity={isDimmed ? 0.4 : 1}
+      >
+        {/* Expanded invisible hit area so tiny shelves are easy to tap */}
+        <Rect
+          x={hitX}
+          y={hitY}
+          width={hitWidth}
+          height={hitHeight}
+          fill="#000"
+          opacity={0.001}
+          onPress={() => onShelfPress?.(shelf, zone)}
+        />
+
         <Defs>
           <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={baseColor} stopOpacity="1" />
@@ -525,9 +601,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     );
   };
 
-  const renderZone = (zone: WarehouseZone) => {
+  const renderZone = (zone: WarehouseZone, zoneIndex: number) => {
     return (
-      <G key={zone.id}>
+      <G key={`zone-${zone.id}-${zoneIndex}`}>
         <Rect
           x={zone.x}
           y={zone.y}
@@ -537,6 +613,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           ry={12}
           fill={COLORS.primary}
           opacity={0.02}
+          onPress={() => onZonePress?.(zone)}
         />
 
         <Rect
@@ -578,11 +655,13 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
               ? zone.code.toLowerCase().includes("zone")
                 ? zone.code
                 : `Zone ${zone.code}`
-              : "Khu vực"}
+              : "Zone"}
           </SvgText>
         </G>
 
-        {(zone.shelves ?? []).map((shelf) => renderShelf(shelf, zone))}
+        {(zone.shelves ?? []).map((shelf, shelfIndex) =>
+          renderShelf(shelf, zone, shelfIndex),
+        )}
       </G>
     );
   };
@@ -621,35 +700,10 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     return <G>{pathLines}</G>;
   };
 
-  // ===== ADDED CODE START =====
-  const renderOptimizedPath = () => {
-    if (status !== "path_optimization" || optimizedSegments.length === 0)
-      return null;
-
-    return (
-      <G>
-        {optimizedSegments.map((seg) => (
-          <Line
-            key={seg.id}
-            x1={seg.x1}
-            y1={seg.y1}
-            x2={seg.x2}
-            y2={seg.y2}
-            stroke={COLORS.primary}
-            strokeWidth={seg.count >= 2 ? 4 : 2}
-            strokeDasharray={seg.count === 1 ? "5, 5" : "none"}
-            strokeLinecap="round"
-          />
-        ))}
-      </G>
-    );
-  };
-  // ===== ADDED CODE END =====
-
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-slate-100 rounded-[32px] mx-4 mb-5 overflow-hidden border-[1.5px] border-white shadow-[0_12px_24px_rgba(15,23,42,0.15)] elevation-8">
       <GestureDetector gesture={composedGesture}>
-        <Animated.View style={styles.mapContainer} onLayout={onMapLayout}>
+        <Animated.View className="flex-1" onLayout={onMapLayout}>
           <Animated.View style={animatedStyle}>
             <Svg
               width={structure.width}
@@ -675,16 +729,14 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
               <Rect width="100%" height="100%" fill="url(#grid)" />
 
-              {(structure.zones ?? []).map(renderZone)}
+              {normalizedZones.map((zone, zoneIndex) =>
+                renderZone(zone, zoneIndex),
+              )}
               {renderPath()}
-
-              {/* ===== ADDED CODE START ===== */}
-              {renderOptimizedPath()}
-              {/* ===== ADDED CODE END ===== */}
 
               {showNodes && (
                 <G>
-                  {/* Các điểm mốc (Nodes) */}
+                  {/* Nodes */}
                   {(structure.nodes ?? []).map((node) => (
                     <Circle
                       key={`node-${node.id}`}
@@ -703,33 +755,35 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       </GestureDetector>
 
       {/* Modern Floating UI */}
-      <View style={styles.floatingControls}>
+      <View className="absolute top-5 right-5 gap-2.5 items-center">
         <TouchableOpacity
-          style={styles.glassButton}
+          className="w-11 h-11 rounded-[14px] bg-white/95 justify-center items-center border border-white/80 shadow-[0_4px_10px_rgba(0,0,0,0.08)] elevation-4"
           onPress={handleZoomIn}
           activeOpacity={0.7}
         >
           <Feather name="plus" size={22} color={COLORS.primary} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.glassButton}
+          className="w-11 h-11 rounded-[14px] bg-white/95 justify-center items-center border border-white/80 shadow-[0_4px_10px_rgba(0,0,0,0.08)] elevation-4"
           onPress={handleZoomOut}
           activeOpacity={0.7}
         >
           <Feather name="minus" size={22} color={COLORS.primary} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.glassButton, { marginTop: 8 }]}
+          className="mt-2 w-11 h-11 rounded-[14px] bg-white/95 justify-center items-center border border-white/80 shadow-[0_4px_10px_rgba(0,0,0,0.08)] elevation-4"
           onPress={calculateInitialFit}
           activeOpacity={0.7}
         >
           <Feather name="maximize" size={20} color={COLORS.textMuted} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.glassButton,
-            showNodes && { backgroundColor: COLORS.primary },
-          ]}
+          className="w-11 h-11 rounded-[14px] justify-center items-center border border-white/80 shadow-[0_4px_10px_rgba(0,0,0,0.08)] elevation-4"
+          style={{
+            backgroundColor: showNodes
+              ? COLORS.primary
+              : "rgba(255, 255, 255, 0.95)",
+          }}
           onPress={() => setShowNodes(!showNodes)}
           activeOpacity={0.7}
         >
@@ -741,108 +795,35 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.footer}>
-        <View style={styles.legendItem}>
+      <View className="flex-row justify-around py-5 bg-white border-t border-slate-100">
+        <View className="flex-row items-center gap-2">
           <View
-            style={[
-              styles.legendDot,
-              { backgroundColor: COLORS.primary, opacity: 0.3 },
-            ]}
+            className="w-[14px] h-[14px] rounded-[5px]"
+            style={{ backgroundColor: COLORS.primary, opacity: 0.3 }}
           />
-          <Text style={styles.legendLabel}>Khu vực</Text>
+          <Text className="text-[13px] font-bold text-slate-500">Zone</Text>
         </View>
-        <View style={styles.legendItem}>
+        <View className="flex-row items-center gap-2">
           <View
-            style={[styles.legendDot, { backgroundColor: COLORS.success }]}
+            className="w-[14px] h-[14px] rounded-[5px]"
+            style={{ backgroundColor: COLORS.success }}
           />
-          <Text style={styles.legendLabel}>Vị trí gợi ý</Text>
+          <Text className="text-[13px] font-bold text-slate-500">
+            Suggested Position
+          </Text>
         </View>
-        <View style={styles.legendItem}>
-          <View
-            style={[
-              styles.legendDot,
-              {
-                backgroundColor: "#E2E8F0",
-                borderWidth: 1,
-                borderColor: "#CBD5E1",
-              },
-            ]}
-          />
-          <Text style={styles.legendLabel}>Kệ hàng</Text>
+        <View className="flex-row items-center gap-2">
+          <View className="w-[14px] h-[14px] rounded-[5px] bg-slate-200 border border-slate-300" />
+          <Text className="text-[13px] font-bold text-slate-500">Shelf</Text>
         </View>
-        <View style={styles.legendItem}>
+        <View className="flex-row items-center gap-2">
           <View
-            style={[styles.legendDot, { backgroundColor: COLORS.secondary }]}
+            className="w-[14px] h-[14px] rounded-[5px]"
+            style={{ backgroundColor: COLORS.secondary }}
           />
-          <Text style={styles.legendLabel}>Đường đi</Text>
+          <Text className="text-[13px] font-bold text-slate-500">Path</Text>
         </View>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F1F5F9", // Subtle slate background
-    borderRadius: 32,
-    marginHorizontal: 16,
-    marginBottom: 20,
-    overflow: "hidden",
-    borderWidth: 1.5,
-    borderColor: "#FFF",
-    elevation: 8,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-  },
-  mapContainer: {
-    flex: 1,
-  },
-  floatingControls: {
-    position: "absolute",
-    top: 20,
-    right: 20,
-    gap: 10,
-    alignItems: "center",
-  },
-  glassButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.8)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 20,
-    backgroundColor: "#FFF",
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  legendDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 5,
-  },
-  legendLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#64748B",
-  },
-});

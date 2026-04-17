@@ -1,7 +1,7 @@
-import { Card, ScreenHeader } from '@/components';
+import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
-import { useInboundOrdersByStaff, useInboundStorageRecommendations, useUpdateInboundTicketItems } from '@/hooks';
+import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { AlertService } from '@/stores/alert.store';
@@ -10,7 +10,7 @@ import type { InboundItemStorageRecommendations, InboundOrderItem } from '@/type
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PutawayDetailScreen() {
@@ -22,16 +22,31 @@ export default function PutawayDetailScreen() {
     const companyId = user?.companyId ?? 0;
     const staffId = user?.id ?? 0;
 
-    const { data: staffOrders, isLoading } = useInboundOrdersByStaff(companyId, staffId);
+    const { data: staffOrders, isLoading, refetch: refetchOrders } = useInboundOrdersByStaff(companyId, staffId);
     const updateItems = useUpdateInboundTicketItems();
     const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
-    const order = useMemo(() => staffOrders?.find((t) => t.id === numericId) ?? null, [staffOrders, numericId]);
+    const { data: inboundTicket, refetch: refetchTicket } = useInboundTicket(numericId);
+    const order = useMemo(() => {
+        if (inboundTicket?.id === numericId) return inboundTicket;
+        return staffOrders?.find((t) => t.id === numericId) ?? null;
+    }, [inboundTicket, staffOrders, numericId]);
     const error = !isLoading && !order;
-    const { data: recommendationItems = [], isLoading: recommendationsLoading } = useInboundStorageRecommendations(order?.id);
+    const { data: recommendationItems = [], isLoading: recommendationsLoading, refetch: refetchRecommendations } = useInboundStorageRecommendations(order?.id);
+
+    const normalizeBinCode = (value?: string | null) => (value || '').trim().toLowerCase();
     
     // Fetch warehouse structure to show bins context for putaway suggestions
     const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
-    const { data: warehouseStructure, isLoading: warehouseLoading, error: warehouseError } = useWarehouseStructure(warehouseId);
+    const { data: warehouseStructure, isLoading: warehouseLoading, error: warehouseError, refetch: refetchWarehouse } = useWarehouseStructure(warehouseId);
+
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchOrders(),
+            numericId > 0 ? refetchTicket() : Promise.resolve(),
+            refetchRecommendations(),
+            refetchWarehouse()
+        ]);
+    };
 
     const validBinCodes = useMemo(() => {
         if (!warehouseStructure?.zones) return new Set<string>();
@@ -44,7 +59,27 @@ export default function PutawayDetailScreen() {
             )
         );
 
-        return new Set(bins.map((code) => code.trim()).filter(Boolean));
+        return new Set(bins.map((code) => normalizeBinCode(code)).filter(Boolean));
+    }, [warehouseStructure]);
+
+    const binIdCodeByInput = useMemo(() => {
+        const map = new Map<string, string>();
+        if (!warehouseStructure?.zones) return map;
+
+        warehouseStructure.zones.forEach((zone) => {
+            (zone.shelves || []).forEach((shelf) => {
+                (shelf.levels || []).forEach((level) => {
+                    (level.bins || []).forEach((bin) => {
+                        const normalizedCode = normalizeBinCode(bin.code);
+                        const normalizedId = normalizeBinCode(bin.id);
+                        if (normalizedCode) map.set(normalizedCode, bin.id);
+                        if (normalizedId) map.set(normalizedId, bin.id);
+                    });
+                });
+            });
+        });
+
+        return map;
     }, [warehouseStructure]);
 
     const [isProcessing, setIsProcessing] = useState(false);
@@ -164,6 +199,7 @@ export default function PutawayDetailScreen() {
                 warehouseId: String(order.warehouse?.id || order.warehouseId || ''),
                 inboundOrderId: String(order.id),
                 focusedBins: bins.join(','),
+                focusedItemId: String(item.id),
                 focusedItemName: item.name || item.product?.name || `SP #${item.productId}`,
             },
         } as any);
@@ -174,11 +210,11 @@ export default function PutawayDetailScreen() {
     };
 
     const resolvePlacementBin = (itemId: number) => {
-        const selected = selectedBinByItem[itemId]?.trim();
-        if (selected) return selected;
-
         const manual = manualBinByItem[itemId]?.trim();
         if (manual) return manual;
+
+        const selected = selectedBinByItem[itemId]?.trim();
+        if (selected) return selected;
 
         return undefined;
     };
@@ -186,10 +222,14 @@ export default function PutawayDetailScreen() {
     const pickSuggestedBin = (itemId: number, binIdCode?: string) => {
         if (!binIdCode) return;
         setSelectedBinByItem((prev) => ({ ...prev, [itemId]: binIdCode }));
+        setManualBinByItem((prev) => ({ ...prev, [itemId]: '' }));
     };
 
     const updateManualBin = (itemId: number, value: string) => {
         setManualBinByItem((prev) => ({ ...prev, [itemId]: value }));
+        if (value.trim()) {
+            setSelectedBinByItem((prev) => ({ ...prev, [itemId]: '' }));
+        }
     };
 
     const handleScanLocation = () => {
@@ -243,7 +283,7 @@ export default function PutawayDetailScreen() {
             if (quantity <= 0) return false;
             const bin = resolvePlacementBin(item.id);
             if (!bin) return false;
-            return !validBinCodes.has(bin);
+            return !validBinCodes.has(normalizeBinCode(bin));
         });
 
         if (invalidBinItems.length > 0) {
@@ -262,19 +302,37 @@ export default function PutawayDetailScreen() {
             return;
         }
 
+        const hasPositiveReceiveDelta = items.some((item) => {
+            const previousReceived = item.receivedQuantity || 0;
+            const nextReceived = localQuantities[item.id] || 0;
+            return nextReceived > previousReceived;
+        });
+
+        if (!hasPositiveReceiveDelta) {
+            AlertService.warning(
+                'Chưa thể ghi nhận vị trí',
+                'Hiện tại hệ thống chỉ ghi nhận vị trí xếp khi có tăng số lượng nhận. Vui lòng cập nhật thêm số lượng nhận cho ít nhất 1 sản phẩm trước khi xác nhận putaway.',
+            );
+            return;
+        }
+
         setIsCompleting(true);
         try {
             const updatedItems = items.map((item: InboundOrderItem) => {
                 const quantity = localQuantities[item.id] || item.receivedQuantity || 0;
                 const placementBin = resolvePlacementBin(item.id);
+                const normalizedPlacement = normalizeBinCode(placementBin);
+                const mappedBinIdCode = normalizedPlacement
+                    ? (binIdCodeByInput.get(normalizedPlacement) || placementBin)
+                    : placementBin;
 
                 return {
                 id: item.id,
                 productId: item.productId || 0,
                 expectedQuantity: item.expectedQuantity,
                 receivedQuantity: quantity,
-                locations: placementBin && quantity > 0
-                    ? [{ binId: placementBin, quantity }]
+                locations: mappedBinIdCode && quantity > 0
+                    ? [{ binId: mappedBinIdCode, quantity }]
                     : undefined,
                 };
             });
@@ -301,7 +359,11 @@ export default function PutawayDetailScreen() {
                 subtitle={order.referenceCode || `PUT-${order.id}`}
             />
 
-            <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
+                onRefresh={handleRefresh}
+            >
                 <View style={styles.placeholderNotice}>
                     <Feather name="info" size={16} color="#854d0e" />
                     <Text style={styles.placeholderNoticeText}>Đang dùng inbound ticket thật cho putaway. Khi backend có endpoint putaway riêng, app sẽ chuyển sang endpoint đó.</Text>
@@ -489,7 +551,7 @@ export default function PutawayDetailScreen() {
                         <Text style={styles.completeBtnText}>Xác nhận vị trí này</Text>
                     </TouchableOpacity>
                 )}
-            </ScrollView>
+            </RefreshContainer>
 
             <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                 <TouchableOpacity

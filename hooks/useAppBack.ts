@@ -1,3 +1,4 @@
+import { useNavigationStore } from '@/stores/navigation.store';
 import { useRouter, useSegments } from 'expo-router';
 import { useCallback } from 'react';
 
@@ -15,7 +16,7 @@ const resolveFallbackFromSegments = (segments: string[]) => {
 
     if (segments.includes('(staff-tabs)')) {
         if (segments.includes('tasks')) return '/(staff-tabs)/tasks';
-        if (segments.includes('orders')) return '/(staff-tabs)/tasks';
+        if (segments.includes('orders')) return '/(staff-tabs)/orders';
         if (segments.includes('profile')) return '/(staff-tabs)/profile';
         if (segments.includes('warehouse')) return '/(staff-tabs)/warehouse';
 
@@ -32,11 +33,17 @@ const resolveFallbackFromSegments = (segments: string[]) => {
 export const useAppBack = (fallbackPath?: string) => {
     const router = useRouter();
     const segments = useSegments();
+    const previousPath = useNavigationStore((state) => state.previousPath);
 
     return useCallback(() => {
         // Expo Router's router.canGoBack() is more reliable for global history
         if (router.canGoBack()) {
             router.back();
+            return;
+        }
+
+        if (previousPath && previousPath !== '/' && previousPath !== '/login') {
+            router.push(previousPath as any);
             return;
         }
 
@@ -46,5 +53,5 @@ export const useAppBack = (fallbackPath?: string) => {
         // Use push instead of replace to allow going back if the user navigates 
         // deeper from the fallback screen
         router.push(resolvedFallback as any);
-    }, [fallbackPath, router, segments]);
+    }, [fallbackPath, previousPath, router, segments]);
 };

@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
 import React from "react";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRefreshStore } from "@/stores/refresh.store";
 
 
 export default function ManagerTabLayout() {
@@ -34,6 +35,13 @@ export default function ManagerTabLayout() {
                     title: "Đề Xuất",
                     tabBarIcon: ({ color }) => <Feather name="file-text" size={28} color={color} />,
                 }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
             />
             <Tabs.Screen
                 name="transfers/index"
@@ -42,6 +50,13 @@ export default function ManagerTabLayout() {
                     title: "Luân Chuyển",
                     tabBarIcon: ({ color }) => <Feather name="repeat" size={28} color={color} />,
                 }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
             />
             <Tabs.Screen
                 name="warehouse"
@@ -83,6 +98,27 @@ export default function ManagerTabLayout() {
                     title: "Orders",
                     tabBarIcon: ({ color }) => <Feather name="package" size={28} color={color} />,
                 }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
+            />
+            <Tabs.Screen
+                name="notifications"
+                options={{
+                    title: "Thông báo",
+                    tabBarIcon: ({ color }) => <Feather name="bell" size={28} color={color} />,
+                }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
             />
             <Tabs.Screen
                 name="profile"
@@ -91,6 +127,13 @@ export default function ManagerTabLayout() {
                     title: "Profile",
                     tabBarIcon: ({ color }) => <Feather name="user" size={28} color={color} />,
                 }}
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        if (navigation.isFocused()) {
+                            useRefreshStore.getState().triggerRefresh();
+                        }
+                    },
+                })}
             />
 
             {/* Hide all other routes from tab bar */}

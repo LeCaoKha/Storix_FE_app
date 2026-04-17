@@ -1,4 +1,4 @@
-import { Card, TabScreenHeader } from '@/components';
+import { Card, RefreshContainer, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useOutboundRequests, useOutboundTickets } from '@/hooks/outbound-orders.hooks';
 import { OutboundOrder, OutboundRequest } from '@/types/outbound-order';
@@ -53,11 +53,17 @@ export default function OutboundOrdersScreen() {
     const [selectedRequestStatus, setSelectedRequestStatus] = useState<RequestStatusKey | 'all'>('all');
     const [selectedTicketStatus, setSelectedTicketStatus] = useState<'all' | 'Created' | 'InProgress' | 'Completed'>('all');
 
-    // Fetch both requests and tickets
-    const { data: requests = [], isLoading: requestsLoading } = useOutboundRequests();
-    const { data: tickets = [], isLoading: ticketsLoading } = useOutboundTickets();
+    const { data: requests = [], isLoading: requestsLoading, refetch: refetchRequests } = useOutboundRequests();
+    const { data: tickets = [], isLoading: ticketsLoading, refetch: refetchTickets } = useOutboundTickets();
 
     const isLoading = requestsLoading || ticketsLoading;
+
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchRequests(),
+            refetchTickets()
+        ]);
+    };
 
     // Filter requests
     const filteredRequests = useMemo(() => {
@@ -395,7 +401,11 @@ export default function OutboundOrdersScreen() {
             </TabScreenHeader>
 
             {/* Order List */}
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <RefreshContainer 
+                style={styles.content} 
+                contentContainerStyle={styles.contentContainer}
+                onRefresh={handleRefresh}
+            >
                 {isLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -425,7 +435,7 @@ export default function OutboundOrdersScreen() {
                         filteredTickets.map(renderTicketCard)
                     )
                 )}
-            </ScrollView>
+            </RefreshContainer>
         </View>
     );
 }
