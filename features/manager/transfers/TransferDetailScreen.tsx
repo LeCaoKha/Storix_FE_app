@@ -31,7 +31,7 @@ export default function TransferDetailScreen() {
 
     const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
     const { data: availability = [], isLoading: isCheckingAvailability } = useCheckTransferAvailability(transferId);
-    
+
     const handleRefresh = async () => {
         await refetch();
     };
@@ -187,8 +187,8 @@ export default function TransferDetailScreen() {
     const handleRemoveItem = (itemId: number) => {
         Alert.alert('Xác nhận', 'Bạn có chắc chắn muốn xóa sản phẩm này khỏi phiếu?', [
             { text: 'Hủy', style: 'cancel' },
-            { 
-                text: 'Xóa', 
+            {
+                text: 'Xóa',
                 style: 'destructive',
                 onPress: () => {
                     removeItemMutation.mutate({ id: transferId, itemId }, {
@@ -265,8 +265,8 @@ export default function TransferDetailScreen() {
                 subtitle={transfer.referenceCode || `Phiếu #${transfer.id}`}
             />
 
-            <RefreshContainer 
-                style={styles.content} 
+            <RefreshContainer
+                style={styles.content}
                 contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}
                 onRefresh={handleRefresh}
             >
@@ -383,11 +383,11 @@ export default function TransferDetailScreen() {
                             <Feather name="package" size={32} color={COLORS.border} />
                             <Text style={styles.emptyItemsText}>Chưa có sản phẩm nào được thêm vào phiếu.</Text>
                             {canEditTransfer && (
-                                <Button 
-                                    title="Thêm sản phẩm ngay" 
-                                    variant="outline" 
-                                    onPress={() => setIsAddModalVisible(true)} 
-                                    style={{ marginTop: 12 }} 
+                                <Button
+                                    title="Thêm sản phẩm ngay"
+                                    variant="outline"
+                                    onPress={() => setIsAddModalVisible(true)}
+                                    style={{ marginTop: 12 }}
                                 />
                             )}
                         </View>
@@ -409,14 +409,14 @@ export default function TransferDetailScreen() {
                             numberOfLines={3}
                         />
                         <View style={styles.reasonActions}>
-                            <Button 
-                                title="Bỏ qua" 
-                                variant="outline" 
+                            <Button
+                                title="Bỏ qua"
+                                variant="outline"
                                 onPress={() => { setShowReasonInput(null); setReason(''); }}
                                 style={{ flex: 1 }}
                             />
-                            <Button 
-                                title="Xác nhận" 
+                            <Button
+                                title="Xác nhận"
                                 onPress={showReasonInput === 'reject' ? handleReject : handleCancel}
                                 loading={rejectMutation.isPending || cancelMutation.isPending}
                                 style={{ flex: 1 }}

@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from "@/constants/color";
 import { useRefreshStore } from "@/stores/refresh.store";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export default function StaffTabLayout() {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
 
     return (
         <Tabs
@@ -34,7 +36,7 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="tasks/index"
                 options={{
-                    title: "Nhiệm vụ",
+                    title: t('tabs.tasks'),
                     tabBarIcon: ({ color }) => <Feather name="clipboard" size={28} color={color} />,
                 }}
                 listeners={({ navigation }) => ({
@@ -48,9 +50,10 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="warehouse"
                 options={{
-                    title: "Sơ đồ kho",
+                    title: t('tabs.map'),
                     href: null,
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             {/* Hide nested warehouse from tab bar but keep it in stack */}
@@ -77,7 +80,7 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="notifications"
                 options={{
-                    title: "Thông báo",
+                    title: t('tabs.notifications'),
                     tabBarIcon: ({ color }) => <Feather name="bell" size={28} color={color} />,
                 }}
                 listeners={({ navigation }) => ({
@@ -91,7 +94,7 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="profile"
                 options={{
-                    title: "Profile",
+                    title: t('tabs.profile'),
                     tabBarIcon: ({ color }) => <Feather name="user" size={28} color={color} />,
                 }}
                 listeners={({ navigation }) => ({
@@ -119,13 +122,6 @@ export default function StaffTabLayout() {
             />
             <Tabs.Screen
                 name="tasks/outbound/[id]"
-                options={{
-                    href: null,
-                    tabBarStyle: { display: 'none' },
-                }}
-            />
-            <Tabs.Screen
-                name="tasks/putaway/[id]"
                 options={{
                     href: null,
                     tabBarStyle: { display: 'none' },

@@ -53,7 +53,7 @@ export default function StaffInboundDetailScreen() {
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Đang tải..." />
+                <ScreenHeader title="Loading..." />
             </View>
         );
     }
@@ -61,12 +61,12 @@ export default function StaffInboundDetailScreen() {
     if (!order || error) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Lỗi" />
+                <ScreenHeader title="Error" />
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
-                    <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
+                    <Text style={styles.errorText}>Order information not found</Text>
                     <TouchableOpacity style={styles.backButton} onPress={goBack}>
-                        <Text style={styles.backButtonText}>Quay lại</Text>
+                        <Text style={styles.backButtonText}>Back</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -113,11 +113,11 @@ export default function StaffInboundDetailScreen() {
                 items: updatedItems,
             });
 
-            AlertService.success('Thành công', allReceived ? 'Đã hoàn tất nhận hàng' : 'Đã lưu thông tin nhận hàng', () => {
+            AlertService.success('Success', allReceived ? 'Receipt completed' : 'Receipt information saved', () => {
                 goBack();
             });
         } catch {
-            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
+            AlertService.error('Error', 'Unable to update quantity');
         } finally {
             setIsSaving(false);
         }
@@ -126,7 +126,7 @@ export default function StaffInboundDetailScreen() {
     return (
         <View style={styles.container}>
             <ScreenHeader
-                title="Nhập Kho"
+                title="Inbound"
                 subtitle={order.referenceCode || `INB-${order.id}`}
                 onBack={goBack}
             />
@@ -139,26 +139,26 @@ export default function StaffInboundDetailScreen() {
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Nhà cung cấp: <Text style={styles.boldText}>{order.supplier?.name || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>Supplier: <Text style={styles.boldText}>{order.supplier?.name || 'N/A'}</Text></Text>
                     </View>
                     {order.referenceCode && (
                         <View style={styles.infoRow}>
                             <Feather name="file-text" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoText}>Mã tham chiếu: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
+                            <Text style={styles.infoText}>Reference Code: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
                         </View>
                     )}
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} mặt hàng</Text>
+                    <Text style={styles.sectionTitle}>Product List</Text>
+                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} items</Text>
                 </View>
 
                 {order.inboundOrderItems.map((item: InboundOrderItem) => (
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                <Text style={styles.productName}>{item.product?.name || `Product #${item.productId}`}</Text>
                                 <Text style={styles.skuText}>SKU: {item.product?.sku || 'N/A'}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
@@ -167,13 +167,13 @@ export default function StaffInboundDetailScreen() {
                                 <Text style={[styles.statusBadgeText, {
                                     color: (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? '#059669' : '#D97706'
                                 }]}>
-                                    {(localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? 'Đủ' : 'Chờ'}
+                                    {(localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? 'Full' : 'Wait'}
                                 </Text>
                             </View>
                         </View>
 
                         <View style={styles.counterRow}>
-                            <Text style={styles.qtyLabel}>Số lượng đã nhận:</Text>
+                            <Text style={styles.qtyLabel}>Received quantity:</Text>
                             <View style={styles.counter}>
                                 <TouchableOpacity
                                     style={styles.counterBtn}
@@ -198,16 +198,16 @@ export default function StaffInboundDetailScreen() {
                         <View style={styles.businessLogicSection}>
                             <View style={styles.dataGrid}>
                                 <View style={styles.dataField}>
-                                    <Text style={styles.dataLabel}>Số lô (Batch)</Text>
+                                    <Text style={styles.dataLabel}>Batch Number</Text>
                                     <TextInput
                                         style={styles.dataInput}
-                                        placeholder="Nhập số lô"
+                                        placeholder="Enter batch number"
                                         value={localItemData[item.id]?.batch}
                                         onChangeText={(v) => handleUpdateItemData(item.id, 'batch', v)}
                                     />
                                 </View>
                                 <View style={styles.dataField}>
-                                    <Text style={styles.dataLabel}>Hạn dùng (Exp)</Text>
+                                    <Text style={styles.dataLabel}>Expiry Date (Exp)</Text>
                                     <TextInput
                                         style={styles.dataInput}
                                         placeholder="DD/MM/YYYY"
@@ -217,26 +217,26 @@ export default function StaffInboundDetailScreen() {
                                 </View>
                             </View>
 
-                            <Text style={styles.dataLabel}>Tình trạng QC</Text>
+                            <Text style={styles.dataLabel}>QC Status</Text>
                             <View style={styles.qcOptions}>
                                 <TouchableOpacity
                                     style={[styles.qcOption, localItemData[item.id]?.qc === 'good' && styles.qcOptionActive]}
                                     onPress={() => handleUpdateItemData(item.id, 'qc', 'good')}
                                 >
-                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'good' && styles.qcOptionTextActive]}>Hàng tốt</Text>
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'good' && styles.qcOptionTextActive]}>Good</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.qcOption, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionActiveDanger]}
                                     onPress={() => handleUpdateItemData(item.id, 'qc', 'damaged')}
                                 >
-                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActive]}>Lỗi/Hỏng</Text>
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActive]}>Damaged</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
                         <TouchableOpacity style={styles.scanItemBtn}>
                             <Feather name="maximize" size={16} color={COLORS.primary} />
-                            <Text style={styles.scanItemBtnText}>Scan mã vạch sản phẩm này</Text>
+                            <Text style={styles.scanItemBtnText}>Scan barcode for this product</Text>
                         </TouchableOpacity>
                     </Card>
                 ))}
@@ -245,7 +245,7 @@ export default function StaffInboundDetailScreen() {
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.reportBtn}>
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
+                    <Text style={styles.reportBtnText}>Report Error</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.saveBtn, isSaving && styles.disabledBtn]}
@@ -253,7 +253,7 @@ export default function StaffInboundDetailScreen() {
                     disabled={isSaving}
                 >
                     <Text style={styles.saveBtnText}>
-                        {isSaving ? 'Đang lưu...' : 'Hoàn tất nhận hàng'}
+                        {isSaving ? 'Saving...' : 'Complete Receipt'}
                     </Text>
                 </TouchableOpacity>
             </View>

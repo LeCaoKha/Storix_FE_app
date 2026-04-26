@@ -74,8 +74,8 @@ export const AlertService = {
             message,
             type: 'confirm',
             buttons: [
-                { text: 'Hủy', onPress: onCancel, style: 'cancel' },
-                { text: 'Đồng ý', onPress: onConfirm, style: 'default' },
+                { text: 'Cancel', onPress: onCancel, style: 'cancel' },
+                { text: 'Confirm', onPress: onConfirm, style: 'default' },
             ],
         });
     },

@@ -49,6 +49,7 @@ interface WarehouseLayoutProps {
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
   onZonePress?: (zone: WarehouseZone) => void;
   optimizedPath?: string[];
+  isCounting?: boolean;
 }
 
 export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
@@ -59,6 +60,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   onShelfPress,
   onZonePress,
   optimizedPath = [],
+  isCounting = false,
 }) => {
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -672,7 +674,16 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   const mapYMax = (structure as any).length ?? structure.height;
 
   return (
-    <View className="flex-1 bg-slate-100 rounded-[32px] mx-4 mb-5 overflow-hidden border-[1.5px] border-white shadow-[0_12px_24px_rgba(15,23,42,0.15)] elevation-8">
+    <View
+      className="flex-1 bg-slate-100 rounded-[32px] mx-4 mb-5 overflow-hidden border-[1.5px] border-white"
+      style={{
+        shadowColor: "rgba(15, 23, 42, 0.15)",
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 1,
+        shadowRadius: 24,
+        elevation: 8,
+      }}
+    >
       <GestureDetector gesture={composedGesture}>
         <Animated.View className="flex-1" onLayout={onMapLayout}>
           <Animated.View style={animatedStyle}>
@@ -780,7 +791,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             style={{ backgroundColor: COLORS.success }}
           />
           <Text className="text-[13px] font-bold text-slate-500">
-            Suggested Position
+            {isCounting ? "Count locations" : "Suggested locations"}
           </Text>
         </View>
         <View className="flex-row items-center gap-2">

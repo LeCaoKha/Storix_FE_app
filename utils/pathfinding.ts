@@ -102,10 +102,10 @@ export const findShortestPath = (
  * Tạo hướng dẫn di chuyển từ path
  */
 const generateInstructions = (path: NavigationNode[]): string[] => {
-  if (path.length < 2) return ['Bạn đã ở đích'];
+  if (path.length < 2) return ['You are already at the destination'];
 
   const instructions: string[] = [];
-  instructions.push(`Bắt đầu tại vị trí (${path[0].x}, ${path[0].y})`);
+  instructions.push(`Start at position (${path[0].x}, ${path[0].y})`);
 
   for (let i = 1; i < path.length; i++) {
     const from = path[i - 1];
@@ -115,10 +115,10 @@ const generateInstructions = (path: NavigationNode[]): string[] => {
     ).toFixed(1);
 
     const direction = getDirection(from, to);
-    instructions.push(`${i}. Đi ${direction} ${distance}m đến (${to.x}, ${to.y})`);
+    instructions.push(`${i}. Go ${direction} ${distance}m to (${to.x}, ${to.y})`);
   }
 
-  instructions.push(`Đã đến đích tại (${path[path.length - 1].x}, ${path[path.length - 1].y})`);
+  instructions.push(`Arrived at destination at (${path[path.length - 1].x}, ${path[path.length - 1].y})`);
 
   return instructions;
 };
@@ -131,10 +131,10 @@ const getDirection = (from: NavigationNode, to: NavigationNode): string => {
   const dy = to.y - from.y;
   const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-  if (angle >= -45 && angle < 45) return 'sang phải';
-  if (angle >= 45 && angle < 135) return 'xuống dưới';
-  if (angle >= 135 || angle < -135) return 'sang trái';
-  return 'lên trên';
+  if (angle >= -45 && angle < 45) return 'right';
+  if (angle >= 45 && angle < 135) return 'down';
+  if (angle >= 135 || angle < -135) return 'left';
+  return 'up';
 };
 
 /**

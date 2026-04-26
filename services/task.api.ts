@@ -17,8 +17,8 @@ export const getTasks = async (staffId: number, companyId: number, _currentWareh
 
             const inboundTasks = inboundTickets.map(ticket => ({
                 id: `inbound-${ticket.id}`,
-                title: `Nhập kho: ${ticket.referenceCode || `INB-${ticket.id}`}`,
-                description: `Nhận hàng từ ${ticket.supplier?.name || 'nhà cung cấp'} với ${ticket.inboundOrderItems?.length || 0} mặt hàng`,
+                title: `Inbound: ${ticket.referenceCode || `INB-${ticket.id}`}`,
+                description: `Receive goods from ${ticket.supplier?.name || 'supplier'} with ${ticket.inboundOrderItems?.length || 0} items`,
                 type: TaskType.INBOUND,
                 status: mapInboundStatus(ticket.status),
                 priority: TaskPriority.MEDIUM,
@@ -42,8 +42,8 @@ export const getTasks = async (staffId: number, companyId: number, _currentWareh
                 const orderItems = ticket.items || ticket.outboundOrderItems || [];
                 return {
                     id: `outbound-${ticket.id}`,
-                    title: `Xuất kho: OUT-${ticket.id}`,
-                    description: `Lấy hàng giao đến ${ticket.destination || 'khách hàng'} với ${orderItems.length} mặt hàng`,
+                    title: `Outbound: OUT-${ticket.id}`,
+                    description: `Pick items to deliver to ${ticket.destination || 'customer'} with ${orderItems.length} items`,
                     type: TaskType.OUTBOUND,
                     status: mapOutboundStatus(ticket.status),
                     priority: TaskPriority.MEDIUM,
@@ -73,14 +73,14 @@ export const getTasks = async (staffId: number, companyId: number, _currentWareh
                 )
                 .map(ticket => ({
                     id: `inventory-count-${ticket.id}`,
-                    title: `Kiểm kê: ${ticket.name || `CNT-${ticket.id}`}`,
-                    description: `Đếm kiểm ${ticket.itemCount || 0} mặt hàng trong phiếu kiểm kê`,
+                    title: `Inventory Count: ${ticket.name || `CNT-${ticket.id}`}`,
+                    description: `Count ${ticket.itemCount || 0} items in the inventory count ticket`,
                     type: TaskType.INVENTORY_COUNT,
                     status: mapCountStatus(ticket.status),
                     priority: TaskPriority.MEDIUM,
                     assignedTo: String(staffId),
                     relatedOrderId: String(ticket.id),
-                    location: ticket.warehouseId ? `Kho #${ticket.warehouseId}` : undefined,
+                    location: ticket.warehouseId ? `Warehouse #${ticket.warehouseId}` : undefined,
                     createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
                     updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
                 }));

@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // View mode - Requests (chờ duyệt) hoặc Tickets (đã duyệt, đang xử lý)
 type ViewMode = 'requests' | 'tickets';
@@ -13,22 +14,22 @@ type ViewMode = 'requests' | 'tickets';
 // Status config cho Request
 type RequestStatusKey = 'Pending' | 'Approved' | 'Rejected';
 const REQUEST_STATUS_CONFIG: Record<RequestStatusKey, { label: string; color: string; bgColor: string }> = {
-    Pending: { label: 'Chờ duyệt', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    Approved: { label: 'Đã duyệt', color: COLORS.success, bgColor: COLORS.success + '20' },
-    Rejected: { label: 'Từ chối', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    Pending: { label: 'common.pending', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Approved: { label: 'common.approved', color: COLORS.success, bgColor: COLORS.success + '20' },
+    Rejected: { label: 'common.rejected', color: COLORS.danger, bgColor: COLORS.danger + '20' },
 };
 
 // Status config cho Ticket - theo BE
 // BE statuses: Created -> Picking -> QualityCheck -> IssueReported/Packing -> LoadHandover -> Completed
 type TicketStatusKey = 'Created' | 'Picking' | 'QualityCheck' | 'IssueReported' | 'Packing' | 'LoadHandover' | 'Completed';
 const TICKET_STATUS_CONFIG: Record<TicketStatusKey, { label: string; color: string; bgColor: string }> = {
-    Created: { label: 'Chờ xử lý', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    Picking: { label: 'Đang lấy hàng', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
-    QualityCheck: { label: 'Kiểm tra CL', color: COLORS.slate700, bgColor: COLORS.slate200 },
-    IssueReported: { label: 'Có vấn đề', color: COLORS.danger, bgColor: COLORS.danger + '20' },
-    Packing: { label: 'Đóng gói', color: COLORS.teal600, bgColor: COLORS.teal50 },
-    LoadHandover: { label: 'Bàn giao', color: COLORS.success, bgColor: COLORS.success + '20' },
-    Completed: { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    Created: { label: 'common.pending', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Picking: { label: 'tasks.pickItems', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    QualityCheck: { label: 'outbound.qualityCheck', color: COLORS.slate700, bgColor: COLORS.slate200 },
+    IssueReported: { label: 'outbound.issue', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    Packing: { label: 'outbound.packing', color: COLORS.teal600, bgColor: COLORS.teal50 },
+    LoadHandover: { label: 'outbound.handover', color: COLORS.success, bgColor: COLORS.success + '20' },
+    Completed: { label: 'common.completed', color: COLORS.success, bgColor: COLORS.success + '20' },
 };
 
 const getRequestStatusConfig = (status?: string) => {
@@ -47,6 +48,7 @@ const getTicketStatusConfig = (status?: string) => {
 };
 
 export default function OutboundOrdersScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const [viewMode, setViewMode] = useState<ViewMode>('tickets');
     const [searchQuery, setSearchQuery] = useState('');
@@ -143,11 +145,11 @@ export default function OutboundOrdersScreen() {
                     <View style={styles.cardHeader}>
                         <View style={styles.cardHeaderLeft}>
                             <Text style={styles.orderNumber}>REQ-{request.id}</Text>
-                            <Text style={styles.typeTag}>Yêu cầu xuất kho</Text>
+                            <Text style={styles.typeTag}>{t('tasks.outbound')}</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
                             <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                                {statusConfig.label}
+                                {t(statusConfig.label as any)}
                             </Text>
                         </View>
                     </View>
@@ -174,7 +176,7 @@ export default function OutboundOrdersScreen() {
                         <Feather name="package" size={16} color={COLORS.textMuted} />
                         <Text style={styles.cardLabel}>Sản phẩm:</Text>
                         <Text style={styles.cardValue}>
-                            {((request as any).items || request.outboundOrderItems)?.length || 0} mặt hàng
+                            {((request as any).items || request.outboundOrderItems)?.length || 0} {t('common.item').toLowerCase()}
                         </Text>
                     </View>
 
@@ -183,7 +185,7 @@ export default function OutboundOrdersScreen() {
                             <Feather name="calendar" size={16} color={COLORS.textMuted} />
                             <Text style={styles.cardLabel}>Ngày tạo:</Text>
                             <Text style={styles.cardValue}>
-                                {new Date(request.createdAt).toLocaleDateString('vi-VN')}
+                                {new Date(request.createdAt).toLocaleDateString()}
                             </Text>
                         </View>
                     )}
@@ -208,7 +210,7 @@ export default function OutboundOrdersScreen() {
                             <Text style={styles.orderNumber}>OUT-{ticket.id}</Text>
                             {ticket.outboundRequestId && (
                                 <Text style={styles.requisitionRef}>
-                                    Từ yêu cầu #{ticket.outboundRequestId}
+                                    {t('tasks.outbound')} #{ticket.outboundRequestId}
                                 </Text>
                             )}
                         </View>
@@ -241,7 +243,7 @@ export default function OutboundOrdersScreen() {
                         <Feather name="package" size={16} color={COLORS.textMuted} />
                         <Text style={styles.cardLabel}>Sản phẩm:</Text>
                         <Text style={styles.cardValue}>
-                            {((ticket as any).items || ticket.outboundOrderItems)?.length || 0} mặt hàng
+                            {((ticket as any).items || ticket.outboundOrderItems)?.length || 0} {t('common.item').toLowerCase()}
                         </Text>
                     </View>
 
@@ -250,7 +252,7 @@ export default function OutboundOrdersScreen() {
                             <Feather name="calendar" size={16} color={COLORS.textMuted} />
                             <Text style={styles.cardLabel}>Ngày tạo:</Text>
                             <Text style={styles.cardValue}>
-                                {new Date(ticket.createdAt).toLocaleDateString('vi-VN')}
+                                {new Date(ticket.createdAt).toLocaleDateString()}
                             </Text>
                         </View>
                     )}
@@ -265,7 +267,7 @@ export default function OutboundOrdersScreen() {
                 showAddButton
                 onAddPress={() => router.push('/(manager-tabs)/(orders-outbound)/create')}
                 showSearch
-                searchPlaceholder="Tìm theo mã đơn, khách hàng..."
+                searchPlaceholder={t('common.search')}
                 searchValue={searchQuery}
                 onSearchChange={setSearchQuery}
                 useTopSafeArea={false}
@@ -278,7 +280,7 @@ export default function OutboundOrdersScreen() {
                     >
                         <Feather name="file-text" size={16} color={viewMode === 'requests' ? '#fff' : COLORS.textMuted} />
                         <Text style={[styles.viewModeText, viewMode === 'requests' && styles.viewModeTextActive]}>
-                            Yêu cầu ({requestCounts.all})
+                            {t('tasks.outbound')} ({requestCounts.all})
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -287,7 +289,7 @@ export default function OutboundOrdersScreen() {
                     >
                         <Feather name="clipboard" size={16} color={viewMode === 'tickets' ? '#fff' : COLORS.textMuted} />
                         <Text style={[styles.viewModeText, viewMode === 'tickets' && styles.viewModeTextActive]}>
-                            Phiếu xuất ({ticketCounts.all})
+                            {t('outbound.ticketTitle')} ({ticketCounts.all})
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -319,7 +321,7 @@ export default function OutboundOrdersScreen() {
                                 onPress={() => setSelectedRequestStatus('Pending')}
                             >
                                 <Text style={[styles.tabText, selectedRequestStatus === 'Pending' && styles.tabTextActive]}>
-                                    Chờ duyệt
+                                    {t('common.pending')}
                                 </Text>
                                 <View style={[styles.tabCount, selectedRequestStatus === 'Pending' && styles.tabCountActive]}>
                                     <Text style={[styles.tabCountText, selectedRequestStatus === 'Pending' && styles.tabCountTextActive]}>
@@ -332,7 +334,7 @@ export default function OutboundOrdersScreen() {
                                 onPress={() => setSelectedRequestStatus('Approved')}
                             >
                                 <Text style={[styles.tabText, selectedRequestStatus === 'Approved' && styles.tabTextActive]}>
-                                    Đã duyệt
+                                    {t('common.approved')}
                                 </Text>
                                 <View style={[styles.tabCount, selectedRequestStatus === 'Approved' && styles.tabCountActive]}>
                                     <Text style={[styles.tabCountText, selectedRequestStatus === 'Approved' && styles.tabCountTextActive]}>
@@ -361,7 +363,7 @@ export default function OutboundOrdersScreen() {
                                 onPress={() => setSelectedTicketStatus('Created')}
                             >
                                 <Text style={[styles.tabText, selectedTicketStatus === 'Created' && styles.tabTextActive]}>
-                                    Chờ xử lý
+                                    {t('common.pending')}
                                 </Text>
                                 <View style={[styles.tabCount, selectedTicketStatus === 'Created' && styles.tabCountActive]}>
                                     <Text style={[styles.tabCountText, selectedTicketStatus === 'Created' && styles.tabCountTextActive]}>
@@ -374,7 +376,7 @@ export default function OutboundOrdersScreen() {
                                 onPress={() => setSelectedTicketStatus('InProgress')}
                             >
                                 <Text style={[styles.tabText, selectedTicketStatus === 'InProgress' && styles.tabTextActive]}>
-                                    Đang xử lý
+                                    {t('common.inProgress')}
                                 </Text>
                                 <View style={[styles.tabCount, selectedTicketStatus === 'InProgress' && styles.tabCountActive]}>
                                     <Text style={[styles.tabCountText, selectedTicketStatus === 'InProgress' && styles.tabCountTextActive]}>
@@ -387,7 +389,7 @@ export default function OutboundOrdersScreen() {
                                 onPress={() => setSelectedTicketStatus('Completed')}
                             >
                                 <Text style={[styles.tabText, selectedTicketStatus === 'Completed' && styles.tabTextActive]}>
-                                    Hoàn tất
+                                    {t('common.completed')}
                                 </Text>
                                 <View style={[styles.tabCount, selectedTicketStatus === 'Completed' && styles.tabCountActive]}>
                                     <Text style={[styles.tabCountText, selectedTicketStatus === 'Completed' && styles.tabCountTextActive]}>
@@ -414,7 +416,7 @@ export default function OutboundOrdersScreen() {
                     filteredRequests.length === 0 ? (
                         <Card style={styles.emptyCard}>
                             <Feather name="inbox" size={48} color={COLORS.border} />
-                            <Text style={styles.emptyText}>Không có yêu cầu xuất kho</Text>
+                            <Text style={styles.emptyText}>{t('common.noData')}</Text>
                             <Text style={styles.emptyHint}>
                                 {searchQuery ? 'Thử tìm kiếm khác' : 'Tạo yêu cầu xuất kho mới để bắt đầu'}
                             </Text>
@@ -426,7 +428,7 @@ export default function OutboundOrdersScreen() {
                     filteredTickets.length === 0 ? (
                         <Card style={styles.emptyCard}>
                             <Feather name="inbox" size={48} color={COLORS.border} />
-                            <Text style={styles.emptyText}>Không có phiếu xuất kho</Text>
+                            <Text style={styles.emptyText}>{t('common.noData')}</Text>
                             <Text style={styles.emptyHint}>
                                 {searchQuery ? 'Thử tìm kiếm khác' : 'Phiếu xuất sẽ được tạo từ yêu cầu đã duyệt'}
                             </Text>

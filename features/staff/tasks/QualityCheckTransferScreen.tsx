@@ -3,6 +3,7 @@ import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useQualityCheckTransfer, useTransferOrder } from '@/hooks/transfer.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AlertService } from '@/stores/alert.store';
 import { TransferQualityCheckItemRequest, TransferQualityCheckPayload } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
@@ -25,6 +26,7 @@ export default function QualityCheckTransferScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const transferId = parseInt(id || '0', 10);
+  const { t } = useTranslation();
 
   const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
 
@@ -44,7 +46,7 @@ export default function QualityCheckTransferScreen() {
       if (!item.productId) return;
       mapped[item.productId] = {
         productId: item.productId,
-        productName: item.productName || `San pham #${item.productId}`,
+        productName: item.productName || `${t('common.product')} #${item.productId}`,
         expectedQuantity: Number(item.quantity || 0),
         okQuantity: Number(item.quantity || 0),
         badQuantity: 0,
@@ -85,15 +87,15 @@ export default function QualityCheckTransferScreen() {
   const rowList = useMemo(() => Object.values(rows), [rows]);
 
   const validateRows = (): string | null => {
-    if (!rowList.length) return 'Khong co san pham de kiem hang.';
+    if (!rowList.length) return t('common.noData');
 
     for (const row of rowList) {
       if (row.okQuantity < 0 || row.badQuantity < 0) {
-        return `So luong khong hop le cho ${row.productName}.`;
+        return t('common.failed');
       }
 
       if (row.okQuantity + row.badQuantity > row.expectedQuantity) {
-        return `Tong OK + Loi vuot qua so luong yeu cau cua ${row.productName}.`;
+        return t('common.failed');
       }
     }
 
@@ -103,7 +105,7 @@ export default function QualityCheckTransferScreen() {
   const handleSubmitQuality = () => {
     const validationError = validateRows();
     if (validationError) {
-      AlertService.error('Du lieu chua hop le', validationError);
+      AlertService.error(t('common.error'), validationError);
       return;
     }
 
@@ -123,11 +125,11 @@ export default function QualityCheckTransferScreen() {
       { id: transferId, payload },
       {
         onSuccess: () => {
-          AlertService.success('Thanh cong', 'Da xac nhan kiem hang luan chuyen.');
+          AlertService.success(t('common.success'), t('common.save'));
           goBack();
         },
         onError: (error: any) => {
-          AlertService.error('Loi', error?.response?.data?.message || 'Khong the cap nhat kiem hang.');
+          AlertService.error(t('common.error'), error?.response?.data?.message || t('common.failed'));
         },
       },
     );
@@ -136,7 +138,7 @@ export default function QualityCheckTransferScreen() {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <Text>Dang tai...</Text>
+        <Text>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -145,8 +147,8 @@ export default function QualityCheckTransferScreen() {
     return (
       <View style={styles.center}>
         <Feather name="alert-circle" size={52} color={COLORS.border} />
-        <Text style={styles.errorText}>Khong tim thay phieu luan chuyen.</Text>
-        <Button title="Quay lai" onPress={goBack} />
+        <Text style={styles.errorText}>{t('common.noData')}</Text>
+        <Button title={t('common.back')} onPress={goBack} />
       </View>
     );
   }
@@ -154,8 +156,8 @@ export default function QualityCheckTransferScreen() {
   return (
     <View style={styles.container}>
       <ScreenHeader
-        title="Kiem hang luan chuyen"
-        subtitle={transfer.referenceCode || `Phieu #${transfer.id}`}
+        title={t('transfer.qualityCheck')}
+        subtitle={transfer.referenceCode || `${t('common.item')} #${transfer.id}`}
       />
 
       <RefreshContainer 
@@ -166,7 +168,7 @@ export default function QualityCheckTransferScreen() {
         <Card style={styles.card}>
           <View style={styles.infoRow}>
             <Feather name="check-square" size={18} color={COLORS.primary} />
-            <Text style={styles.infoText}>Nhap so luong OK va loi cho tung san pham</Text>
+            <Text style={styles.infoText}>{t('transfer.confirmQC')}</Text>
           </View>
         </Card>
 
@@ -174,11 +176,11 @@ export default function QualityCheckTransferScreen() {
           {rowList.map((row, index) => (
             <View key={row.productId} style={styles.itemWrap}>
               <Text style={styles.productName}>{row.productName}</Text>
-              <Text style={styles.expectedText}>Yeu cau: {row.expectedQuantity}</Text>
+              <Text style={styles.expectedText}>{t('putaway.toLocation')}: {row.expectedQuantity}</Text>
 
               <View style={styles.inputsRow}>
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>So luong OK</Text>
+                  <Text style={styles.inputLabel}>{t('transfer.okQty')}</Text>
                   <TextInput
                     style={styles.input}
                     keyboardType="numeric"
@@ -188,7 +190,7 @@ export default function QualityCheckTransferScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>So luong Loi</Text>
+                  <Text style={styles.inputLabel}>{t('transfer.badQty')}</Text>
                   <TextInput
                     style={[styles.input, styles.badInput]}
                     keyboardType="numeric"
@@ -200,7 +202,7 @@ export default function QualityCheckTransferScreen() {
 
               <TextInput
                 style={styles.noteInput}
-                placeholder="Ghi chu cho san pham nay (neu co)"
+                placeholder={t('common.note')}
                 value={row.note}
                 onChangeText={(value) => updateRowNote(row.productId, value)}
               />
@@ -211,10 +213,10 @@ export default function QualityCheckTransferScreen() {
         </View>
 
         <Card style={[styles.card, styles.noteCard]}>
-          <Text style={styles.inputLabel}>Ghi chu tong</Text>
+          <Text style={styles.inputLabel}>{t('common.note')}</Text>
           <TextInput
             style={styles.globalNoteInput}
-            placeholder="Mo ta tong quan ket qua kiem hang"
+            placeholder={t('common.note')}
             multiline
             numberOfLines={3}
             value={note}
@@ -225,7 +227,7 @@ export default function QualityCheckTransferScreen() {
 
       <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
         <Button
-          title="Xac nhan kiem hang"
+          title={t('transfer.confirmSave')}
           onPress={handleSubmitQuality}
           loading={qualityMutation.isPending}
         />

@@ -3,6 +3,7 @@ import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -20,11 +21,10 @@ export default function InboundDetailScreen() {
     const insets = useSafeAreaInsets();
     const goBack = useAppBack();
     const user = useAuthStore((state) => state.user);
+    const { t } = useTranslation();
     const companyId = user?.companyId ?? 0;
     const staffId = user?.id ?? 0;
 
-    // Dùng endpoint staff-specific (filter theo Warehouse.CompanyId — đúng)
-    // thay vì GET /tickets/{companyId}/{id} (filter theo CreatedByNavigation.CompanyId — sai, gây 404)
     const { data: staffOrders, isLoading, refetch: refetchOrders } = useInboundOrdersByStaff(companyId, staffId);
     const numericId = typeof id === 'string' ? parseInt(id, 10) : Number(id);
     const { data: inboundTicket, refetch: refetchTicket } = useInboundTicket(numericId);
@@ -57,40 +57,6 @@ export default function InboundDetailScreen() {
     const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
     const { data: warehouseStructure, refetch: refetchStructure } = useWarehouseStructure(warehouseId);
 
-    const validBinCodes = useMemo(() => {
-        if (!warehouseStructure?.zones) return new Set<string>();
-
-        const bins = warehouseStructure.zones.flatMap((zone) =>
-            (zone.shelves || []).flatMap((shelf) =>
-                (shelf.levels || []).flatMap((level) =>
-                    (level.bins || []).flatMap((bin) => [bin.code, bin.id].filter(Boolean) as string[])
-                )
-            )
-        );
-
-        return new Set(bins.map((code) => normalizeBinCode(code)).filter(Boolean));
-    }, [warehouseStructure]);
-
-    const binIdCodeByInput = useMemo(() => {
-        const map = new Map<string, string>();
-        if (!warehouseStructure?.zones) return map;
-
-        warehouseStructure.zones.forEach((zone) => {
-            (zone.shelves || []).forEach((shelf) => {
-                (shelf.levels || []).forEach((level) => {
-                    (level.bins || []).forEach((bin) => {
-                        const normalizedCode = normalizeBinCode(bin.code);
-                        const normalizedId = normalizeBinCode(bin.id);
-                        if (normalizedCode) map.set(normalizedCode, bin.id);
-                        if (normalizedId) map.set(normalizedId, bin.id);
-                    });
-                });
-            });
-        });
-
-        return map;
-    }, [warehouseStructure]);
-
     const openWarehouseForItem = (item: InboundOrderItem) => {
         const bins = recommendationByItemId
             .get(item.id)
@@ -110,8 +76,6 @@ export default function InboundDetailScreen() {
         } as any);
     };
 
-    const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
-    const [isConfirming, setIsConfirming] = useState(false);
     const stagedTickets = useInboundStagingStore((state) => state.tickets);
     const getItemStagedQuantity = useInboundStagingStore((state) => state.getItemStagedQuantity);
     const getItemStagedBins = useInboundStagingStore((state) => state.getItemStagedBins);
@@ -133,19 +97,6 @@ export default function InboundDetailScreen() {
         return actualReceived >= expected;
     }, [getReceivedQuantity]);
 
-    const syncLocalQuantitiesFromOrder = React.useCallback((nextOrder: any) => {
-        if (!nextOrder?.inboundOrderItems) return;
-
-        const nextQuantities = nextOrder.inboundOrderItems.reduce((acc: Record<number, number>, item: InboundOrderItem) => {
-            const baseReceived = Number(item.receivedQuantity || 0);
-            const stagedReceived = Number(getItemStagedQuantity(nextOrder.id, item.id) || 0);
-            acc[item.id] = baseReceived + stagedReceived;
-            return acc;
-        }, {});
-
-        setLocalQuantities(nextQuantities);
-    }, [getItemStagedQuantity]);
-
     const handleRefresh = async () => {
         await Promise.all([
             refetchOrders(),
@@ -157,7 +108,6 @@ export default function InboundDetailScreen() {
 
     useFocusEffect(
         React.useCallback(() => {
-            // Keep list/detail in sync after returning from warehouse view.
             void Promise.all([
                 refetchOrders(),
                 numericId > 0 ? refetchTicket() : Promise.resolve(),
@@ -167,15 +117,13 @@ export default function InboundDetailScreen() {
         }, [numericId, refetchOrders, refetchTicket, refetchRecs, refetchStructure])
     );
 
-
-    // Keep status flags before any early return to preserve hook call order.
     const isCompleted = order?.status === 'Completed';
-    const canEdit = !!order && !isCompleted;
+    const [isConfirming, setIsConfirming] = useState(false);
 
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Đang tải..." />
+                <ScreenHeader title={t('common.loading')} />
             </View>
         );
     }
@@ -183,19 +131,18 @@ export default function InboundDetailScreen() {
     if (!order || error) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Lỗi" />
+                <ScreenHeader title={t('common.error')} />
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
-                    <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
+                    <Text style={styles.errorText}>{t('common.noData')}</Text>
                     <TouchableOpacity style={styles.backButton} onPress={goBack}>
-                        <Text style={styles.backButtonText}>Quay lại</Text>
+                        <Text style={styles.backButtonText}>{t('common.back')}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
         );
     }
 
-    // Check if all items are received
     const allItemsReceived = order?.inboundOrderItems?.every(
         (item: InboundOrderItem) => isItemReceivedEnough(item)
     ) ?? false;
@@ -204,12 +151,11 @@ export default function InboundDetailScreen() {
         if (!order || !user) return;
 
         AlertService.confirm(
-            'Xác nhận hoàn tất nhập kho',
-            'Bạn có chắc chắn đã nhận đủ và kiểm tra tất cả hàng hóa? Sau khi xác nhận, phiếu nhập sẽ được đánh dấu hoàn thành.',
+            t('inbound.confirmComplete'),
+            t('inbound.confirmCompleteMsg') || 'Are you sure you have received and checked all items?',
             async () => {
                 setIsConfirming(true);
                 try {
-                    // Update items with final quantities and staged locations.
                     const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
                         const baseReceived = Math.max(0, Number(item.receivedQuantity || 0));
                         const stagedBins = getItemStagedBins(order.id, item.id);
@@ -217,8 +163,6 @@ export default function InboundDetailScreen() {
                             .map(([binId, qty]) => ({ binId: String(binId), quantity: Math.max(0, Number(qty || 0)) }))
                             .filter((loc) => loc.quantity > 0);
                         
-                        // FIX: receivedQuantity should be ALREADY DONE + NEWLY STAGED SUM
-                        // Do not use target clamp here because it causes sum mismatch error in backend
                         const currentSessionStagedTotal = locations.reduce((sum, loc) => sum + loc.quantity, 0);
                         const finalReceived = baseReceived + currentSessionStagedTotal;
 
@@ -231,14 +175,6 @@ export default function InboundDetailScreen() {
                         };
                     });
 
-                    console.log('[InboundDetailScreen] Final PUT payload', {
-                        ticketId: order.id,
-                        items: updatedItems,
-                    });
-
-                    // LOG PAYLOAD FOR DEBUGGING
-                    console.log('[InboundDetail] Updating ticket items payload:', JSON.stringify(updatedItems, null, 2));
-
                     await updateItems.mutateAsync({
                         ticketId: order.id,
                         items: updatedItems,
@@ -246,11 +182,11 @@ export default function InboundDetailScreen() {
 
                     clearStagedTicket(order.id);
 
-                    AlertService.success('Hoàn thành', 'Phiếu nhập kho đã được xác nhận hoàn tất. Hàng hóa đã được ghi nhận vào tồn kho.', () => {
+                    AlertService.success(t('common.success'), t('inbound.successMsg') || 'The inbound ticket has been confirmed.', () => {
                         goBack();
                     });
                 } catch {
-                    AlertService.error('Lỗi', 'Không thể xác nhận hoàn tất. Vui lòng thử lại.');
+                    AlertService.error(t('common.error'), t('common.failed'));
                 } finally {
                     setIsConfirming(false);
                 }
@@ -261,7 +197,7 @@ export default function InboundDetailScreen() {
     return (
         <View style={styles.container}>
             <ScreenHeader
-                title="Nhập Kho"
+                title={t('inbound.ticketTitle')}
                 subtitle={order.referenceCode || `INB-${order.id}`}
             />
 
@@ -273,12 +209,12 @@ export default function InboundDetailScreen() {
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Nhà cung cấp: <Text style={styles.boldText}>{order.supplier?.name || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>{t('inbound.supplier')}: <Text style={styles.boldText}>{order.supplier?.name || 'N/A'}</Text></Text>
                     </View>
                     {order.referenceCode && (
                         <View style={styles.infoRow}>
                             <Feather name="file-text" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoText}>Mã tham chiếu: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
+                            <Text style={styles.infoText}>Reference Code: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
                         </View>
                     )}
                 </Card>
@@ -286,13 +222,13 @@ export default function InboundDetailScreen() {
                 <Card style={styles.recommendationCard}>
                     <View style={styles.recommendationHeader}>
                         <Feather name="map-pin" size={16} color={COLORS.primary} />
-                        <Text style={styles.recommendationTitle}>Gợi ý xếp hàng sau nhập kho</Text>
+                        <Text style={styles.recommendationTitle}>{t('inbound.recommendations')}</Text>
                     </View>
 
                     {recommendationsLoading ? (
-                        <Text style={styles.recommendationSubtle}>Đang tải gợi ý vị trí...</Text>
+                        <Text style={styles.recommendationSubtle}>{t('common.loading')}</Text>
                     ) : recommendedBinCodes.length === 0 ? (
-                        <Text style={styles.recommendationSubtle}>Chưa có gợi ý từ hệ thống. Staff có thể tự chọn vị trí xếp hàng.</Text>
+                        <Text style={styles.recommendationSubtle}>{t('common.noData')}</Text>
                     ) : (
                         <>
                             {order.inboundOrderItems.map((item: InboundOrderItem) => {
@@ -312,7 +248,6 @@ export default function InboundDetailScreen() {
                     )}
                 </Card>
 
-                {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
                     style={styles.warehouseCard}
                     onPress={() => router.push({
@@ -328,22 +263,22 @@ export default function InboundDetailScreen() {
                         <Feather name="map" size={18} color={COLORS.primary} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.warehouseTitle}>Sơ đồ kho</Text>
-                        <Text style={styles.warehouseSubtitle}>Nhấn để xem vị trí đề xuất trên sơ đồ</Text>
+                        <Text style={styles.warehouseTitle}>{t('outbound.warehouseMap')}</Text>
+                        <Text style={styles.warehouseSubtitle}>{t('outbound.tapToNavigate')}</Text>
                     </View>
                     <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
                 </TouchableOpacity>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} mặt hàng</Text>
+                    <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
+                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} {t('tabs.tasks').toLowerCase()}</Text>
                 </View>
 
                 {order.inboundOrderItems.map((item: InboundOrderItem) => (
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.name || item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                <Text style={styles.productName}>{item.name || item.product?.name || `Product #${item.productId}`}</Text>
                                 <Text style={styles.skuText}>SKU: {item.sku || item.product?.sku || 'N/A'}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
@@ -352,13 +287,13 @@ export default function InboundDetailScreen() {
                                 <Text style={[styles.statusBadgeText, {
                                     color: (isCompleted || isItemReceivedEnough(item)) ? COLORS.success : COLORS.warning
                                 }]}>
-                                    {(isCompleted || isItemReceivedEnough(item)) ? 'Đủ' : 'Chờ'}
+                                    {(isCompleted || isItemReceivedEnough(item)) ? t('common.done') : t('common.pending')}
                                 </Text>
                             </View>
                         </View>
 
                         <View style={styles.counterRow}>
-                            <Text style={styles.qtyLabel}>Số lượng đã nhận:</Text>
+                            <Text style={styles.qtyLabel}>{t('inbound.receivedQty')}</Text>
                             <View style={styles.qtyDisplay}>
                                 <Text style={[
                                     styles.qtyValue, 
@@ -383,18 +318,16 @@ export default function InboundDetailScreen() {
 
                                     if (isItemCompleted) {
                                         return hasRecommendation
-                                            ? 'Xem kệ đã xếp cho sản phẩm này'
-                                            : 'Xem kệ đã xếp hàng';
+                                            ? t('inbound.viewShelfRec') || 'View shelf locations for this product'
+                                            : t('inbound.viewShelf') || 'View shelf locations';
                                     }
 
                                     return hasRecommendation
-                                        ? 'Xem kệ cần xếp cho sản phẩm này'
-                                        : 'Xem kệ để xếp hàng';
+                                        ? t('inbound.viewShelfSuggested') || 'View suggested shelf for this product'
+                                        : t('inbound.viewShelfStore') || 'View shelf to store';
                                 })()}
                             </Text>
                         </TouchableOpacity>
-
-
                     </Card>
                 ))}
             </RefreshContainer>
@@ -403,17 +336,17 @@ export default function InboundDetailScreen() {
                 <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                     <View style={[styles.completedBanner, { flex: 1 }]}>
                         <Feather name="check-circle" size={20} color={COLORS.success} />
-                        <Text style={styles.completedBannerText}>Đơn nhập kho đã hoàn tất</Text>
+                        <Text style={styles.completedBannerText}>{t('outbound.orderCompleted')}</Text>
                     </View>
                 </View>
             ) : (
                 <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
                     <TouchableOpacity 
                         style={styles.reportBtn} 
-                        onPress={() => AlertService.info('Hỗ trợ', 'Tính năng báo lỗi đang được phát triển.')}
+                        onPress={() => AlertService.info('Support', 'Error reporting feature is under development.')}
                     >
                         <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                        <Text style={styles.reportBtnText}>Báo lỗi</Text>
+                        <Text style={styles.reportBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('outbound.issue')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -431,8 +364,12 @@ export default function InboundDetailScreen() {
                             size={20} 
                             color={allItemsReceived ? "#fff" : COLORS.slate500} 
                         />
-                        <Text style={[styles.confirmBtnText, !allItemsReceived && { color: COLORS.slate500 }]}>
-                            {isConfirming ? 'Đang xử lý...' : allItemsReceived ? 'Xác nhận hoàn tất' : 'Chưa đủ số lượng'}
+                        <Text 
+                            style={[styles.confirmBtnText, !allItemsReceived && { color: COLORS.slate500 }]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                        >
+                            {isConfirming ? t('common.loading') : allItemsReceived ? t('inbound.confirmComplete') : t('inbound.notEnoughQty')}
                         </Text>
                     </TouchableOpacity>
                 </View>

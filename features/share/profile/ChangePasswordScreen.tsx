@@ -32,17 +32,17 @@ export default function ChangePasswordScreen() {
 
     const handleSave = async () => {
         if (!password) {
-            AlertService.warning('Lỗi', 'Vui lòng nhập mật khẩu mới.');
+            AlertService.warning('Error', 'Please enter a new password.');
             return;
         }
 
         if (password.length < 6) {
-            AlertService.warning('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự.');
+            AlertService.warning('Error', 'Password must be at least 6 characters.');
             return;
         }
 
         if (password !== confirmPassword) {
-            AlertService.warning('Lỗi', 'Mật khẩu xác nhận không khớp.');
+            AlertService.warning('Error', 'Confirmation password does not match.');
             return;
         }
 
@@ -55,12 +55,12 @@ export default function ChangePasswordScreen() {
                 formData,
             });
 
-            AlertService.success('Thành công', 'Mật khẩu đã được thay đổi.', () => {
+            AlertService.success('Success', 'Password has been changed.', () => {
                 goBack();
             });
         } catch (error: any) {
             console.error('[ChangePassword] Error:', error);
-            AlertService.error('Lỗi', 'Không thể đổi mật khẩu. Vui lòng thử lại.');
+            AlertService.error('Error', 'Unable to change password. Please try again.');
         }
     };
 
@@ -69,28 +69,28 @@ export default function ChangePasswordScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <SafeAreaHeader title="Đổi mật khẩu" onBack={goBack} />
+            <SafeAreaHeader title="Change Password" onBack={goBack} />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
                     <View style={styles.iconContainer}>
                         <Feather name="lock" size={40} color={COLORS.primary} />
                     </View>
-                    <Text style={styles.title}>Cập nhật mật khẩu</Text>
+                    <Text style={styles.title}>Update Password</Text>
                     <Text style={styles.subtitle}>
-                        Vui lòng nhập mật khẩu mới để bảo mật tài khoản của bạn.
+                        Please enter a new password to secure your account.
                     </Text>
                 </View>
 
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Mật khẩu mới</Text>
+                        <Text style={styles.label}>New Password</Text>
                         <View style={styles.passwordInputContainer}>
                             <TextInput
                                 style={styles.passwordInput}
                                 value={password}
                                 onChangeText={setPassword}
-                                placeholder="Ít nhất 6 ký tự"
+                                placeholder="At least 6 characters"
                                 secureTextEntry={!showPassword}
                             />
                             <TouchableOpacity
@@ -107,12 +107,12 @@ export default function ChangePasswordScreen() {
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Xác nhận mật khẩu</Text>
+                        <Text style={styles.label}>Confirm Password</Text>
                         <TextInput
                             style={styles.input}
                             value={confirmPassword}
                             onChangeText={setConfirmPassword}
-                            placeholder="Nhập lại mật khẩu mới"
+                            placeholder="Re-enter new password"
                             secureTextEntry={!showPassword}
                         />
                     </View>
@@ -125,7 +125,7 @@ export default function ChangePasswordScreen() {
                         {updateProfileMutation.isPending ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <Text style={styles.saveButtonText}>Cập nhật mật khẩu</Text>
+                            <Text style={styles.saveButtonText}>Update Password</Text>
                         )}
                     </TouchableOpacity>
                 </View>

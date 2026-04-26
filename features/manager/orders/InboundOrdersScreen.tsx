@@ -6,23 +6,24 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // Status config cho Request
 type RequestStatusKey = 'Pending' | 'Approved' | 'Rejected' | 'Transported';
 const REQUEST_STATUS_CONFIG: Record<RequestStatusKey, { label: string; color: string; bgColor: string }> = {
-    Pending: { label: 'Chờ duyệt', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    Approved: { label: 'Đã duyệt', color: COLORS.success, bgColor: COLORS.success + '20' },
-    Rejected: { label: 'Từ chối', color: COLORS.danger, bgColor: COLORS.danger + '20' },
-    Transported: { label: 'Đang vận chuyển', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    Pending: { label: 'pending', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    Approved: { label: 'approved', color: COLORS.success, bgColor: COLORS.success + '20' },
+    Rejected: { label: 'rejected', color: COLORS.danger, bgColor: COLORS.danger + '20' },
+    Transported: { label: 'transported', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
 };
 
 // Status config cho Ticket - theo BE
 // BE statuses: 'Waiting for payment', 'Partially Completed', 'Completed'
 type TicketStatusKey = 'Waiting for payment' | 'Partially Completed' | 'Completed';
 const TICKET_STATUS_CONFIG: Record<TicketStatusKey, { label: string; color: string; bgColor: string }> = {
-    'Waiting for payment': { label: 'Chờ nhận hàng', color: COLORS.warning, bgColor: COLORS.warning + '20' },
-    'Partially Completed': { label: 'Đang nhập', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
-    'Completed': { label: 'Hoàn tất', color: COLORS.success, bgColor: COLORS.success + '20' },
+    'Waiting for payment': { label: 'awaitingReceive', color: COLORS.warning, bgColor: COLORS.warning + '20' },
+    'Partially Completed': { label: 'inProgress', color: COLORS.primary, bgColor: COLORS.primaryLight + '20' },
+    'Completed': { label: 'completed', color: COLORS.success, bgColor: COLORS.success + '20' },
 };
 
 const getRequestStatusConfig = (status?: string) => {
@@ -47,6 +48,7 @@ const getTicketStatusConfig = (status?: string) => {
 type ViewMode = 'requests' | 'tickets';
 
 export default function InboundOrdersScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeView, setActiveView] = useState<ViewMode>('requests');
@@ -129,7 +131,7 @@ export default function InboundOrdersScreen() {
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
                             <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                                {statusConfig.label}
+                                {t(`common.${statusConfig.label}`)}
                             </Text>
                         </View>
                     </View>
@@ -139,7 +141,7 @@ export default function InboundOrdersScreen() {
                     {(request as any).supplier && (
                         <View style={styles.cardRow}>
                             <Feather name="truck" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.cardLabel}>Nhà cung cấp:</Text>
+                            <Text style={styles.cardLabel}>{t('inbound.supplier')}:</Text>
                             <Text style={styles.cardValue}>{(request as any).supplier.name}</Text>
                         </View>
                     )}
@@ -147,25 +149,25 @@ export default function InboundOrdersScreen() {
                     {(request as any).warehouse && (
                         <View style={styles.cardRow}>
                             <Feather name="home" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.cardLabel}>Kho:</Text>
+                            <Text style={styles.cardLabel}>{t('tasks.warehouse')}:</Text>
                             <Text style={styles.cardValue}>{(request as any).warehouse.name}</Text>
                         </View>
                     )}
 
                     <View style={styles.cardRow}>
                         <Feather name="package" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.cardLabel}>Sản phẩm:</Text>
+                        <Text style={styles.cardLabel}>{t('common.product')}:</Text>
                         <Text style={styles.cardValue}>
-                            {request.inboundOrderItems?.length || 0} mặt hàng
+                            {request.inboundOrderItems?.length || 0} {t('common.item').toLowerCase()}
                         </Text>
                     </View>
 
                     {request.createdAt && (
                         <View style={styles.cardRow}>
                             <Feather name="calendar" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.cardLabel}>Ngày tạo:</Text>
+                            <Text style={styles.cardLabel}>{t('tasks.createdBy')}:</Text>
                             <Text style={styles.cardValue}>
-                                {new Date(request.createdAt).toLocaleDateString('vi-VN')}
+                                {new Date(request.createdAt).toLocaleDateString()}
                             </Text>
                         </View>
                     )}
@@ -192,13 +194,13 @@ export default function InboundOrdersScreen() {
                             </Text>
                             {ticket.inboundRequestId && (
                                 <Text style={styles.requisitionRef}>
-                                    Từ yêu cầu #{ticket.inboundRequestId}
+                                    {t('tasks.inbound')} #{ticket.inboundRequestId}
                                 </Text>
                             )}
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
                             <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                                {statusConfig.label}
+                                {t(`common.${statusConfig.label}`)}
                             </Text>
                         </View>
                     </View>
@@ -207,34 +209,34 @@ export default function InboundOrdersScreen() {
 
                     <View style={styles.cardRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.cardLabel}>Nhà cung cấp:</Text>
+                        <Text style={styles.cardLabel}>{t('inbound.supplier')}:</Text>
                         <Text style={styles.cardValue}>
-                            {ticket.supplier?.name || 'Chưa xác định'}
+                            {ticket.supplier?.name || t('common.noData')}
                         </Text>
                     </View>
 
                     {ticket.warehouse && (
                         <View style={styles.cardRow}>
                             <Feather name="home" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.cardLabel}>Kho:</Text>
+                            <Text style={styles.cardLabel}>{t('tasks.warehouse')}:</Text>
                             <Text style={styles.cardValue}>{ticket.warehouse.name}</Text>
                         </View>
                     )}
 
                     <View style={styles.cardRow}>
                         <Feather name="package" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.cardLabel}>Sản phẩm:</Text>
+                        <Text style={styles.cardLabel}>{t('common.product')}:</Text>
                         <Text style={styles.cardValue}>
-                            {ticket.inboundOrderItems?.length || 0} mặt hàng
+                            {ticket.inboundOrderItems?.length || 0} {t('common.item').toLowerCase()}
                         </Text>
                     </View>
 
                     {ticket.createdAt && (
                         <View style={styles.cardRow}>
                             <Feather name="calendar" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.cardLabel}>Ngày tạo:</Text>
+                            <Text style={styles.cardLabel}>{t('tasks.createdBy')}:</Text>
                             <Text style={styles.cardValue}>
-                                {new Date(ticket.createdAt).toLocaleDateString('vi-VN')}
+                                {new Date(ticket.createdAt).toLocaleDateString()}
                             </Text>
                         </View>
                     )}
@@ -247,7 +249,7 @@ export default function InboundOrdersScreen() {
         <View style={styles.container}>
             <TabScreenHeader
                 showSearch
-                searchPlaceholder="Tìm theo mã đơn, nhà cung cấp..."
+                searchPlaceholder={t('common.search')}
                 searchValue={searchQuery}
                 onSearchChange={setSearchQuery}
                 useTopSafeArea={false}
@@ -259,7 +261,7 @@ export default function InboundOrdersScreen() {
                         onPress={() => setActiveView('requests')}
                     >
                         <Text style={[styles.viewToggleBtnText, activeView === 'requests' && styles.viewToggleBtnTextActive]}>
-                            Yêu cầu ({requests.length})
+                            {t('tasks.inbound')} ({requests.length})
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -267,7 +269,7 @@ export default function InboundOrdersScreen() {
                         onPress={() => setActiveView('tickets')}
                     >
                         <Text style={[styles.viewToggleBtnText, activeView === 'tickets' && styles.viewToggleBtnTextActive]}>
-                            Phiếu nhập ({tickets.length})
+                            {t('inbound.ticketTitle')} ({tickets.length})
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -281,10 +283,10 @@ export default function InboundOrdersScreen() {
                         contentContainerStyle={styles.tabsContainer}
                     >
                         {[
-                            { key: 'all' as const, label: 'Tất cả', count: requestCounts.all },
-                            { key: 'Pending' as const, label: 'Chờ duyệt', count: requestCounts.Pending },
-                            { key: 'Approved' as const, label: 'Đã duyệt', count: requestCounts.Approved },
-                            { key: 'Transported' as const, label: 'Đang vận chuyển', count: requestCounts.Transported },
+                            { key: 'all' as const, label: t('common.all'), count: requestCounts.all },
+                            { key: 'Pending' as const, label: t('common.pending'), count: requestCounts.Pending },
+                            { key: 'Approved' as const, label: t('common.approved'), count: requestCounts.Approved },
+                            { key: 'Transported' as const, label: t('common.transported'), count: requestCounts.Transported },
                         ].map(({ key, label, count }) => (
                             <TouchableOpacity
                                 key={key}
@@ -306,10 +308,10 @@ export default function InboundOrdersScreen() {
                         contentContainerStyle={styles.tabsContainer}
                     >
                         {[
-                            { key: 'all' as const, label: 'Tất cả', count: ticketCounts.all },
-                            { key: 'Waiting for payment' as const, label: 'Chờ nhận hàng', count: ticketCounts['Waiting for payment'] },
-                            { key: 'Partially Completed' as const, label: 'Đang nhập', count: ticketCounts['Partially Completed'] },
-                            { key: 'Completed' as const, label: 'Hoàn tất', count: ticketCounts.Completed },
+                            { key: 'all' as const, label: t('common.all'), count: ticketCounts.all },
+                            { key: 'Waiting for payment' as const, label: t('common.awaitingReceive'), count: ticketCounts['Waiting for payment'] },
+                            { key: 'Partially Completed' as const, label: t('common.inProgress'), count: ticketCounts['Partially Completed'] },
+                            { key: 'Completed' as const, label: t('common.completed'), count: ticketCounts.Completed },
                         ].map(({ key, label, count }) => (
                             <TouchableOpacity
                                 key={key}
@@ -340,7 +342,7 @@ export default function InboundOrdersScreen() {
                     filteredRequests.length === 0 ? (
                         <Card style={styles.emptyCard}>
                             <Feather name="inbox" size={48} color={COLORS.border} />
-                            <Text style={styles.emptyText}>Không có yêu cầu nhập kho</Text>
+                            <Text style={styles.emptyText}>{t('common.noData')}</Text>
                             <Text style={styles.emptyHint}>
                                 {searchQuery ? 'Thử tìm kiếm khác' : 'Các yêu cầu nhập kho sẽ xuất hiện ở đây'}
                             </Text>
@@ -352,7 +354,7 @@ export default function InboundOrdersScreen() {
                     filteredTickets.length === 0 ? (
                         <Card style={styles.emptyCard}>
                             <Feather name="inbox" size={48} color={COLORS.border} />
-                            <Text style={styles.emptyText}>Không có phiếu nhập kho</Text>
+                            <Text style={styles.emptyText}>{t('common.noData')}</Text>
                             <Text style={styles.emptyHint}>
                                 {searchQuery ? 'Thử tìm kiếm khác' : 'Phiếu nhập sẽ được tạo từ yêu cầu đã duyệt'}
                             </Text>

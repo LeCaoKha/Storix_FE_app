@@ -128,7 +128,7 @@ export default function LoginScreen() {
             }
         } catch (error) {
             console.error('Login failed:', error);
-            AlertService.error('Đăng nhập thất bại', 'Email hoặc mật khẩu không chính xác. Vui lòng thử lại.');
+            AlertService.error('Login Failed', 'Incorrect email or password. Please try again.');
         }
     };
 
@@ -159,19 +159,19 @@ export default function LoginScreen() {
                                 contentFit="contain"
                             />
                         </View>
-                        <Text style={styles.appTagline}>Hệ thống Quản lý Kho hàng</Text>
+                        <Text style={styles.appTagline}>Warehouse Management System</Text>
                     </View>
                 </LinearGradient>
 
                 <View style={styles.contentContainer}>
                     <View style={styles.formCard}>
-                        <Text style={styles.formTitle}>Đăng nhập</Text>
-                        <Text style={styles.formSubtitle}>Nhập thông tin để tiếp tục</Text>
+                        <Text style={styles.formTitle}>Sign In</Text>
+                        <Text style={styles.formSubtitle}>Enter your details to continue</Text>
 
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Email</Text>
                             <Input
-                                placeholder="Nhập email"
+                                placeholder="Enter email"
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
@@ -182,9 +182,9 @@ export default function LoginScreen() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Mật khẩu</Text>
+                            <Text style={styles.label}>Password</Text>
                             <Input
-                                placeholder="Nhập mật khẩu"
+                                placeholder="Enter password"
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry={!showPassword}
@@ -203,11 +203,11 @@ export default function LoginScreen() {
                         </View>
 
                         <TouchableOpacity style={styles.forgotPass}>
-                            <Text style={styles.forgotPassText}>Quên mật khẩu?</Text>
+                            <Text style={styles.forgotPassText}>Forgot password?</Text>
                         </TouchableOpacity>
 
                         <Button
-                            title="Đăng nhập"
+                            title="Sign In"
                             onPress={handleLogin}
                             loading={isLoading}
                             style={styles.loginButton}
@@ -217,11 +217,11 @@ export default function LoginScreen() {
 
                         <View style={styles.helpSection}>
                             <Feather name="help-circle" size={16} color={COLORS.slate500} />
-                            <Text style={styles.helpText}>Cần hỗ trợ? Liên hệ Quản trị viên</Text>
+                            <Text style={styles.helpText}>Need help? Contact Administrator</Text>
                         </View>
                     </View>
 
-                    <Text style={styles.versionText}>v2.4.0 • Phiên bản doanh nghiệp</Text>
+                    <Text style={styles.versionText}>v2.4.0 • Enterprise Edition</Text>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>

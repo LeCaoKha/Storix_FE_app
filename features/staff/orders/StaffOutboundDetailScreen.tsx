@@ -57,7 +57,7 @@ export default function StaffOutboundDetailScreen() {
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Đang tải..." />
+                <ScreenHeader title="Loading..." />
             </View>
         );
     }
@@ -65,12 +65,12 @@ export default function StaffOutboundDetailScreen() {
     if (!order || error) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Lỗi" />
+                <ScreenHeader title="Error" />
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
-                    <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
+                    <Text style={styles.errorText}>Order information not found</Text>
                     <TouchableOpacity style={styles.backButton} onPress={goBack}>
-                        <Text style={styles.backButtonText}>Quay lại</Text>
+                        <Text style={styles.backButtonText}>Back</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -83,13 +83,13 @@ export default function StaffOutboundDetailScreen() {
         setTimeout(() => {
             setIsSaving(false);
             setVerifiedItems(prev => ({ ...prev, [itemId]: true }));
-            AlertService.success('Thành công', 'Đã xác nhận đúng sản phẩm');
+            AlertService.success('Success', 'Product verified successfully');
         }, 600);
     };
 
     const handleUpdateQty = (itemId: number, increment: boolean) => {
         if (!verifiedItems[itemId]) {
-            AlertService.warning('Lưu ý', 'Vui lòng quét mã sản phẩm để xác minh trước khi lấy hàng');
+            AlertService.warning('Notice', 'Please scan product code to verify before picking');
             return;
         }
         setLocalQuantities(prev => {
@@ -124,11 +124,11 @@ export default function StaffOutboundDetailScreen() {
                 items: updatedItems,
             });
 
-            AlertService.success('Thành công', allPicked ? 'Đã hoàn tất lấy hàng' : 'Đã cập nhật số lượng lấy hàng', () => {
+            AlertService.success('Success', allPicked ? 'Picking completed' : 'Picking quantity updated', () => {
                 goBack();
             });
         } catch {
-            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
+            AlertService.error('Error', 'Unable to update quantity');
         } finally {
             setIsSaving(false);
         }
@@ -137,7 +137,7 @@ export default function StaffOutboundDetailScreen() {
     return (
         <View style={styles.container}>
             <ScreenHeader
-                title="Xuất Kho"
+                title="Outbound"
                 subtitle={order.note || `OUT-${order.id}`}
             />
 
@@ -149,17 +149,17 @@ export default function StaffOutboundDetailScreen() {
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="user" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Người tạo: <Text style={styles.boldText}>{order.createdByNavigation?.email || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>Created by: <Text style={styles.boldText}>{order.createdByNavigation?.email || 'N/A'}</Text></Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Feather name="map-pin" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Giao đến: <Text style={styles.boldText}>{order.destination || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>Ship to: <Text style={styles.boldText}>{order.destination || 'N/A'}</Text></Text>
                     </View>
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{orderItems.length} mặt hàng</Text>
+                    <Text style={styles.sectionTitle}>Product List</Text>
+                    <Text style={styles.sectionSubtitle}>{orderItems.length} items</Text>
                 </View>
 
                 {sortedItems.map((item: OutboundOrderItem) => {
@@ -171,7 +171,7 @@ export default function StaffOutboundDetailScreen() {
                         <Card key={item.id} style={cardStyle}>
                             <View style={styles.itemHeader}>
                                 <View style={styles.itemInfo}>
-                                    <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                    <Text style={styles.productName}>{item.product?.name || `Product #${item.productId}`}</Text>
                                     <View style={styles.skuRow}>
                                         <View style={styles.skuBadge}>
                                             <Text style={styles.skuText}>{item.product?.sku || 'N/A'}</Text>
@@ -184,16 +184,16 @@ export default function StaffOutboundDetailScreen() {
                                     <Text style={[styles.statusBadgeText, {
                                         color: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? '#059669' : '#D97706'
                                     }]}>
-                                        {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? 'Xong' : 'Chờ'}
+                                        {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? 'Done' : 'Wait'}
                                     </Text>
                                 </View>
                             </View>
 
                             <View style={styles.counterRow}>
                                 <View style={styles.qtyLabelContainer}>
-                                    <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
+                                    <Text style={styles.qtyLabel}>Picked quantity:</Text>
                                     {!verifiedItems[item.id] && (
-                                        <Text style={styles.verificationPrompt}>Quét để xác minh</Text>
+                                        <Text style={styles.verificationPrompt}>Scan to verify</Text>
                                     )}
                                 </View>
                                 <View style={[styles.counter, !verifiedItems[item.id] && styles.disabledCounter]}>
@@ -227,7 +227,7 @@ export default function StaffOutboundDetailScreen() {
                             >
                                 <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? "#059669" : COLORS.primary} />
                                 <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: '#059669' }]}>
-                                    {verifiedItems[item.id] ? 'Đã xác minh sản phẩm' : 'Verify Scan (Quét mã xác nhận)'}
+                                    {verifiedItems[item.id] ? 'Product verified' : 'Verify Scan'}
                                 </Text>
                             </TouchableOpacity>
                         </Card>
@@ -238,7 +238,7 @@ export default function StaffOutboundDetailScreen() {
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.reportBtn}>
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
+                    <Text style={styles.reportBtnText}>Report Error</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.saveBtn, isSaving && styles.disabledBtn]}
@@ -246,7 +246,7 @@ export default function StaffOutboundDetailScreen() {
                     disabled={isSaving}
                 >
                     <Text style={styles.saveBtnText}>
-                        {isSaving ? 'Đang lưu...' : 'Hoàn tất lấy hàng'}
+                        {isSaving ? 'Saving...' : 'Complete Picking'}
                     </Text>
                 </TouchableOpacity>
             </View>

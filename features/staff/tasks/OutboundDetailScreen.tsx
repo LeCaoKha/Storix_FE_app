@@ -7,6 +7,7 @@ import {
   useUpdateOutboundTicketStatus,
 } from "@/hooks";
 import { useAppBack } from "@/hooks/useAppBack";
+import { useTranslation } from "@/hooks/useTranslation";
 import { AlertService } from "@/stores/alert.store";
 import { useAuthStore } from "@/stores/auth.store";
 import type { OutboundOrderItem } from "@/types/outbound-order";
@@ -34,123 +35,127 @@ type TicketStatus =
   | "LoadHandover"
   | "Completed";
 
-const STATUS_CONFIG: Record<
-  TicketStatus,
-  { label: string; color: string; bgColor: string }
-> = {
-  Created: {
-    label: "Created",
-    color: COLORS.warning,
-    bgColor: COLORS.warning + "20",
-  },
-  Picking: {
-    label: "Picking",
-    color: COLORS.primary,
-    bgColor: COLORS.primaryLight + "20",
-  },
-  QualityCheck: {
-    label: "Quality Check",
-    color: "#7C3AED",
-    bgColor: "#7C3AED20",
-  },
-  IssueReported: {
-    label: "Issue Reported",
-    color: COLORS.danger,
-    bgColor: COLORS.danger + "20",
-  },
-  Packing: { label: "Packing", color: COLORS.teal600, bgColor: COLORS.teal50 },
-  LoadHandover: {
-    label: "Pending Approval",
-    color: COLORS.warning,
-    bgColor: COLORS.warning + "20",
-  },
-  Completed: {
-    label: "Completed",
-    color: COLORS.success,
-    bgColor: COLORS.success + "20",
-  },
-};
-
-// Get next staff action based on current status
-const getNextAction = (
-  status: TicketStatus,
-): { label: string; nextStatus: TicketStatus; color: string } | null => {
-  switch (status) {
-    case "Created":
-      return {
-        label: "Start Picking",
-        nextStatus: "Picking",
-        color: COLORS.primary,
-      };
-    case "Picking":
-      return {
-        label: "Finish Picking → Quality Check",
-        nextStatus: "QualityCheck",
-        color: "#7C3AED",
-      };
-    case "QualityCheck":
-      return {
-        label: "Passed → Packing",
-        nextStatus: "Packing",
-        color: COLORS.teal600,
-      };
-    case "IssueReported":
-      return {
-        label: "Resolved → Packing",
-        nextStatus: "Packing",
-        color: COLORS.teal600,
-      };
-    case "Packing":
-      return {
-        label: "Finish Packing → Handover",
-        nextStatus: "LoadHandover",
-        color: COLORS.warning,
-      };
-    default:
-      return null;
-  }
-};
-
-// Get previous staff action based on current status
-const getPreviousAction = (
-  status: TicketStatus,
-): { label: string; prevStatus: TicketStatus; color: string } | null => {
-  switch (status) {
-    case "Picking":
-      return {
-        label: "Undo Picking",
-        prevStatus: "Created",
-        color: COLORS.textMuted,
-      };
-    case "QualityCheck":
-      return {
-        label: "Back to Picking",
-        prevStatus: "Picking",
-        color: COLORS.textMuted,
-      };
-    case "IssueReported":
-      return {
-        label: "Cancel Issue",
-        prevStatus: "QualityCheck",
-        color: COLORS.textMuted,
-      };
-    case "Packing":
-      return {
-        label: "Back to QC",
-        prevStatus: "QualityCheck",
-        color: COLORS.textMuted,
-      };
-    default:
-      return null;
-  }
-};
-
 export default function OutboundDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const goBack = useAppBack();
   const user = useAuthStore((state) => state.user);
+  const { t } = useTranslation();
+
+  // BE Status Flow (Staff allowed transitions):
+  // Created → Picking → QualityCheck → (IssueReported | Packing) → Packing → LoadHandover
+  // Manager confirms LoadHandover → Completed
+  const STATUS_CONFIG: Record<
+    TicketStatus,
+    { label: string; color: string; bgColor: string }
+  > = {
+    Created: {
+      label: t('common.pending'),
+      color: COLORS.warning,
+      bgColor: COLORS.warning + "20",
+    },
+    Picking: {
+      label: t('tasks.pickItems'),
+      color: COLORS.primary,
+      bgColor: COLORS.primaryLight + "20",
+    },
+    QualityCheck: {
+      label: t('outbound.qualityCheck'),
+      color: "#7C3AED",
+      bgColor: "#7C3AED20",
+    },
+    IssueReported: {
+      label: t('outbound.issue'),
+      color: COLORS.danger,
+      bgColor: COLORS.danger + "20",
+    },
+    Packing: { label: t('outbound.packing'), color: COLORS.teal600, bgColor: COLORS.teal50 },
+    LoadHandover: {
+      label: t('common.pending'),
+      color: COLORS.warning,
+      bgColor: COLORS.warning + "20",
+    },
+    Completed: {
+      label: t('common.done'),
+      color: COLORS.success,
+      bgColor: COLORS.success + "20",
+    },
+  };
+
+  // Get next staff action based on current status
+  const getNextAction = (
+    status: TicketStatus,
+  ): { label: string; nextStatus: TicketStatus; color: string } | null => {
+    switch (status) {
+      case "Created":
+        return {
+          label: t('outbound.startPicking'),
+          nextStatus: "Picking",
+          color: COLORS.primary,
+        };
+      case "Picking":
+        return {
+          label: t('outbound.finishPicking'),
+          nextStatus: "QualityCheck",
+          color: "#7C3AED",
+        };
+      case "QualityCheck":
+        return {
+          label: t('outbound.passAndPack'),
+          nextStatus: "Packing",
+          color: COLORS.teal600,
+        };
+      case "IssueReported":
+        return {
+          label: t('outbound.resolved'),
+          nextStatus: "Packing",
+          color: COLORS.teal600,
+        };
+      case "Packing":
+        return {
+          label: t('outbound.complete'),
+          nextStatus: "LoadHandover",
+          color: COLORS.warning,
+        };
+      default:
+        return null;
+    }
+  };
+
+  // Get previous staff action based on current status
+  const getPreviousAction = (
+    status: TicketStatus,
+  ): { label: string; prevStatus: TicketStatus; color: string } | null => {
+    switch (status) {
+      case "Picking":
+        return {
+          label: t('common.undo'),
+          prevStatus: "Created",
+          color: COLORS.textMuted,
+        };
+      case "QualityCheck":
+        return {
+          label: t('common.back'),
+          prevStatus: "Picking",
+          color: COLORS.textMuted,
+        };
+      case "IssueReported":
+        return {
+          label: t('common.cancel'),
+          prevStatus: "QualityCheck",
+          color: COLORS.textMuted,
+        };
+      case "Packing":
+        return {
+          label: t('common.back'),
+          prevStatus: "QualityCheck",
+          color: COLORS.textMuted,
+        };
+      default:
+        return null;
+    }
+  };
   const companyId = user?.companyId ?? 0;
   const staffId = user?.id ?? 0;
 
@@ -250,7 +255,7 @@ export default function OutboundDetailScreen() {
   if (isLoading) {
     return (
       <View className="flex-1 bg-slate-50">
-        <ScreenHeader title="Loading..." />
+        <ScreenHeader title={t('common.loading')} />
       </View>
     );
   }
@@ -258,21 +263,21 @@ export default function OutboundDetailScreen() {
   if (!order || error) {
     return (
       <View className="flex-1 bg-slate-50">
-        <ScreenHeader title="Error" />
+        <ScreenHeader title={t('common.error')} />
         <View className="flex-1 justify-center items-center p-5">
           <Feather name="alert-circle" size={48} color={COLORS.danger} />
           <Text
             className="text-base mt-3 mb-6 text-center"
             style={{ color: COLORS.textMuted }}
           >
-            Order information not found
+            {t('common.noData')}
           </Text>
           <TouchableOpacity
             className="px-6 py-3 rounded-lg"
             style={{ backgroundColor: COLORS.primary }}
             onPress={goBack}
           >
-            <Text className="text-white font-bold">Go Back</Text>
+            <Text className="text-white font-bold">{t('common.back')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -282,8 +287,8 @@ export default function OutboundDetailScreen() {
   const handleUpdateQty = (itemId: number, increment: boolean) => {
     if (!canEditItems) {
       AlertService.warning(
-        "Cannot Edit",
-        "Quantities cannot be updated at this stage.",
+        t('outbound.cannotEdit'),
+        t('outbound.cannotEditMsg'),
       );
       return;
     }
@@ -318,10 +323,10 @@ export default function OutboundDetailScreen() {
         items: updatedItems,
       });
 
-      AlertService.success("Success", "Quantities updated successfully");
+      AlertService.success(t('common.success'), t('warehouse.recordedSuccessfully'));
     } catch (error) {
       console.error("Save Items Error:", error);
-      AlertService.error("Error", "Failed to update quantities");
+      AlertService.error(t('common.error'), t('common.failed'));
     } finally {
       setIsSaving(false);
     }
@@ -386,12 +391,12 @@ export default function OutboundDetailScreen() {
         });
 
         AlertService.success(
-          "Success",
-          `Status changed to: ${STATUS_CONFIG[nextAction.nextStatus].label}`,
+          t('common.success'),
+          `${t('tasks.status')}: ${STATUS_CONFIG[nextAction.nextStatus].label}`,
         );
       } catch (error) {
         console.error(error);
-        AlertService.error("Error", "Failed to update status");
+        AlertService.error(t('common.error'), t('common.failed'));
       } finally {
         setIsTransitioning(false);
       }
@@ -404,8 +409,8 @@ export default function OutboundDetailScreen() {
 
     const confirmMsg =
       nextAction.nextStatus === "LoadHandover"
-        ? "After handover, the Manager will confirm the completion of the order."
-        : `Change status to "${STATUS_CONFIG[nextAction.nextStatus].label}"?`;
+        ? t('outbound.handoverMsg')
+        : `${t('common.confirm')} "${STATUS_CONFIG[nextAction.nextStatus].label}"?`;
 
     AlertService.confirm(nextAction.label, confirmMsg, executeTransition);
   };
@@ -414,8 +419,8 @@ export default function OutboundDetailScreen() {
     if (!order || !user || !prevAction) return;
 
     AlertService.confirm(
-      "Revert Status",
-      `Are you sure you want to go back to ${STATUS_CONFIG[prevAction.prevStatus].label}?`,
+      t('common.undo'),
+      t('outbound.revertConfirm', { status: STATUS_CONFIG[prevAction.prevStatus].label }),
       async () => {
         setIsTransitioning(true);
         try {
@@ -426,11 +431,11 @@ export default function OutboundDetailScreen() {
           });
 
           AlertService.success(
-            "Reverted",
+            t('common.success'),
             `Successfully went back to: ${STATUS_CONFIG[prevAction.prevStatus].label}`,
           );
         } catch {
-          AlertService.error("Error", "Failed to revert status");
+          AlertService.error(t('common.error'), "Failed to revert status");
         } finally {
           setIsTransitioning(false);
         }
@@ -442,8 +447,8 @@ export default function OutboundDetailScreen() {
     if (!order || !user || !canReportIssue) return;
 
     AlertService.confirm(
-      "Report Issue",
-      "Confirm there is an issue with the order? You can edit quantities after reporting the issue.",
+      t('outbound.reportIssue'),
+      t('outbound.issueMsg'),
       async () => {
         setIsTransitioning(true);
         try {
@@ -453,11 +458,11 @@ export default function OutboundDetailScreen() {
             status: "IssueReported",
           });
           AlertService.success(
-            "Issue Reported",
-            "Please update quantities and proceed.",
+            t('outbound.issue'),
+            t('outbound.reportIssueSuccess'),
           );
         } catch {
-          AlertService.error("Error", "Failed to report issue");
+          AlertService.error(t('common.error'), "Failed to report issue");
         } finally {
           setIsTransitioning(false);
         }
@@ -468,7 +473,7 @@ export default function OutboundDetailScreen() {
   return (
     <View className="flex-1 bg-slate-50">
       <ScreenHeader
-        title="Outbound Ticket"
+        title={t('outbound.ticketTitle')}
         subtitle={order.note || `OUT-${order.id}`}
       />
 
@@ -486,7 +491,7 @@ export default function OutboundDetailScreen() {
               className="text-sm mr-2.5"
               style={{ color: COLORS.textMuted }}
             >
-              Status:
+              {t('tasks.status')}:
             </Text>
             <View
               className="px-2 py-1 rounded-md"
@@ -508,7 +513,7 @@ export default function OutboundDetailScreen() {
               className="mr-2.5"
             />
             <Text className="text-sm" style={{ color: COLORS.textMuted }}>
-              Created By:{" "}
+              {t('tasks.createdBy')}:{" "}
               <Text className="font-semibold text-slate-800">
                 {order.createdByUser?.fullName ||
                   order.createdByUser?.email ||
@@ -525,7 +530,7 @@ export default function OutboundDetailScreen() {
               className="mr-2.5"
             />
             <Text className="text-sm" style={{ color: COLORS.textMuted }}>
-              Destination:{" "}
+              {t('tasks.destination')}:{" "}
               <Text className="font-semibold text-slate-800">
                 {order.destination || "N/A"}
               </Text>
@@ -562,13 +567,13 @@ export default function OutboundDetailScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-base font-bold text-slate-800">
-                Warehouse Map
+                {t('outbound.warehouseMap')}
               </Text>
               <Text
                 className="text-xs mt-0.5"
                 style={{ color: COLORS.textMuted }}
               >
-                Tap to view location and navigate
+                {t('outbound.tapToNavigate')}
               </Text>
             </View>
             <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
@@ -577,10 +582,10 @@ export default function OutboundDetailScreen() {
 
         <View className="flex-row justify-between items-end mb-3 mt-2">
           <Text className="text-base font-bold text-slate-800">
-            Product List
+            {t('outbound.productList')}
           </Text>
           <Text className="text-sm" style={{ color: COLORS.textMuted }}>
-            {(order.items || order.outboundOrderItems)?.length ?? 0} items
+            {(order.items || order.outboundOrderItems)?.length ?? 0} {t('tabs.tasks').toLowerCase()}
           </Text>
         </View>
 
@@ -598,7 +603,7 @@ export default function OutboundDetailScreen() {
                     {item.productName ||
                       item.name ||
                       item.product?.name ||
-                      `Product #${item.productId}`}
+                      `${t('common.product')} #${item.productId}`}
                   </Text>
                   <View className="flex-row flex-wrap">
                     <View className="bg-slate-100 px-2 py-1 rounded">
@@ -635,8 +640,8 @@ export default function OutboundDetailScreen() {
                     >
                       {(Number(localQuantities[item.id]) || 0) >=
                       (item.quantity || 0)
-                        ? "Done"
-                        : "Pending"}
+                        ? t('common.done')
+                        : t('common.pending')}
                     </Text>
                   </View>
                 )}
@@ -645,10 +650,10 @@ export default function OutboundDetailScreen() {
               <View className="flex-row justify-between items-center mt-2 border-t border-slate-50 pt-3">
                 <Text className="text-sm font-medium text-slate-700">
                   {currentStatus === "Created"
-                    ? "Item Quantity:"
+                    ? t('outbound.itemQty')
                     : currentStatus === "Picking"
-                      ? "Picked Quantity:"
-                      : "Ready Quantity:"}
+                      ? t('outbound.pickedQty')
+                      : t('outbound.readyQty')}
                 </Text>
 
                 {canEditItems ? (
@@ -760,8 +765,10 @@ export default function OutboundDetailScreen() {
             <Text
               className="text-[10px] font-bold mt-1"
               style={{ color: COLORS.danger }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
             >
-              Issue
+              {t('outbound.issue')}
             </Text>
           </TouchableOpacity>
         )}
@@ -787,6 +794,8 @@ export default function OutboundDetailScreen() {
             <Text
               className="text-sm font-bold"
               style={{ color: COLORS.textMuted }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
             >
               {prevAction.label}
             </Text>
@@ -802,8 +811,12 @@ export default function OutboundDetailScreen() {
             onPress={handleSaveItems}
             disabled={isSaving}
           >
-            <Text className="text-base font-bold text-white">
-              {isSaving ? "Saving..." : "Save Quantities"}
+            <Text 
+              className="text-base font-bold text-white"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {isSaving ? t('common.loading') : t('common.save')}
             </Text>
           </TouchableOpacity>
         )}
@@ -823,8 +836,12 @@ export default function OutboundDetailScreen() {
               color="#fff"
               className="mr-2"
             />
-            <Text className="text-base font-bold text-white">
-              {isTransitioning ? "Processing..." : nextAction.label}
+            <Text 
+              className="text-base font-bold text-white"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {isTransitioning ? "..." : nextAction.label}
             </Text>
           </TouchableOpacity>
         )}
@@ -836,7 +853,7 @@ export default function OutboundDetailScreen() {
           >
             <Feather name="clock" size={20} color="#fff" className="mr-2" />
             <Text className="text-base font-bold text-white">
-              Awaiting Approval
+              {t('outbound.awaitingApproval')}
             </Text>
           </View>
         )}
@@ -859,7 +876,7 @@ export default function OutboundDetailScreen() {
               className="text-base font-bold"
               style={{ color: COLORS.success }}
             >
-              Order Completed
+              {t('outbound.orderCompleted')}
             </Text>
           </View>
         )}

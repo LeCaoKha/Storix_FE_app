@@ -47,7 +47,7 @@ export default function EditProfileScreen() {
     const handlePickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            AlertService.warning('Quyền truy cập', 'Vui lòng cho phép truy cập thư viện ảnh để đổi ảnh đại diện.');
+            AlertService.warning('Permission', 'Please allow access to photo library to change profile picture.');
             return;
         }
 
@@ -66,7 +66,7 @@ export default function EditProfileScreen() {
 
     const handleSave = async () => {
         if (!fullName.trim()) {
-            AlertService.warning('Lỗi', 'Vui lòng nhập họ tên.');
+            AlertService.warning('Error', 'Please enter full name.');
             return;
         }
 
@@ -99,12 +99,12 @@ export default function EditProfileScreen() {
                 formData,
             });
 
-            AlertService.success('Thành công', 'Thông tin cá nhân đã được cập nhật.', () => {
+            AlertService.success('Success', 'Personal information has been updated.', () => {
                 goBack();
             });
         } catch (error: any) {
             console.error('[EditProfile] Save error:', error);
-            AlertService.error('Lỗi', 'Không thể cập nhật thông tin. Vui lòng thử lại.');
+            AlertService.error('Error', 'Unable to update information. Please try again.');
         }
     };
 
@@ -121,7 +121,7 @@ export default function EditProfileScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <SafeAreaHeader title="Chỉnh sửa hồ sơ" onBack={goBack} />
+            <SafeAreaHeader title="Edit Profile" onBack={goBack} />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.avatarSection}>
@@ -137,27 +137,27 @@ export default function EditProfileScreen() {
                             <Feather name="camera" size={16} color="#fff" />
                         </View>
                     </TouchableOpacity>
-                    <Text style={styles.avatarHint}>Nhấn để thay đổi ảnh</Text>
+                    <Text style={styles.avatarHint}>Tap to change photo</Text>
                 </View>
 
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Họ và tên</Text>
+                        <Text style={styles.label}>Full Name</Text>
                         <TextInput
                             style={styles.input}
                             value={fullName}
                             onChangeText={setFullName}
-                            placeholder="Nhập họ tên"
+                            placeholder="Enter full name"
                         />
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Số điện thoại</Text>
+                        <Text style={styles.label}>Phone Number</Text>
                         <TextInput
                             style={styles.input}
                             value={phone}
                             onChangeText={setPhone}
-                            placeholder="Nhập số điện thoại"
+                            placeholder="Enter phone number"
                             keyboardType="phone-pad"
                         />
                     </View>
@@ -169,7 +169,7 @@ export default function EditProfileScreen() {
                             value={email}
                             editable={false}
                         />
-                        <Text style={styles.inputHint}>Email hiện không thể thay đổi</Text>
+                        <Text style={styles.inputHint}>Email cannot be changed currently</Text>
                     </View>
 
                     <TouchableOpacity
@@ -180,7 +180,7 @@ export default function EditProfileScreen() {
                         {updateProfileMutation.isPending ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <Text style={styles.saveButtonText}>Lưu thay đổi</Text>
+                            <Text style={styles.saveButtonText}>Save Changes</Text>
                         )}
                     </TouchableOpacity>
                 </View>

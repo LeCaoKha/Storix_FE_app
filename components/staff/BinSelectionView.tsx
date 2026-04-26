@@ -1,4 +1,5 @@
 import { COLORS } from '@/constants/color';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Bin, Shelf } from '@/types/warehouse';
 import { Feather } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
@@ -15,6 +16,7 @@ interface BinSelectionViewProps {
   selectedBinId?: string | number;
   recommendedBinCodes?: string[];
   onSelectBin: (bin: Bin) => void;
+  isCounting?: boolean;
 }
 
 export const BinSelectionView: React.FC<BinSelectionViewProps> = ({
@@ -22,7 +24,19 @@ export const BinSelectionView: React.FC<BinSelectionViewProps> = ({
   selectedBinId,
   recommendedBinCodes = [],
   onSelectBin,
+  isCounting = false,
 }) => {
+  const { t } = useTranslation();
+  const getBinOccupancy = (bin: Bin) => {
+    const raw =
+      typeof bin.percentage === 'number'
+        ? bin.percentage
+        : typeof bin.occupancyPercentage === 'number'
+          ? bin.occupancyPercentage
+          : 0;
+    return Math.min(100, Math.max(0, Number(raw || 0)));
+  };
+
   const allBins = useMemo(() => {
     if (!shelf) return [];
     return (shelf.levels ?? []).flatMap((level) => level.bins ?? []);
@@ -42,7 +56,7 @@ export const BinSelectionView: React.FC<BinSelectionViewProps> = ({
     return (
       <View style={styles.emptyContainer}>
         <Feather name="package" size={20} color={COLORS.slate300} />
-        <Text style={styles.emptyText}>Kệ này không có ô hàng</Text>
+        <Text style={styles.emptyText}>{t('warehouse.noItemsForShelf')}</Text>
       </View>
     );
   }
@@ -59,13 +73,15 @@ export const BinSelectionView: React.FC<BinSelectionViewProps> = ({
         ]} />
         <Text style={styles.selectedLabel} numberOfLines={1}>
           {selectedBin
-            ? <>Ô đã chọn: <Text style={styles.selectedCode}>{selectedBin.code}</Text></>
-            : 'Chưa chọn ô — nhấn để chọn'}
+            ? <>{t('warehouse.selectedBin')} <Text style={styles.selectedCode}>{selectedBin.code}</Text></>
+            : t('warehouse.noBinSelected')}
         </Text>
         {recommendedBinCodes.length > 0 && (
           <View style={styles.recCountBadge}>
-            <Feather name="star" size={9} color={COLORS.success} />
-            <Text style={styles.recCountText}>{recommendedBinCodes.length} gợi ý</Text>
+            <Feather name={isCounting ? "check-circle" : "star"} size={9} color={COLORS.success} />
+            <Text style={styles.recCountText}>
+              {recommendedBinCodes.length} {isCounting ? t('warehouse.itemsToCount') : t('warehouse.recommended')}
+            </Text>
           </View>
         )}
       </View>
@@ -79,7 +95,7 @@ export const BinSelectionView: React.FC<BinSelectionViewProps> = ({
           return (
             <View key={level.id || lIndex} style={styles.levelRow}>
               <View style={styles.levelHeader}>
-                <Text style={styles.levelLabel}>Tầng {level.code || lIndex + 1}</Text>
+                <Text style={styles.levelLabel}>{t('warehouse.level')} {level.code || lIndex + 1}</Text>
               </View>
               <ScrollView
                 horizontal
@@ -89,29 +105,44 @@ export const BinSelectionView: React.FC<BinSelectionViewProps> = ({
                 {bins.map((bin) => {
                   const isRecommended = recommendedBinSet.has(String(bin.code));
                   const isSelected = String(selectedBinId) === String(bin.id);
+                  const occupancy = getBinOccupancy(bin);
+                  const isFull = occupancy >= 100;
 
                   return (
                     <TouchableOpacity
                       key={bin.id}
                       style={[
                         styles.binChip,
+                        isFull && styles.binChipFull,
                         isRecommended && !isSelected && styles.binChipRecommended,
                         isSelected && styles.binChipSelected,
                       ]}
-                      onPress={() => onSelectBin(bin)}
-                      activeOpacity={0.75}
+                      onPress={() => {
+                        if (!isFull) onSelectBin(bin);
+                      }}
+                      activeOpacity={isFull ? 1 : 0.75}
+                      disabled={isFull}
                     >
-                      {isSelected ? (
+                      {isFull ? (
+                        <Feather name="x-circle" size={11} color={COLORS.danger} />
+                      ) : isSelected ? (
                         <Feather name="check" size={12} color="#fff" />
                       ) : isRecommended ? (
-                        <Feather name="star" size={11} color={COLORS.success} />
+                        <Feather name={isCounting ? "check-circle" : "star"} size={11} color={COLORS.success} />
                       ) : null}
                       <Text style={[
                         styles.binChipText,
+                        isFull && styles.binChipTextFull,
                         isRecommended && !isSelected && styles.binChipTextRecommended,
                         isSelected && styles.binChipTextSelected,
                       ]}>
                         {bin.code}
+                      </Text>
+                      <Text style={[
+                        styles.binOccupancyText,
+                        isFull && styles.binOccupancyTextFull,
+                      ]}>
+                        {occupancy}%
                       </Text>
                     </TouchableOpacity>
                   );
@@ -219,6 +250,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.success + '08',
     borderColor: COLORS.success + '30',
   },
+  binChipFull: {
+    backgroundColor: COLORS.danger + '18',
+    borderColor: COLORS.danger + '80',
+  },
   binChipSelected: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
@@ -236,7 +271,18 @@ const styles = StyleSheet.create({
   binChipTextRecommended: {
     color: COLORS.successText,
   },
+  binChipTextFull: {
+    color: COLORS.danger,
+  },
   binChipTextSelected: {
     color: '#FFFFFF',
+  },
+  binOccupancyText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.slate400,
+  },
+  binOccupancyTextFull: {
+    color: COLORS.danger,
   },
 });

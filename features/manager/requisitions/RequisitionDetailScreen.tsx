@@ -86,8 +86,8 @@ export default function RequisitionDetailScreen() {
                 }
             />
 
-            <RefreshContainer 
-                style={styles.content} 
+            <RefreshContainer
+                style={styles.content}
                 contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}
                 onRefresh={handleRefresh}
             >
