@@ -150,9 +150,38 @@ export default function WarehouseDiagramScreen() {
     refetch: refetchStructure,
   } = useWarehouseStructure(selectedWarehouseId);
 
+  const resolvedProductId = useMemo(() => {
+    if (!focusedItemId) return undefined;
+    
+    if (inboundOrderId && inboundTicket?.inboundOrderItems) {
+      const item = inboundTicket.inboundOrderItems.find((i: any) => i.id === focusedItemId);
+      if (item?.productId) return Number(item.productId);
+    }
+    
+    if (outboundOrderId && outboundOrder?.outboundOrderItems) {
+      const item = outboundOrder.outboundOrderItems.find((i: any) => i.id === focusedItemId);
+      if (item?.productId) return Number(item.productId);
+    }
+
+    if (inventoryCountTicketId && stockCountTicket?.items) {
+      const itemById = stockCountTicket.items.find((i: any) => i.id === focusedItemId);
+      if (itemById?.productId) return Number(itemById.productId);
+
+      const itemByProductId = stockCountTicket.items.find((i: any) => Number(i.productId || 0) === focusedItemId);
+      if (itemByProductId) return focusedItemId;
+    }
+    
+    const isTicketsLoading = (inboundOrderId && !inboundTicket) || 
+                             (outboundOrderId && !outboundOrder) || 
+                             (inventoryCountTicketId && !stockCountTicket);
+    if (isTicketsLoading) return undefined;
+
+    return focusedItemId;
+  }, [focusedItemId, inboundOrderId, inboundTicket, outboundOrderId, outboundOrder, inventoryCountTicketId, stockCountTicket]);
+
   const { data: focusedProductLocations = [] } =
     useProductInventoryLocations(
-      focusedItemId,
+      resolvedProductId,
       selectedWarehouseId,
     );
   const { data: products = [] } = useProducts();
@@ -917,12 +946,7 @@ export default function WarehouseDiagramScreen() {
       );
       return;
     }
-    const refreshedStructureResult = await refetchStructure();
-    const refreshedStructure = refreshedStructureResult.data ?? structure;
-    const currentSelectedShelf =
-      refreshedStructure?.zones
-        ?.flatMap((zone) => zone.shelves ?? [])
-        ?.find((shelf) => shelf.id === selectedShelf.id) ?? selectedShelf;
+    const currentSelectedShelf = selectedShelf;
 
     if (!isPicking && inboundOrderId) {
       if (!ticketWarehouseId) {

@@ -916,27 +916,6 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                                   : t('warehouse.willOutboundFromBin')}
                               </Text>
 
-                              {item.recommendedQuantity !== undefined &&
-                                item.recommendedQuantity > 0 && (
-                                  <View
-                                    className="flex-row items-center gap-1 px-2 py-1 rounded-lg my-1 self-start"
-                                    style={{
-                                      backgroundColor: COLORS.primary + "08",
-                                    }}
-                                  >
-                                    <Feather
-                                      name="info"
-                                      size={10}
-                                      color={COLORS.primary}
-                                    />
-                                    <Text
-                                      className="text-[11px] font-semibold"
-                                      style={{ color: COLORS.primary }}
-                                    >
-                                      {t('warehouse.recommendedForShelf', { count: item.recommendedQuantity })}
-                                    </Text>
-                                  </View>
-                                )}
 
                               <Text className="text-[11px] text-slate-400 font-medium">
                                 {isInbound && selectedBinRemainingVolume != null && getProductUnitVolume(item) > 0 ? (
