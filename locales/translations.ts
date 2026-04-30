@@ -15,6 +15,7 @@ export const translations = {
       notAvailable: 'N/A',
       confirm: 'Confirm',
       cancel: 'Cancel',
+      back: 'Back',
       undo: 'Undo',
       done: 'Done',
       add: 'Add',

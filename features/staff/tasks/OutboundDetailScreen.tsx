@@ -192,7 +192,6 @@ export default function OutboundDetailScreen() {
     currentStatus !== "LoadHandover" &&
     currentStatus !== "Completed";
 
-  const canReportIssue = currentStatus === "QualityCheck";
 
   const showSaveBtn =
     currentStatus === "QualityCheck" || currentStatus === "IssueReported";
@@ -444,32 +443,7 @@ export default function OutboundDetailScreen() {
     );
   };
 
-  const handleReportIssue = async () => {
-    if (!order || !user || !canReportIssue) return;
 
-    AlertService.confirm(
-      t('outbound.reportIssue'),
-      t('outbound.issueMsg'),
-      async () => {
-        setIsTransitioning(true);
-        try {
-          await updateStatus.mutateAsync({
-            ticketId: order.id,
-            performedBy: user.id || 0,
-            status: "IssueReported",
-          });
-          AlertService.success(
-            t('outbound.issue'),
-            t('outbound.reportIssueSuccess'),
-          );
-        } catch {
-          AlertService.error(t('common.error'), t('outbound.reportIssueFailedMsg'));
-        } finally {
-          setIsTransitioning(false);
-        }
-      },
-    );
-  };
 
   return (
     <KeyboardAvoidingView 
@@ -754,29 +728,7 @@ export default function OutboundDetailScreen() {
         className="p-5 bg-white flex-row items-center border-t border-slate-200"
         style={{ paddingBottom: getBottomSafePadding(insets.bottom, 20) }}
       >
-        {canReportIssue && (
-          <TouchableOpacity
-            className={`w-14 h-14 rounded-xl border justify-center items-center mr-3 ${
-              isTransitioning ? "opacity-60" : ""
-            }`}
-            style={{
-              borderColor: COLORS.danger + "30",
-              backgroundColor: COLORS.danger + "05",
-            }}
-            onPress={handleReportIssue}
-            disabled={isTransitioning}
-          >
-            <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-            <Text
-              className="text-[10px] font-bold mt-1"
-              style={{ color: COLORS.danger }}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {t('outbound.issue')}
-            </Text>
-          </TouchableOpacity>
-        )}
+
 
         {prevAction && (
           <TouchableOpacity

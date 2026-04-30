@@ -238,10 +238,6 @@ export default function StaffOutboundDetailScreen() {
             </RefreshContainer>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.reportBtn}>
-                    <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>{t('outbound.reportIssue')}</Text>
-                </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.saveBtn, isSaving && styles.disabledBtn]}
                     onPress={handleSave}
@@ -471,22 +467,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
     },
-    reportBtn: {
-        width: 56,
-        height: 56,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.danger + '30',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.danger + '05',
-    },
-    reportBtnText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: COLORS.danger,
-        marginTop: 2,
-    },
+
     saveBtn: {
         flex: 1,
         height: 56,
