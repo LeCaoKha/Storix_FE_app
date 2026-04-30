@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HorizontalFilterBar, RefreshContainer, SafeAreaHeader, TaskCard, type FilterOption } from '@/components';
 import { COLORS } from '@/constants/color';
@@ -56,8 +56,9 @@ export default function TasksScreen() {
     // Early return AFTER all hooks
     if (isLoading) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>{t('common.loading')}</Text>
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={{ marginTop: 12, color: COLORS.textMuted }}>{t('common.loading')}</Text>
             </View>
         );
     }
