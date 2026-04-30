@@ -1,3 +1,4 @@
+import { isRunningInExpoGo } from 'expo';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -16,6 +17,10 @@ Notifications.setNotificationHandler({
 
 export const registerForPushNotificationsAsync = async () => {
   let token;
+
+  if (isRunningInExpoGo()) {
+    return null;
+  }
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {

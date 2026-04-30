@@ -2,6 +2,7 @@ import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useOutboundOrder, useUpdateOutboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AlertService } from '@/stores/alert.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function StaffOutboundDetailScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const goBack = useAppBack('/(staff-tabs)/tasks');
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,7 +59,7 @@ export default function StaffOutboundDetailScreen() {
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Loading..." />
+                <ScreenHeader title={t('common.loading')} />
             </View>
         );
     }
@@ -65,12 +67,12 @@ export default function StaffOutboundDetailScreen() {
     if (!order || error) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Error" />
+                <ScreenHeader title={t('common.error')} />
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
-                    <Text style={styles.errorText}>Order information not found</Text>
+                    <Text style={styles.errorText}>{t('common.orderNotFound')}</Text>
                     <TouchableOpacity style={styles.backButton} onPress={goBack}>
-                        <Text style={styles.backButtonText}>Back</Text>
+                        <Text style={styles.backButtonText}>{t('common.back')}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -83,13 +85,13 @@ export default function StaffOutboundDetailScreen() {
         setTimeout(() => {
             setIsSaving(false);
             setVerifiedItems(prev => ({ ...prev, [itemId]: true }));
-            AlertService.success('Success', 'Product verified successfully');
+            AlertService.success(t('common.success'), t('outbound.productVerified'));
         }, 600);
     };
 
     const handleUpdateQty = (itemId: number, increment: boolean) => {
         if (!verifiedItems[itemId]) {
-            AlertService.warning('Notice', 'Please scan product code to verify before picking');
+            AlertService.warning(t('common.noticeTitle'), t('outbound.scanToVerifyMsg'));
             return;
         }
         setLocalQuantities(prev => {
@@ -124,11 +126,11 @@ export default function StaffOutboundDetailScreen() {
                 items: updatedItems,
             });
 
-            AlertService.success('Success', allPicked ? 'Picking completed' : 'Picking quantity updated', () => {
+            AlertService.success(t('common.success'), allPicked ? t('outbound.pickingCompleted') : t('outbound.pickingUpdated'), () => {
                 goBack();
             });
         } catch {
-            AlertService.error('Error', 'Unable to update quantity');
+            AlertService.error(t('common.error'), t('outbound.updateQuantityFailed'));
         } finally {
             setIsSaving(false);
         }
@@ -137,7 +139,7 @@ export default function StaffOutboundDetailScreen() {
     return (
         <View style={styles.container}>
             <ScreenHeader
-                title="Outbound"
+                title={t('tasks.outbound')}
                 subtitle={order.note || `OUT-${order.id}`}
             />
 
@@ -149,17 +151,17 @@ export default function StaffOutboundDetailScreen() {
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="user" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Created by: <Text style={styles.boldText}>{order.createdByNavigation?.email || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>{t('tasks.createdBy')}: <Text style={styles.boldText}>{order.createdByNavigation?.email || t('common.notAvailable')}</Text></Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Feather name="map-pin" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Ship to: <Text style={styles.boldText}>{order.destination || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>{t('tasks.destination')}: <Text style={styles.boldText}>{order.destination || t('common.notAvailable')}</Text></Text>
                     </View>
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Product List</Text>
-                    <Text style={styles.sectionSubtitle}>{orderItems.length} items</Text>
+                    <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
+                    <Text style={styles.sectionSubtitle}>{orderItems.length} {t('common.items')}</Text>
                 </View>
 
                 {sortedItems.map((item: OutboundOrderItem) => {
@@ -174,7 +176,7 @@ export default function StaffOutboundDetailScreen() {
                                     <Text style={styles.productName}>{item.product?.name || `Product #${item.productId}`}</Text>
                                     <View style={styles.skuRow}>
                                         <View style={styles.skuBadge}>
-                                            <Text style={styles.skuText}>{item.product?.sku || 'N/A'}</Text>
+                                            <Text style={styles.skuText}>{t('common.sku')}: {item.product?.sku || t('common.notAvailable')}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -184,16 +186,16 @@ export default function StaffOutboundDetailScreen() {
                                     <Text style={[styles.statusBadgeText, {
                                         color: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? '#059669' : '#D97706'
                                     }]}>
-                                        {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? 'Done' : 'Wait'}
+                                        {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? t('common.done') : t('common.pending')}
                                     </Text>
                                 </View>
                             </View>
 
                             <View style={styles.counterRow}>
                                 <View style={styles.qtyLabelContainer}>
-                                    <Text style={styles.qtyLabel}>Picked quantity:</Text>
+                                    <Text style={styles.qtyLabel}>{t('outbound.pickedQty')}</Text>
                                     {!verifiedItems[item.id] && (
-                                        <Text style={styles.verificationPrompt}>Scan to verify</Text>
+                                        <Text style={styles.verificationPrompt}>{t('outbound.scanToVerifyMsg')}</Text>
                                     )}
                                 </View>
                                 <View style={[styles.counter, !verifiedItems[item.id] && styles.disabledCounter]}>
@@ -227,7 +229,7 @@ export default function StaffOutboundDetailScreen() {
                             >
                                 <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? "#059669" : COLORS.primary} />
                                 <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: '#059669' }]}>
-                                    {verifiedItems[item.id] ? 'Product verified' : 'Verify Scan'}
+                                    {verifiedItems[item.id] ? t('outbound.productVerified') : t('outbound.verifyScan')}
                                 </Text>
                             </TouchableOpacity>
                         </Card>
@@ -238,7 +240,7 @@ export default function StaffOutboundDetailScreen() {
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.reportBtn}>
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Report Error</Text>
+                    <Text style={styles.reportBtnText}>{t('outbound.reportIssue')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.saveBtn, isSaving && styles.disabledBtn]}
@@ -246,7 +248,7 @@ export default function StaffOutboundDetailScreen() {
                     disabled={isSaving}
                 >
                     <Text style={styles.saveBtnText}>
-                        {isSaving ? 'Saving...' : 'Complete Picking'}
+                        {isSaving ? t('common.loading') : t('outbound.finishPicking')}
                     </Text>
                 </TouchableOpacity>
             </View>

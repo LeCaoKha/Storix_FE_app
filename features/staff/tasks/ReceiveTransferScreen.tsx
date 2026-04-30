@@ -9,7 +9,7 @@ import { ReceiveTransferItemRequest, ReceiveTransferOrderRequest } from '@/types
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReceiveTransferScreen() {
@@ -136,7 +136,10 @@ export default function ReceiveTransferScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
                 title={t('transfer.qualityCheck')}
                 subtitle={`${t('common.item')} #${transfer.id}`}
@@ -189,7 +192,7 @@ export default function ReceiveTransferScreen() {
                     loading={receiveMutation.isPending} 
                 />
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

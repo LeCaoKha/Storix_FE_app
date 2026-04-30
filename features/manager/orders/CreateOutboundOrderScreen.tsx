@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateOutboundOrderScreen() {
     const router = useRouter();
@@ -76,7 +76,10 @@ export default function CreateOutboundOrderScreen() {
     }
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
                 title="Tạo Đơn Xuất Kho"
             />
@@ -224,7 +227,7 @@ export default function CreateOutboundOrderScreen() {
                     </Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

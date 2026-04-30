@@ -1,10 +1,10 @@
-import { ScreenHeader } from "@/components";
+import { RefreshContainer, ScreenHeader } from "@/components";
 import { getBottomSafePadding } from "@/components/ui/safeArea";
 import { COLORS } from "@/constants/color";
 import {
-  useOutboundTasksByStaff,
-  useUpdateOutboundTicketItems,
-  useUpdateOutboundTicketStatus,
+    useOutboundTasksByStaff,
+    useUpdateOutboundTicketItems,
+    useUpdateOutboundTicketStatus,
 } from "@/hooks";
 import { useAppBack } from "@/hooks/useAppBack";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -15,11 +15,12 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -159,7 +160,7 @@ export default function OutboundDetailScreen() {
   const companyId = user?.companyId ?? 0;
   const staffId = user?.id ?? 0;
 
-  const { data: staffTasks, isLoading } = useOutboundTasksByStaff(
+  const { data: staffTasks, isLoading, refetch } = useOutboundTasksByStaff(
     companyId,
     staffId,
   );
@@ -432,10 +433,10 @@ export default function OutboundDetailScreen() {
 
           AlertService.success(
             t('common.success'),
-            `Successfully went back to: ${STATUS_CONFIG[prevAction.prevStatus].label}`,
+            t('outbound.revertSuccess', { status: STATUS_CONFIG[prevAction.prevStatus].label }),
           );
         } catch {
-          AlertService.error(t('common.error'), "Failed to revert status");
+          AlertService.error(t('common.error'), t('outbound.revertFailedMsg'));
         } finally {
           setIsTransitioning(false);
         }
@@ -462,7 +463,7 @@ export default function OutboundDetailScreen() {
             t('outbound.reportIssueSuccess'),
           );
         } catch {
-          AlertService.error(t('common.error'), "Failed to report issue");
+          AlertService.error(t('common.error'), t('outbound.reportIssueFailedMsg'));
         } finally {
           setIsTransitioning(false);
         }
@@ -471,13 +472,17 @@ export default function OutboundDetailScreen() {
   };
 
   return (
-    <View className="flex-1 bg-slate-50">
+    <KeyboardAvoidingView 
+      className="flex-1 bg-slate-50"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader
         title={t('outbound.ticketTitle')}
         subtitle={order.note || `OUT-${order.id}`}
       />
 
-      <ScrollView
+      <RefreshContainer
+        onRefresh={async () => { await refetch(); }}
         className="flex-1"
         contentContainerStyle={{
           padding: 20,
@@ -742,7 +747,7 @@ export default function OutboundDetailScreen() {
             </View>
           );
         })}
-      </ScrollView>
+      </RefreshContainer>
 
       {/* Bottom Footer */}
       <View
@@ -881,6 +886,6 @@ export default function OutboundDetailScreen() {
           </View>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

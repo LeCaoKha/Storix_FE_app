@@ -37,6 +37,30 @@ type RawStockCountTicket = {
     items?: RawStockCountItem[] | null;
 };
 
+const inferStockCountStatus = (ticket: RawStockCountTicket): string | undefined => {
+    if (ticket.status && ticket.status.trim()) {
+        return ticket.status;
+    }
+
+    const items = ticket.items ?? ticket.inventoryCountItems ?? [];
+    if (!items.length) {
+        return undefined;
+    }
+
+    const hasAnyCounted = items.some((item) => item.countedQuantity != null);
+    const allCounted = items.every((item) => item.countedQuantity != null);
+
+    if (allCounted) {
+        return 'Finished';
+    }
+
+    if (hasAnyCounted) {
+        return 'In Progress';
+    }
+
+    return 'Pending';
+};
+
 const mapStockCountItem = (item: RawStockCountItem): StockCountItem => ({
     id: item.id || item.productId || 0,
     productId: item.productId ?? undefined,
@@ -57,7 +81,7 @@ const mapStockCountTicket = (ticket: RawStockCountTicket): StockCountTicket => {
         warehouseId: ticket.warehouseId ?? undefined,
         name: ticket.name ?? undefined,
         type: ticket.type ?? undefined,
-        status: ticket.status ?? undefined,
+        status: inferStockCountStatus(ticket),
         createdAt: ticket.createdAt ?? undefined,
         executedDay: ticket.executedDay ?? undefined,
         finishedDay: ticket.finishedDay ?? undefined,

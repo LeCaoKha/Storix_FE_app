@@ -4,6 +4,7 @@ import {
     DefaultTheme,
     ThemeProvider,
 } from "@react-navigation/native";
+import { isRunningInExpoGo } from 'expo';
 import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from 'react';
@@ -35,7 +36,10 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    registerForPushNotificationsAsync();
+    if (!isRunningInExpoGo()) {
+      registerForPushNotificationsAsync();
+    }
+
     const cleanup = setupNotificationListeners();
     return cleanup;
   }, []);

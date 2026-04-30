@@ -352,10 +352,10 @@ export default function WarehouseDiagramScreen() {
         }
       } catch (err) {
         console.error("[PathOptimization] Error fetching path:", err);
-        AlertService.error(
-          t('common.error'),
-          "Failed to connect to path optimization service.",
-        );
+        // AlertService.error(
+        //   t('common.error'),
+        //   "Failed to connect to path optimization service.",
+        // );
       } finally {
         setIsFetchingPath(false);
       }
@@ -951,8 +951,8 @@ export default function WarehouseDiagramScreen() {
     if (!isPicking && inboundOrderId) {
       if (!ticketWarehouseId) {
         AlertService.warning(
-          "Undefined warehouse",
-          "Cannot determine the warehouse for this inbound ticket. Please refresh and try again.",
+          t('warehouse.undefinedWarehouse'),
+          t('warehouse.undefinedWarehouseMsg'),
         );
         return;
       }
@@ -973,8 +973,8 @@ export default function WarehouseDiagramScreen() {
       : undefined;
     if (!defaultBinId) {
       AlertService.warning(
-        "Missing bin location",
-        "This shelf does not have a valid bin to update.",
+        t('warehouse.missingBinTitle'),
+        t('warehouse.missingBinMsg'),
       );
       return;
     }
@@ -1334,16 +1334,16 @@ export default function WarehouseDiagramScreen() {
             <TouchableOpacity
               onPress={() => {
                 AlertService.confirm(
-                  "Clear all progress?",
-                  "Are you sure you want to clear all placed quantities for all items in this inbound ticket?",
+                  t('warehouse.clearProgressTitle'),
+                  t('warehouse.clearProgressMsg'),
                   () => {
                     useInboundStagingStore
                       .getState()
                       .clearTicket(inboundOrderId);
                     setLocalReceivedByItemId({});
                     AlertService.success(
-                      "Cleared",
-                      "All local progress has been reset.",
+                      t('warehouse.clearedTitle'),
+                      t('warehouse.clearedMsg'),
                     );
                   },
                 );

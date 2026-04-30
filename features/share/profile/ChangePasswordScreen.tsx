@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -16,13 +15,14 @@ import {
 import { SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useUpdateProfile } from '@/hooks/user.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function ChangePasswordScreen() {
-    const router = useRouter();
     const goBack = useAppBack('/(manager-tabs)/profile');
+    const { t } = useTranslation();
     const { user } = useAuthStore();
     const updateProfileMutation = useUpdateProfile();
 
@@ -32,17 +32,17 @@ export default function ChangePasswordScreen() {
 
     const handleSave = async () => {
         if (!password) {
-            AlertService.warning('Error', 'Please enter a new password.');
+            AlertService.warning(t('common.error'), t('profile.enterNewPassword'));
             return;
         }
 
         if (password.length < 6) {
-            AlertService.warning('Error', 'Password must be at least 6 characters.');
+            AlertService.warning(t('common.error'), t('profile.passwordMinLength'));
             return;
         }
 
         if (password !== confirmPassword) {
-            AlertService.warning('Error', 'Confirmation password does not match.');
+            AlertService.warning(t('common.error'), t('profile.passwordMismatch'));
             return;
         }
 
@@ -55,12 +55,12 @@ export default function ChangePasswordScreen() {
                 formData,
             });
 
-            AlertService.success('Success', 'Password has been changed.', () => {
+            AlertService.success(t('common.success'), t('profile.passwordChanged'), () => {
                 goBack();
             });
         } catch (error: any) {
             console.error('[ChangePassword] Error:', error);
-            AlertService.error('Error', 'Unable to change password. Please try again.');
+            AlertService.error(t('common.error'), t('profile.changePasswordFailed'));
         }
     };
 
@@ -69,28 +69,26 @@ export default function ChangePasswordScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <SafeAreaHeader title="Change Password" onBack={goBack} />
+            <SafeAreaHeader title={t('profile.changePassword')} onBack={goBack} />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
                     <View style={styles.iconContainer}>
                         <Feather name="lock" size={40} color={COLORS.primary} />
                     </View>
-                    <Text style={styles.title}>Update Password</Text>
-                    <Text style={styles.subtitle}>
-                        Please enter a new password to secure your account.
-                    </Text>
+                    <Text style={styles.title}>{t('profile.updatePassword')}</Text>
+                    <Text style={styles.subtitle}>{t('profile.updatePasswordSubtitle')}</Text>
                 </View>
 
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>New Password</Text>
+                        <Text style={styles.label}>{t('profile.newPassword')}</Text>
                         <View style={styles.passwordInputContainer}>
                             <TextInput
                                 style={styles.passwordInput}
                                 value={password}
                                 onChangeText={setPassword}
-                                placeholder="At least 6 characters"
+                                placeholder={t('profile.passwordMinPlaceholder')}
                                 secureTextEntry={!showPassword}
                             />
                             <TouchableOpacity
@@ -107,12 +105,12 @@ export default function ChangePasswordScreen() {
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Confirm Password</Text>
+                        <Text style={styles.label}>{t('profile.confirmPassword')}</Text>
                         <TextInput
                             style={styles.input}
                             value={confirmPassword}
                             onChangeText={setConfirmPassword}
-                            placeholder="Re-enter new password"
+                            placeholder={t('profile.reenterPassword')}
                             secureTextEntry={!showPassword}
                         />
                     </View>
@@ -125,7 +123,7 @@ export default function ChangePasswordScreen() {
                         {updateProfileMutation.isPending ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <Text style={styles.saveButtonText}>Update Password</Text>
+                            <Text style={styles.saveButtonText}>{t('profile.updatePassword')}</Text>
                         )}
                     </TouchableOpacity>
                 </View>

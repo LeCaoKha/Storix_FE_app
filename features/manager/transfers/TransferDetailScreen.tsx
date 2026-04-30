@@ -19,7 +19,7 @@ import { TransferAvailability, TransferOrderItem } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TransferDetailScreen() {
@@ -259,7 +259,10 @@ export default function TransferDetailScreen() {
     );
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
                 title="Chi tiết luân chuyển"
                 subtitle={transfer.referenceCode || `Phiếu #${transfer.id}`}
@@ -474,7 +477,7 @@ export default function TransferDetailScreen() {
                 onAdd={handleAddItem}
                 isAdding={addItemMutation.isPending}
             />
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

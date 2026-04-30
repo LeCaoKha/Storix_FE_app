@@ -9,7 +9,7 @@ import { TransferQualityCheckItemRequest, TransferQualityCheckPayload } from '@/
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type QualityRow = {
@@ -154,7 +154,10 @@ export default function QualityCheckTransferScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader
         title={t('transfer.qualityCheck')}
         subtitle={transfer.referenceCode || `${t('common.item')} #${transfer.id}`}
@@ -232,7 +235,7 @@ export default function QualityCheckTransferScreen() {
           loading={qualityMutation.isPending}
         />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

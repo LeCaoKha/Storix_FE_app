@@ -1,11 +1,13 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HorizontalFilterBar, RefreshContainer, SafeAreaHeader, TaskCard, type FilterOption } from '@/components';
 import { COLORS } from '@/constants/color';
-import { useTranslation } from '@/hooks/useTranslation';
 import { useTasks } from '@/hooks/task.hooks';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useRefreshStore } from '@/stores/refresh.store';
 import { Task, TaskStatus, TaskType } from '@/types/order';
 
 export default function TasksScreen() {
@@ -13,9 +15,10 @@ export default function TasksScreen() {
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
     const { data: tasks = [], isLoading, refetch } = useTasks();
     const { t } = useTranslation();
+    const refreshSignal = useRefreshStore((state) => state.refreshSignal);
 
     // Helper functions
-    const getFilterLabel = (type: 'all' | TaskType) => {
+    const getFilterLabel = React.useCallback((type: 'all' | TaskType) => {
         switch (type) {
             case 'all': return t('common.all');
             case TaskType.OUTBOUND: return t('tasks.outbound');
@@ -23,7 +26,17 @@ export default function TasksScreen() {
             case TaskType.INVENTORY_COUNT: return t('tasks.inventoryCount');
             default: return type.charAt(0).toUpperCase() + type.slice(1);
         }
-    };
+    }, [t]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            void refetch();
+        }, [refetch])
+    );
+
+    useEffect(() => {
+        void refetch();
+    }, [refreshSignal, refetch]);
 
     // Prepare filter options with counts - MUST be before early return
     const filterOptions = useMemo<FilterOption<'all' | TaskType>[]>(() => {
@@ -38,7 +51,7 @@ export default function TasksScreen() {
             label: getFilterLabel(filter),
             count: filter === 'all' ? tasks.length : tasks.filter((t: Task) => t.type === filter).length,
         }));
-    }, [tasks, t]);
+    }, [tasks, getFilterLabel]);
 
     // Early return AFTER all hooks
     if (isLoading) {

@@ -57,11 +57,6 @@ export default function OutboundOrderDetailScreen() {
     const [isProcessing, setIsProcessing] = useState(false);
     const insets = useSafeAreaInsets();
 
-    // Export handler
-    const handleExport = (format: 'csv' | 'excel') => {
-        AlertService.info('Xuất dữ liệu', `Tính năng xuất ${format.toUpperCase()} đang được phát triển.`);
-    };
-
     // Fetch data based on type
     const { data: request, isLoading: requestLoading, error: requestError, refetch: refetchRequest } = useOutboundRequest(
         type === 'request' ? id : undefined
@@ -202,27 +197,6 @@ export default function OutboundOrderDetailScreen() {
                     <Text style={styles.typeLabel}>
                         {isRequest ? 'Yêu cầu xuất kho' : 'Phiếu xuất kho'}
                     </Text>
-                </Card>
-
-                {/* Export Card */}
-                <Card style={styles.card}>
-                    <Text style={styles.cardTitle}>Xuất Dữ Liệu</Text>
-                    <View style={styles.exportRow}>
-                        <TouchableOpacity
-                            style={[styles.exportButton, { backgroundColor: '#EBF5FF' }]}
-                            onPress={() => handleExport('csv')}
-                        >
-                            <Feather name="file-text" size={16} color="#007AFF" />
-                            <Text style={[styles.exportButtonText, { color: '#007AFF' }]}>Xuất CSV</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.exportButton, { backgroundColor: '#F0FFF4' }]}
-                            onPress={() => handleExport('excel')}
-                        >
-                            <Feather name="grid" size={16} color="#38A169" />
-                            <Text style={[styles.exportButtonText, { color: '#38A169' }]}>Xuất Excel</Text>
-                        </TouchableOpacity>
-                    </View>
                 </Card>
 
                 {/* Destination Info */}

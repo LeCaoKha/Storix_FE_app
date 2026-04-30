@@ -11,7 +11,7 @@ import { useInboundStagingStore } from '@/stores/inbound-staging.store';
 import type { InboundItemStorageRecommendations, InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -152,7 +152,7 @@ export default function InboundDetailScreen() {
 
         AlertService.confirm(
             t('inbound.confirmComplete'),
-            t('inbound.confirmCompleteMsg') || 'Are you sure you have received and checked all items?',
+            t('inbound.confirmCompleteMsg'),
             async () => {
                 setIsConfirming(true);
                 try {
@@ -182,7 +182,7 @@ export default function InboundDetailScreen() {
 
                     clearStagedTicket(order.id);
 
-                    AlertService.success(t('common.success'), t('inbound.successMsg') || 'The inbound ticket has been confirmed.', () => {
+                    AlertService.success(t('common.success'), t('inbound.successMsg'), () => {
                         goBack();
                     });
                 } catch {
@@ -247,27 +247,6 @@ export default function InboundDetailScreen() {
                         </>
                     )}
                 </Card>
-
-                <TouchableOpacity
-                    style={styles.warehouseCard}
-                    onPress={() => router.push({
-                        pathname: '/warehouse-view',
-                        params: {
-                            warehouseId: String(order.warehouse?.id || order.warehouseId || ''),
-                            inboundOrderId: String(order.id),
-                            recommendedBins: recommendedBinCodes.join(','),
-                        },
-                    } as any)}
-                >
-                    <View style={styles.warehouseIconWrap}>
-                        <Feather name="map" size={18} color={COLORS.primary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.warehouseTitle}>{t('outbound.warehouseMap')}</Text>
-                        <Text style={styles.warehouseSubtitle}>{t('outbound.tapToNavigate')}</Text>
-                    </View>
-                    <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
-                </TouchableOpacity>
 
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
@@ -341,14 +320,6 @@ export default function InboundDetailScreen() {
                 </View>
             ) : (
                 <View style={[styles.footer, { paddingBottom: getBottomSafePadding(insets.bottom, 20) }]}>
-                    <TouchableOpacity 
-                        style={styles.reportBtn} 
-                        onPress={() => AlertService.info('Support', 'Error reporting feature is under development.')}
-                    >
-                        <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                        <Text style={styles.reportBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('outbound.issue')}</Text>
-                    </TouchableOpacity>
-
                     <TouchableOpacity
                         style={[
                             styles.confirmBtn, 
@@ -736,41 +707,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: COLORS.success,
     },
-    warehouseCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        marginHorizontal: 0,
-        marginBottom: 16,
-        padding: 14,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: COLORS.borderLight,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    warehouseIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: COLORS.primary + '10',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    warehouseTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: COLORS.slate800,
-    },
-    warehouseSubtitle: {
-        fontSize: 12,
-        color: COLORS.textMuted,
-        marginTop: 2,
-    },
+
     recommendationCard: {
         marginBottom: 12,
         backgroundColor: '#fff',

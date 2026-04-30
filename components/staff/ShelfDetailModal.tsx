@@ -1078,8 +1078,8 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                       style={{ color: COLORS.info }}
                     >
                       {countItems.length > 0
-                        ? `Sẵn sàng lưu kiểm kê cho ${countItems.length} sản phẩm`
-                        : "Kệ này chưa có sản phẩm để kiểm kê"}
+                        ? t('inventoryCount.readyToSave', { count: countItems.length })
+                        : t('inventoryCount.noItemsToCount')}
                     </Text>
                   </View>
                 ) : selectedTotalQuantity > 0 ? (

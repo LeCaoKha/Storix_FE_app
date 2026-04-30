@@ -9,7 +9,7 @@ import type { StockCountItem } from '@/types/stock-count';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InventoryCountDetailScreen() {
@@ -119,7 +119,10 @@ export default function InventoryCountDetailScreen() {
     }
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
                 title={t('inventoryCount.ticketTitle')}
                 subtitle={ticket.name || `CNT-${ticket.id}`}
@@ -350,7 +353,7 @@ export default function InventoryCountDetailScreen() {
                     })}
                 <View style={{ height: 40 }} />
             </RefreshContainer>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

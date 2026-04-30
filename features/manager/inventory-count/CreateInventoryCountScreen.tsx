@@ -10,7 +10,7 @@ import { AlertService } from '@/stores/alert.store';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CreateInventoryCountScreen() {
@@ -73,7 +73,10 @@ export default function CreateInventoryCountScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <SafeAreaHeader backgroundColor="#fff" onBack={() => step > 1 ? setStep(1) : router.back()}>
                 <Text style={styles.headerTitle}>{t('inventoryCount.createTicket')}</Text>
             </SafeAreaHeader>
@@ -217,7 +220,7 @@ export default function CreateInventoryCountScreen() {
                     </View>
                 )}
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

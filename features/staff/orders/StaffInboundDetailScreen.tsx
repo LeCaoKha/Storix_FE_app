@@ -2,15 +2,17 @@ import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { InboundOrderItem } from '@/types/inbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function StaffInboundDetailScreen() {
+    const { t } = useTranslation();
     const { id, from } = useLocalSearchParams<{ id: string; from?: string | string[] }>();
     const user = useAuthStore((state) => state.user);
     const companyId = user?.companyId ?? 0;
@@ -53,7 +55,7 @@ export default function StaffInboundDetailScreen() {
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Loading..." />
+                <ScreenHeader title={t('common.loading')} />
             </View>
         );
     }
@@ -61,12 +63,12 @@ export default function StaffInboundDetailScreen() {
     if (!order || error) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Error" />
+                <ScreenHeader title={t('common.error')} />
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
-                    <Text style={styles.errorText}>Order information not found</Text>
+                    <Text style={styles.errorText}>{t('common.orderNotFound')}</Text>
                     <TouchableOpacity style={styles.backButton} onPress={goBack}>
-                        <Text style={styles.backButtonText}>Back</Text>
+                        <Text style={styles.backButtonText}>{t('common.back')}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -113,20 +115,23 @@ export default function StaffInboundDetailScreen() {
                 items: updatedItems,
             });
 
-            AlertService.success('Success', allReceived ? 'Receipt completed' : 'Receipt information saved', () => {
+            AlertService.success(t('common.success'), allReceived ? t('inbound.receiptCompleted') : t('inbound.receiptSaved'), () => {
                 goBack();
             });
         } catch {
-            AlertService.error('Error', 'Unable to update quantity');
+            AlertService.error(t('common.error'), t('inbound.updateQuantityFailed'));
         } finally {
             setIsSaving(false);
         }
     };
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
-                title="Inbound"
+                title={t('tasks.inbound')}
                 subtitle={order.referenceCode || `INB-${order.id}`}
                 onBack={goBack}
             />
@@ -139,19 +144,19 @@ export default function StaffInboundDetailScreen() {
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Supplier: <Text style={styles.boldText}>{order.supplier?.name || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>{t('inbound.supplier')}: <Text style={styles.boldText}>{order.supplier?.name || t('common.notAvailable')}</Text></Text>
                     </View>
                     {order.referenceCode && (
                         <View style={styles.infoRow}>
                             <Feather name="file-text" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoText}>Reference Code: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
+                            <Text style={styles.infoText}>{t('common.referenceCode')}: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
                         </View>
                     )}
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Product List</Text>
-                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} items</Text>
+                    <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
+                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} {t('common.items')}</Text>
                 </View>
 
                 {order.inboundOrderItems.map((item: InboundOrderItem) => (
@@ -159,7 +164,7 @@ export default function StaffInboundDetailScreen() {
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
                                 <Text style={styles.productName}>{item.product?.name || `Product #${item.productId}`}</Text>
-                                <Text style={styles.skuText}>SKU: {item.product?.sku || 'N/A'}</Text>
+                                <Text style={styles.skuText}>{t('common.sku')}: {item.product?.sku || t('common.notAvailable')}</Text>
                             </View>
                             <View style={[styles.statusBadge, {
                                 backgroundColor: (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? '#D1FAE5' : '#FEF3C7'
@@ -167,13 +172,13 @@ export default function StaffInboundDetailScreen() {
                                 <Text style={[styles.statusBadgeText, {
                                     color: (localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? '#059669' : '#D97706'
                                 }]}>
-                                    {(localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? 'Full' : 'Wait'}
+                                    {(localQuantities[item.id] || 0) >= (item.expectedQuantity || 0) ? t('common.done') : t('common.pending')}
                                 </Text>
                             </View>
                         </View>
 
                         <View style={styles.counterRow}>
-                            <Text style={styles.qtyLabel}>Received quantity:</Text>
+                            <Text style={styles.qtyLabel}>{t('inbound.receivedQty')}</Text>
                             <View style={styles.counter}>
                                 <TouchableOpacity
                                     style={styles.counterBtn}
@@ -198,16 +203,16 @@ export default function StaffInboundDetailScreen() {
                         <View style={styles.businessLogicSection}>
                             <View style={styles.dataGrid}>
                                 <View style={styles.dataField}>
-                                    <Text style={styles.dataLabel}>Batch Number</Text>
+                                    <Text style={styles.dataLabel}>{t('inbound.batchNumber')}</Text>
                                     <TextInput
                                         style={styles.dataInput}
-                                        placeholder="Enter batch number"
+                                        placeholder={t('inbound.batchNumber')}
                                         value={localItemData[item.id]?.batch}
                                         onChangeText={(v) => handleUpdateItemData(item.id, 'batch', v)}
                                     />
                                 </View>
                                 <View style={styles.dataField}>
-                                    <Text style={styles.dataLabel}>Expiry Date (Exp)</Text>
+                                    <Text style={styles.dataLabel}>{t('inbound.expiryDate')}</Text>
                                     <TextInput
                                         style={styles.dataInput}
                                         placeholder="DD/MM/YYYY"
@@ -217,26 +222,26 @@ export default function StaffInboundDetailScreen() {
                                 </View>
                             </View>
 
-                            <Text style={styles.dataLabel}>QC Status</Text>
+                            <Text style={styles.dataLabel}>{t('inbound.qcStatus')}</Text>
                             <View style={styles.qcOptions}>
                                 <TouchableOpacity
                                     style={[styles.qcOption, localItemData[item.id]?.qc === 'good' && styles.qcOptionActive]}
                                     onPress={() => handleUpdateItemData(item.id, 'qc', 'good')}
                                 >
-                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'good' && styles.qcOptionTextActive]}>Good</Text>
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'good' && styles.qcOptionTextActive]}>{t('inbound.good')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.qcOption, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionActiveDanger]}
                                     onPress={() => handleUpdateItemData(item.id, 'qc', 'damaged')}
                                 >
-                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActive]}>Damaged</Text>
+                                    <Text style={[styles.qcOptionText, localItemData[item.id]?.qc === 'damaged' && styles.qcOptionTextActive]}>{t('inbound.damaged')}</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
                         <TouchableOpacity style={styles.scanItemBtn}>
                             <Feather name="maximize" size={16} color={COLORS.primary} />
-                            <Text style={styles.scanItemBtnText}>Scan barcode for this product</Text>
+                            <Text style={styles.scanItemBtnText}>{t('inbound.scanBarcode')}</Text>
                         </TouchableOpacity>
                     </Card>
                 ))}
@@ -245,7 +250,7 @@ export default function StaffInboundDetailScreen() {
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.reportBtn}>
                     <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Report Error</Text>
+                    <Text style={styles.reportBtnText}>{t('inbound.reportError')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.saveBtn, isSaving && styles.disabledBtn]}
@@ -253,11 +258,11 @@ export default function StaffInboundDetailScreen() {
                     disabled={isSaving}
                 >
                     <Text style={styles.saveBtnText}>
-                        {isSaving ? 'Saving...' : 'Complete Receipt'}
+                        {isSaving ? t('inbound.saving') : t('inbound.completeReceipt')}
                     </Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

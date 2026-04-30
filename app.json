@@ -4,7 +4,7 @@
     "slug": "storix-fe-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/Logo.png",
+    "icon": "./assets/images/icon-square.png",
     "scheme": "storixfeapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -16,9 +16,7 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/Logo.png",
-        "backgroundImage": "./assets/images/Logo.png",
-        "monochromeImage": "./assets/images/Logo.png"
+        "foregroundImage": "./assets/images/icon-square.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -26,7 +24,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/Logo.png"
+      "favicon": "./assets/images/icon-square.png"
     },
     "plugins": [
       "expo-router",
@@ -42,7 +40,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -21,8 +21,10 @@ import { useAppBack } from '@/hooks/useAppBack';
 import { useProfile, useUpdateProfile } from '@/hooks/user.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function EditProfileScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const goBack = useAppBack('/(manager-tabs)/profile');
     const { user } = useAuthStore();
@@ -47,7 +49,7 @@ export default function EditProfileScreen() {
     const handlePickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            AlertService.warning('Permission', 'Please allow access to photo library to change profile picture.');
+            AlertService.warning(t('profile.permissionTitle'), t('profile.cameraPermissionMsg'));
             return;
         }
 
@@ -66,7 +68,7 @@ export default function EditProfileScreen() {
 
     const handleSave = async () => {
         if (!fullName.trim()) {
-            AlertService.warning('Error', 'Please enter full name.');
+            AlertService.warning(t('common.error'), t('profile.fullNameRequiredMsg'));
             return;
         }
 
@@ -99,12 +101,12 @@ export default function EditProfileScreen() {
                 formData,
             });
 
-            AlertService.success('Success', 'Personal information has been updated.', () => {
+            AlertService.success(t('common.success'), t('profile.profileUpdated'), () => {
                 goBack();
             });
         } catch (error: any) {
             console.error('[EditProfile] Save error:', error);
-            AlertService.error('Error', 'Unable to update information. Please try again.');
+            AlertService.error(t('common.error'), t('profile.updateFailed'));
         }
     };
 

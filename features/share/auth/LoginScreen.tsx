@@ -5,15 +5,19 @@ import { useRootNavigationState, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Input } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useLogin } from '@/hooks/auth.hooks';
+import { useTranslation } from '@/hooks/useTranslation';
 import { getUserById, getUserProfile, mergeUserProfileIntoUser } from '@/services/user.api';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function LoginScreen() {
+    const { t, language, setLanguage } = useTranslation();
+    const insets = useSafeAreaInsets();
     const router = useRouter();
     const rootNavigationState = useRootNavigationState();
     const { mutateAsync: login, isPending: isLoading } = useLogin();
@@ -21,7 +25,10 @@ export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const authStore = useAuthStore();
+
+    const handleLanguageToggle = () => {
+        setLanguage(language === 'en' ? 'vi' : 'en');
+    };
 
     // Tự động đăng nhập nếu đã có token
     React.useEffect(() => {
@@ -128,7 +135,7 @@ export default function LoginScreen() {
             }
         } catch (error) {
             console.error('Login failed:', error);
-            AlertService.error('Login Failed', 'Incorrect email or password. Please try again.');
+            AlertService.error(t('auth.loginFailedTitle'), t('auth.loginFailedMsg'));
         }
     };
 
@@ -139,6 +146,16 @@ export default function LoginScreen() {
             style={styles.container}
         >
             <StatusBar style="light" />
+            <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('profile.language')}
+                onPress={handleLanguageToggle}
+                style={[styles.floatingLanguageButton, { top: insets.top + 10 }]}
+            >
+                <Text style={[styles.languageText, language === 'en' && styles.languageTextActive]}>EN</Text>
+                <Text style={styles.languageDivider}>|</Text>
+                <Text style={[styles.languageText, language === 'vi' && styles.languageTextActive]}>VI</Text>
+            </TouchableOpacity>
 
             <ScrollView
                 contentContainerStyle={{ flexGrow: 1 }}
@@ -165,13 +182,13 @@ export default function LoginScreen() {
 
                 <View style={styles.contentContainer}>
                     <View style={styles.formCard}>
-                        <Text style={styles.formTitle}>Sign In</Text>
-                        <Text style={styles.formSubtitle}>Enter your details to continue</Text>
+                        <Text style={styles.formTitle}>{t('auth.login')}</Text>
+                        <Text style={styles.formSubtitle}>{t('auth.loginSubtitle')}</Text>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Email</Text>
+                            <Text style={styles.label}>{t('auth.email')}</Text>
                             <Input
-                                placeholder="Enter email"
+                                placeholder={t('auth.enterEmail')}
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
@@ -182,9 +199,9 @@ export default function LoginScreen() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Password</Text>
+                            <Text style={styles.label}>{t('auth.password')}</Text>
                             <Input
-                                placeholder="Enter password"
+                                placeholder={t('auth.enterPassword')}
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry={!showPassword}
@@ -203,11 +220,17 @@ export default function LoginScreen() {
                         </View>
 
                         <TouchableOpacity style={styles.forgotPass}>
-                            <Text style={styles.forgotPassText}>Forgot password?</Text>
+                            <Text
+                                style={styles.forgotPassText}
+                                onPress={() => router.push('/forgot-password' as any)}
+                                suppressHighlighting
+                            >
+                                {t('auth.forgotPassword')}
+                            </Text>
                         </TouchableOpacity>
 
                         <Button
-                            title="Sign In"
+                            title={t('auth.login')}
                             onPress={handleLogin}
                             loading={isLoading}
                             style={styles.loginButton}
@@ -217,11 +240,9 @@ export default function LoginScreen() {
 
                         <View style={styles.helpSection}>
                             <Feather name="help-circle" size={16} color={COLORS.slate500} />
-                            <Text style={styles.helpText}>Need help? Contact Administrator</Text>
+                            <Text style={styles.helpText}>{t('auth.needHelp')}{t('auth.contactAdmin')}</Text>
                         </View>
                     </View>
-
-                    <Text style={styles.versionText}>v2.4.0 • Enterprise Edition</Text>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -233,10 +254,43 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.slate50,
     },
+    floatingLanguageButton: {
+        position: 'absolute',
+        right: 14,
+        minWidth: 74,
+        height: 40,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        flexDirection: 'row',
+        gap: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(13, 148, 136, 0.42)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.24)',
+        zIndex: 20,
+        elevation: 10,
+    },
+    languageText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.8,
+    },
+    languageTextActive: {
+        color: '#fff',
+    },
+    languageDivider: {
+        color: 'rgba(255,255,255,0.45)',
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: -1,
+    },
     headerBackground: {
         height: '45%',
         alignItems: 'center',
         paddingTop: 80,
+        position: 'relative',
     },
     headerContent: {
         alignItems: 'center',
@@ -384,12 +438,4 @@ const styles = StyleSheet.create({
         color: COLORS.slate500,
         fontSize: 13,
     },
-    versionText: {
-        textAlign: 'center',
-        marginTop: 'auto',
-        marginBottom: 30,
-        color: COLORS.slate500,
-        fontSize: 12,
-        fontWeight: '500',
-    }
 });

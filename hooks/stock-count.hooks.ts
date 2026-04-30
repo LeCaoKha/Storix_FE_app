@@ -1,11 +1,11 @@
 import {
+    cancelStockCountTicket,
+    createStockCountTicket,
     getStockCountTicketById,
     getStockCountTickets,
     getStockCountTicketsByStaff,
     getWarehouseInventory,
-    updateStockCountTicketItems,
-    createStockCountTicket,
-    cancelStockCountTicket
+    updateStockCountTicketItems
 } from '@/services/stock-count.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { UpdateStockCountItemPayload } from '@/types/stock-count';
@@ -91,6 +91,7 @@ export const useUpdateStockCountItem = () => {
             }),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: stockCountKeys.tickets() });
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
             queryClient.invalidateQueries({ queryKey: stockCountKeys.ticket(variables.ticketId) });
         },
     });

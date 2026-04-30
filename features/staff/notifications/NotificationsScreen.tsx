@@ -1,15 +1,15 @@
 import { Card, RefreshContainer, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
-import { deleteNotification, getUserNotifications, markNotificationAsRead, type NotificationItem } from '@/services/notification.api';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { useAuthStore } from '@/stores/auth.store';
 import { useTranslation } from '@/hooks/useTranslation';
+import { deleteNotification, getUserNotifications, markNotificationAsRead, type NotificationItem } from '@/services/notification.api';
+import { useAuthStore } from '@/stores/auth.store';
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
 interface Notification {
   id: number;
@@ -36,7 +36,7 @@ export default function NotificationsScreen() {
     const createdAt = createdAtValue ? new Date(createdAtValue) : new Date();
     const normalizedType = String(item.type || source.type || '').toLowerCase();
     
-    let title = item.title || source.title || 'Notification';
+    let title = item.title || source.title || t('notifications.defaultTitle');
     let message = item.message || source.message || '';
 
     // Localize dynamic content
@@ -81,14 +81,14 @@ export default function NotificationsScreen() {
   const markReadMutation = useMutation({
     mutationFn: (notificationId: number) => markNotificationAsRead(user?.id ?? 0, notificationId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (notificationId: number) => deleteNotification(user?.id ?? 0, notificationId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
   });
@@ -105,7 +105,7 @@ export default function NotificationsScreen() {
     await Promise.all(unread.map((notification) => markReadMutation.mutateAsync(notification.id)));
     
     // Invalidate once at the end
-    await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+    await queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
 
   const clearAllNotifications = async () => {
@@ -113,7 +113,7 @@ export default function NotificationsScreen() {
     try {
       await Promise.all(notifications.map((notification) => deleteMutation.mutateAsync(notification.id)));
       // Invalidate once at the end
-      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       console.error(err);
     }

@@ -16,7 +16,9 @@ import React, { useEffect, useState } from 'react';
 import {
     Alert,
     FlatList,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -286,7 +288,10 @@ export default function CreateRequisitionScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
                 title="Tạo đề nghị mới"
                 rightButton={
@@ -722,7 +727,7 @@ export default function CreateRequisitionScreen() {
                     )}
                 </View>
             </Modal>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
