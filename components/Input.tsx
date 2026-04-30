@@ -64,6 +64,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
+    color: '#1E293B',
     backgroundColor: '#fff',
     minHeight: 44,
   },

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "storix-fe-app",
+    "name": "Storix WMS",
     "slug": "storix-fe-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon-square.png",
+    "icon": "./assets/images/logoStorix.png",
     "scheme": "storixfeapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -15,8 +15,8 @@
       "package": "com.storix.warehouse",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/icon-square.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/logoStorix.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -32,12 +32,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/Logo.png",
+          "image": "./assets/images/logoStorix.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#ffffff"
           }
         }
       ],
@@ -46,6 +46,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "94b038d3-96cc-4e96-882e-182a9503e250"
+      }
+    },
+    "owner": "nguyenhoang149"
   }
 }

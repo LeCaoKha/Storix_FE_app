@@ -142,8 +142,9 @@ export default function LoginScreen() {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior="padding"
             style={styles.container}
+            keyboardVerticalOffset={Platform.OS === 'android' ? -100 : 0}
         >
             <StatusBar style="light" />
             <TouchableOpacity
@@ -408,6 +409,7 @@ const styles = StyleSheet.create({
     input: {
         backgroundColor: COLORS.slate50,
         borderColor: COLORS.slate200,
+        color: COLORS.text,
     },
     forgotPass: {
         alignSelf: 'flex-end',
