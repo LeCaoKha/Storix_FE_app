@@ -4,7 +4,7 @@ import { COLORS } from '@/constants/color';
 import { Product } from '@/types/product';
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface AddTransferItemModalProps {
@@ -42,7 +42,10 @@ export const AddTransferItemModal: React.FC<AddTransferItemModalProps> = ({ visi
             />
 
             <Modal visible={visible && !!selectedProduct} animationType="slide" onRequestClose={handleClose}>
-                <View style={styles.container}>
+                <KeyboardAvoidingView 
+                    style={styles.container}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
                     <View style={[styles.header, { paddingTop: getTopSafePadding(insets.top, 12) }]}>
                         <Text style={styles.title}>Thêm sản phẩm luân chuyển</Text>
                         <TouchableOpacity onPress={handleClose}>
@@ -78,7 +81,7 @@ export const AddTransferItemModal: React.FC<AddTransferItemModalProps> = ({ visi
                             />
                         </View>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </>
     );

@@ -5,7 +5,6 @@ import {
   WarehouseGridView,
   WarehouseLayout,
 } from "@/components/staff";
-import { ShelfActionItem } from "@/components/staff/ShelfDetailModal";
 import { COLORS } from "@/constants/color";
 import {
   useInboundOrdersByStaff,
@@ -16,20 +15,23 @@ import {
   useOutboundTicket,
   useUpdateOutboundTicketItems,
 } from "@/hooks/outbound-orders.hooks";
+import { useProductInventoryLocations, useProducts } from "@/hooks/product.hooks";
 import {
   useStockCountTicket,
   useWarehouseInventory,
 } from "@/hooks/stock-count.hooks";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useWarehouses, useWarehouseStructure } from "@/hooks/warehouse.hooks";
+import { getProductInventoryLocations } from "@/services/product.api";
 import { AlertService } from "@/stores/alert.store";
 import { useAuthStore } from "@/stores/auth.store";
 import { useInboundStagingStore } from "@/stores/inbound-staging.store";
 import { usePendingQuantitiesStore } from "@/stores/pending-quantities.store";
+import type { ProductInventoryLocation } from "@/types/product";
 import { PathResult, Shelf, WarehouseZone } from "@/types/warehouse";
 import { findNearestNode, findShortestPath } from "@/utils/pathfinding";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -37,8 +39,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
 
 export default function WarehouseDiagramScreen() {
+    const { t } = useTranslation();
   const params = useLocalSearchParams<{
     warehouseId?: string;
     inboundOrderId?: string;
@@ -108,6 +112,9 @@ export default function WarehouseDiagramScreen() {
   const [currentLocation] = useState<{ x: number; y: number } | null>(null);
   const [viewMode, setViewMode] = useState<"map" | "grid">("map");
   const [, setLocalReceivedByItemId] = useState<Record<number, number>>({});
+  const [countLocationsByProductId, setCountLocationsByProductId] = useState<
+    Record<number, ProductInventoryLocation[]>
+  >({});
 
   // Get token and user from auth store
   const user = useAuthStore((state) => state.user);
@@ -142,6 +149,157 @@ export default function WarehouseDiagramScreen() {
     error: structureError,
     refetch: refetchStructure,
   } = useWarehouseStructure(selectedWarehouseId);
+
+  const resolvedProductId = useMemo(() => {
+    if (!focusedItemId) return undefined;
+    
+    if (inboundOrderId && inboundTicket?.inboundOrderItems) {
+      const item = inboundTicket.inboundOrderItems.find((i: any) => i.id === focusedItemId);
+      if (item?.productId) return Number(item.productId);
+    }
+    
+    if (outboundOrderId && outboundOrder?.outboundOrderItems) {
+      const item = outboundOrder.outboundOrderItems.find((i: any) => i.id === focusedItemId);
+      if (item?.productId) return Number(item.productId);
+    }
+
+    if (inventoryCountTicketId && stockCountTicket?.items) {
+      const itemById = stockCountTicket.items.find((i: any) => i.id === focusedItemId);
+      if (itemById?.productId) return Number(itemById.productId);
+
+      const itemByProductId = stockCountTicket.items.find((i: any) => Number(i.productId || 0) === focusedItemId);
+      if (itemByProductId) return focusedItemId;
+    }
+    
+    const isTicketsLoading = (inboundOrderId && !inboundTicket) || 
+                             (outboundOrderId && !outboundOrder) || 
+                             (inventoryCountTicketId && !stockCountTicket);
+    if (isTicketsLoading) return undefined;
+
+    return focusedItemId;
+  }, [focusedItemId, inboundOrderId, inboundTicket, outboundOrderId, outboundOrder, inventoryCountTicketId, stockCountTicket]);
+
+  const { data: focusedProductLocations = [] } =
+    useProductInventoryLocations(
+      resolvedProductId,
+      selectedWarehouseId,
+    );
+  const { data: products = [] } = useProducts();
+
+  const productDimensionsById = useMemo(() => {
+    const map = new Map<number, { width?: number; height?: number; length?: number }>();
+    (products || []).forEach((product) => {
+      const productId = Number(product.id || 0);
+      if (productId <= 0) return;
+      map.set(productId, {
+        width: product.width,
+        height: product.height,
+        length: product.length,
+      });
+    });
+    return map;
+  }, [products]);
+
+  useEffect(() => {
+    if (!isCounting || !stockCountTicket || !selectedWarehouseId || !user?.id) {
+      setCountLocationsByProductId({});
+      return;
+    }
+
+    const productIds = Array.from(
+      new Set(
+        stockCountTicket.items
+          .map((item) => Number(item.productId || 0))
+          .filter((id) => id > 0),
+      ),
+    );
+
+    if (productIds.length === 0) {
+      setCountLocationsByProductId({});
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLocations = async () => {
+      try {
+        const results = await Promise.all(
+          productIds.map(async (productId) => {
+            const locations = await getProductInventoryLocations(
+              Number(user.id),
+              productId,
+              Number(selectedWarehouseId),
+            );
+            return [productId, locations] as const;
+          }),
+        );
+
+        if (cancelled) return;
+
+        const next: Record<number, ProductInventoryLocation[]> = {};
+        results.forEach(([productId, locations]) => {
+          next[productId] = Array.isArray(locations) ? locations : [];
+        });
+        setCountLocationsByProductId(next);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("[WarehouseDiagramScreen] Failed to load inventory locations for count mode", error);
+          setCountLocationsByProductId({});
+        }
+      }
+    };
+
+    void loadLocations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCounting, stockCountTicket, selectedWarehouseId, user?.id]);
+
+  const focusedInventorySummary = useMemo(() => {
+    const grouped = new Map<
+      string,
+      { shelfId?: string; shelfCode?: string; label: string; quantity: number }
+    >();
+
+    focusedProductLocations.forEach((location) => {
+      const rawLabel =
+        location.shelfCode ||
+        location.shelfIdCode ||
+        (location.shelfId ? `${t('warehouse.shelf')} #${location.shelfId}` : t('warehouse.shelfNotRecognized'));
+      const normalizedKey = String(
+        location.shelfIdCode || location.shelfCode || location.shelfId || rawLabel,
+      )
+        .trim()
+        .toLowerCase();
+      const quantity = Math.max(0, Number(location.quantity || 0));
+
+      if (!grouped.has(normalizedKey)) {
+        grouped.set(normalizedKey, {
+          shelfId: location.shelfId ? String(location.shelfId) : undefined,
+          shelfCode: location.shelfIdCode || location.shelfCode || undefined,
+          label: rawLabel,
+          quantity: 0,
+        });
+      }
+
+      grouped.get(normalizedKey)!.quantity += quantity;
+    });
+
+    return Array.from(grouped.values()).sort(
+      (left, right) => right.quantity - left.quantity || left.label.localeCompare(right.label),
+    );
+  }, [focusedProductLocations]);
+
+  const focusedInventoryHighlightValues = useMemo(() => {
+    const values = focusedProductLocations.flatMap((location) => [
+      location.shelfIdCode,
+      location.shelfCode,
+      location.shelfId ? String(location.shelfId) : undefined,
+    ]);
+
+    return Array.from(new Set(values.filter((value): value is string => !!value)));
+  }, [focusedProductLocations]);
 
   // ===== PATH OPTIMIZATION FETCH EFFECT =====
   useEffect(() => {
@@ -183,21 +341,21 @@ export default function WarehouseDiagramScreen() {
           setOptimizedPath(pathArray);
           setViewMode("map");
           AlertService.success(
-            "Path Found",
-            "Optimized picking path loaded successfully on the map.",
+            t('warehouse.pathFound'),
+            t('warehouse.pathFoundMsg'),
           );
         } else {
           AlertService.warning(
-            "Path Not Found",
-            "Could not generate an optimized path for this ticket.",
+            t('warehouse.pathNotFound'),
+            t('warehouse.pathNotFoundMsg'),
           );
         }
       } catch (err) {
         console.error("[PathOptimization] Error fetching path:", err);
-        AlertService.error(
-          "Error",
-          "Failed to connect to path optimization service.",
-        );
+        // AlertService.error(
+        //   t('common.error'),
+        //   "Failed to connect to path optimization service.",
+        // );
       } finally {
         setIsFetchingPath(false);
       }
@@ -218,9 +376,6 @@ export default function WarehouseDiagramScreen() {
   );
   const getItemStagedQuantity = useInboundStagingStore(
     (state) => state.getItemStagedQuantity,
-  );
-  const getItemStagedBins = useInboundStagingStore(
-    (state) => state.getItemStagedBins,
   );
 
   const syncLocalReceivedByItemId = React.useCallback(
@@ -265,7 +420,7 @@ export default function WarehouseDiagramScreen() {
   };
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const { clearShelfPending } = usePendingQuantitiesStore();
+  const clearShelfPending = usePendingQuantitiesStore((state) => state.clearShelfPending);
 
   const recommendedBins = useMemo(() => {
     const binsFromApi = recommendationItems
@@ -282,36 +437,327 @@ export default function WarehouseDiagramScreen() {
       .filter((id): id is string => !!id);
   }, [stockCountTicket]);
 
-  const productIdsWithMissingLocations = useMemo(() => {
+  const countTicketProductIds = useMemo(() => {
     if (!isCounting || !stockCountTicket) return [];
-    return stockCountTicket.items
-      .filter((item) => !item.locationId && !!item.productId)
-      .map((item) => item.productId!);
+
+    return Array.from(
+      new Set(
+        stockCountTicket.items
+          .map((item) => Number(item.productId || 0))
+          .filter((productId) => productId > 0),
+      ),
+    );
   }, [isCounting, stockCountTicket]);
 
   const { data: suggestedInventory = [] } = useWarehouseInventory(
     selectedWarehouseId,
-    productIdsWithMissingLocations,
+    countTicketProductIds,
   );
 
+  const normalizeShelfKey = React.useCallback((value: unknown) => {
+    return String(value ?? "").trim().toLowerCase();
+  }, []);
+
+  const isLocationInSelectedShelf = React.useCallback(
+    (location: ProductInventoryLocation, shelf: Shelf | null) => {
+      if (!shelf) return false;
+
+      const selectedShelfId = normalizeShelfKey(shelf.id);
+      const selectedShelfCode = normalizeShelfKey(shelf.code);
+      const locationShelfCode = normalizeShelfKey(location.shelfCode);
+      const locationShelfIdCode = normalizeShelfKey(location.shelfIdCode);
+      const locationShelfId = normalizeShelfKey(location.shelfId);
+
+      return (
+        (!!selectedShelfCode &&
+          (locationShelfCode === selectedShelfCode ||
+            locationShelfIdCode === selectedShelfCode)) ||
+        (!!selectedShelfId &&
+          (locationShelfId === selectedShelfId ||
+            locationShelfIdCode === selectedShelfId))
+      );
+    },
+    [normalizeShelfKey],
+  );
+
+  const selectedShelfQuantityByProductId = useMemo(() => {
+    const quantities: Record<number, number> = {};
+    if (!selectedShelf) return quantities;
+
+    Object.entries(countLocationsByProductId).forEach(([productIdKey, locations]) => {
+      const productId = Number(productIdKey || 0);
+      if (productId <= 0) return;
+
+      const qtyOnSelectedShelf = (locations || [])
+        .filter((location) => isLocationInSelectedShelf(location, selectedShelf))
+        .reduce((sum, location) => sum + Math.max(0, Number(location.quantity || 0)), 0);
+
+      if (qtyOnSelectedShelf > 0) {
+        quantities[productId] = qtyOnSelectedShelf;
+      }
+    });
+
+    suggestedInventory.forEach((inventoryItem) => {
+      const productId = Number(inventoryItem.productId || 0);
+      if (productId <= 0) return;
+      if (Number(quantities[productId] || 0) > 0) return;
+
+      const qtyOnSelectedShelf = (inventoryItem.binDetails || [])
+        .filter(
+          (bin) =>
+            normalizeShelfKey(bin.shelfCode) === normalizeShelfKey(selectedShelf.code),
+        )
+        .reduce((sum, bin) => sum + Math.max(0, Number(bin.quantity || 0)), 0);
+
+      if (qtyOnSelectedShelf > 0) {
+        quantities[productId] = qtyOnSelectedShelf;
+      }
+    });
+
+    return quantities;
+  }, [
+    countLocationsByProductId,
+    isLocationInSelectedShelf,
+    normalizeShelfKey,
+    selectedShelf,
+    suggestedInventory,
+  ]);
+
+  const selectedShelfQuantityByLocationMap = useMemo(() => {
+    const quantities: Record<number, number> = {};
+    if (!selectedShelf) return quantities;
+
+    Object.values(countLocationsByProductId).forEach((locations) => {
+      (locations || []).forEach((location) => {
+        const matchesSelectedShelf = isLocationInSelectedShelf(location, selectedShelf);
+
+        if (!matchesSelectedShelf) return;
+
+        const inventoryLocationId = Number(location.inventoryLocationId || 0);
+        if (inventoryLocationId <= 0) return;
+
+        quantities[inventoryLocationId] = Math.max(0, Number(location.quantity || 0));
+      });
+    });
+
+    return quantities;
+  }, [countLocationsByProductId, isLocationInSelectedShelf, selectedShelf]);
+
   const suggestedBins = useMemo(() => {
-    if (suggestedInventory.length === 0) return [];
     const bins: string[] = [];
+    
+    // Vị trí từ tồn kho tổng quát (cho cả phiếu)
     suggestedInventory.forEach((item) => {
       item.binDetails?.forEach((bin) => {
         if (bin.binCode) bins.push(bin.binCode);
       });
     });
+
+    // Vị trí thực tế của sản phẩm đang focus (dữ liệu chính xác nhất)
+    focusedProductLocations.forEach((loc) => {
+      if (loc.shelfIdCode) bins.push(String(loc.shelfIdCode));
+      if (loc.shelfCode) bins.push(String(loc.shelfCode));
+      if (loc.shelfId) bins.push(String(loc.shelfId));
+    });
+
     return Array.from(new Set(bins));
-  }, [suggestedInventory]);
+  }, [suggestedInventory, focusedProductLocations]);
+
+  const focusedShelfQuantity = useMemo(() => {
+    if (focusedItemId && selectedShelfQuantityByProductId[Number(focusedItemId)]) {
+      return Number(selectedShelfQuantityByProductId[Number(focusedItemId)] || 0);
+    }
+
+    if (!selectedShelf) return 0;
+
+    const matched = focusedInventorySummary.find(
+      (entry) =>
+        String(entry.shelfId ?? "").trim() === String(selectedShelf.id).trim() ||
+        String(entry.shelfCode ?? "").trim() === String(selectedShelf.code).trim(),
+    );
+
+    return Number(matched?.quantity || 0);
+  }, [focusedItemId, selectedShelf, selectedShelfQuantityByProductId, focusedInventorySummary]);
+
+  const countItemsForSelectedShelf = useMemo(() => {
+    if (!isCounting || !stockCountTicket || !selectedShelf) return [];
+
+    const focusedProductId = Number(focusedItemId || 0);
+    const applyFocusedProductFilter = (items: typeof stockCountTicket.items) => {
+      if (focusedProductId <= 0) return items;
+      return items.filter(
+        (item) => Number(item.productId || 0) === focusedProductId,
+      );
+    };
+
+    const shelfBinValues = new Set(
+      (selectedShelf.levels ?? []).flatMap((level) =>
+        (level.bins ?? []).flatMap((bin) => [String(bin.id), String(bin.code)]),
+      ),
+    );
+
+    const shelfIdentityValues = new Set<string>([
+      String(selectedShelf.id),
+      String(selectedShelf.code),
+      ...Array.from(shelfBinValues),
+    ]);
+
+    const selectedShelfHasFocusedInventory = focusedInventorySummary.some(
+      (entry) =>
+        String(entry.shelfId ?? "").trim() === String(selectedShelf.id).trim() ||
+        String(entry.shelfCode ?? "").trim() === String(selectedShelf.code).trim(),
+    );
+
+    const matchedItems = stockCountTicket.items.filter((item) => {
+      const locationValue = item.locationId != null ? String(item.locationId) : "";
+      const matchesLocation = locationValue.length > 0 && shelfIdentityValues.has(locationValue);
+      const locationIdAsNumber = Number(item.locationId || 0);
+      const matchesInventoryLocationMap =
+        locationIdAsNumber > 0 &&
+        Number(selectedShelfQuantityByLocationMap[locationIdAsNumber] || 0) > 0;
+
+      const matchesFocusedProductOnShelf =
+        !!focusedItemId &&
+        Number(item.productId || 0) === Number(focusedItemId) &&
+        selectedShelfHasFocusedInventory &&
+        focusedShelfQuantity > 0;
+
+      return matchesLocation || matchesInventoryLocationMap || matchesFocusedProductOnShelf;
+    });
+
+    if (matchedItems.length > 0) return applyFocusedProductFilter(matchedItems);
+
+    const shelfMatchedByInventory = stockCountTicket.items.filter((item) => {
+      const productId = Number(item.productId || 0);
+      return productId > 0 && Number(selectedShelfQuantityByProductId[productId] || 0) > 0;
+    });
+
+    if (shelfMatchedByInventory.length > 0)
+      return applyFocusedProductFilter(shelfMatchedByInventory);
+
+    // Fallback: if user is counting a specific focused product, allow counting it on the selected shelf.
+    if (focusedItemId && focusedShelfQuantity > 0) {
+      return stockCountTicket.items.filter(
+        (item) => Number(item.productId || 0) === Number(focusedItemId),
+      );
+    }
+
+    return applyFocusedProductFilter([]);
+  }, [
+    isCounting,
+    stockCountTicket,
+    selectedShelf,
+    focusedItemId,
+    focusedShelfQuantity,
+    selectedShelfQuantityByProductId,
+    selectedShelfQuantityByLocationMap,
+    focusedInventorySummary,
+  ]);
+
+  const countExpectedByItemId = useMemo(() => {
+    const map: Record<number, number> = {};
+
+    countItemsForSelectedShelf.forEach((item) => {
+      const isFocusedProduct =
+        !!focusedItemId && Number(item.productId || 0) === Number(focusedItemId);
+
+      const shelfExpectedByInventory = Number(
+        selectedShelfQuantityByProductId[Number(item.productId || 0)] || 0,
+      );
+      const shelfExpectedByLocation = Number(
+        selectedShelfQuantityByLocationMap[Number(item.locationId || 0)] || 0,
+      );
+
+      map[item.id] = shelfExpectedByLocation > 0
+        ? shelfExpectedByLocation
+        : shelfExpectedByInventory > 0
+        ? shelfExpectedByInventory
+        : isFocusedProduct && focusedShelfQuantity > 0
+          ? focusedShelfQuantity
+          : Math.max(0, Number(item.systemQuantity || 0));
+    });
+
+    return map;
+  }, [
+    countItemsForSelectedShelf,
+    focusedItemId,
+    focusedShelfQuantity,
+    selectedShelfQuantityByProductId,
+    selectedShelfQuantityByLocationMap,
+  ]);
+
+  useEffect(() => {
+    if (!isCounting) return;
+
+    const selectedShelfBins = (selectedShelf?.levels ?? []).flatMap((level) =>
+      (level.bins ?? []).map((bin) => ({ id: String(bin.id), code: String(bin.code) })),
+    );
+
+    const ticketItemsDebug = (stockCountTicket?.items ?? []).map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      locationId: item.locationId,
+      systemQuantity: item.systemQuantity,
+      countedQuantity: item.countedQuantity,
+      sku: item.sku,
+      name: item.name,
+    }));
+
+    const locationsDebug = Object.entries(countLocationsByProductId).map(
+      ([productId, locations]) => ({
+        productId: Number(productId),
+        locations: (locations || []).map((loc) => ({
+          inventoryLocationId: loc.inventoryLocationId,
+          shelfId: loc.shelfId,
+          shelfCode: loc.shelfCode,
+          shelfIdCode: loc.shelfIdCode,
+          quantity: loc.quantity,
+        })),
+      }),
+    );
+
+    console.log("[CountDebug] Selected shelf", {
+      id: selectedShelf?.id,
+      code: selectedShelf?.code,
+      bins: selectedShelfBins,
+    });
+    console.log("[CountDebug] Stock count ticket items", ticketItemsDebug);
+    console.log("[CountDebug] Product inventory locations", locationsDebug);
+    console.log("[CountDebug] Quantity by inventoryLocationId", selectedShelfQuantityByLocationMap);
+    console.log("[CountDebug] Quantity by productId", selectedShelfQuantityByProductId);
+    console.log("[CountDebug] Matched items for selected shelf", countItemsForSelectedShelf.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      locationId: item.locationId,
+      resolvedExpected: countExpectedByItemId[item.id],
+      systemQuantity: item.systemQuantity,
+      countedQuantity: item.countedQuantity,
+    })));
+  }, [
+    isCounting,
+    selectedShelf,
+    stockCountTicket,
+    countLocationsByProductId,
+    selectedShelfQuantityByLocationMap,
+    selectedShelfQuantityByProductId,
+    countItemsForSelectedShelf,
+    countExpectedByItemId,
+  ]);
 
   const effectiveHighlightedBins = useMemo(() => {
     if (focusedBinsArray.length > 0) return focusedBinsArray;
+    if (focusedItemId) {
+      return Array.from(
+        new Set([...focusedInventoryHighlightValues, ...(isCounting ? [...inventoryBins, ...suggestedBins] : recommendedBins)]),
+      );
+    }
     if (isCounting)
       return Array.from(new Set([...inventoryBins, ...suggestedBins]));
     return recommendedBins;
   }, [
     focusedBinsArray,
+    focusedItemId,
+    focusedInventoryHighlightValues,
     isCounting,
     inventoryBins,
     suggestedBins,
@@ -371,6 +817,9 @@ export default function WarehouseDiagramScreen() {
     let firstZone: WarehouseZone | null = null;
     for (const zone of structure.zones ?? []) {
       for (const shelf of zone.shelves ?? []) {
+        const isShelfDirectlyRecommended = effectiveHighlightedBins.some(
+          (code) => String(code) === shelf.id || String(code) === shelf.code,
+        );
         const hasRecommendedBin = (shelf.levels ?? []).some((level) =>
           (level.bins ?? []).some((bin) =>
             effectiveHighlightedBins.some(
@@ -378,7 +827,7 @@ export default function WarehouseDiagramScreen() {
             ),
           ),
         );
-        if (hasRecommendedBin) {
+        if (isShelfDirectlyRecommended || hasRecommendedBin) {
           shelfIds.add(shelf.id);
           if (!firstShelf) {
             firstShelf = shelf;
@@ -488,36 +937,29 @@ export default function WarehouseDiagramScreen() {
     handleFindPath(recommendationResolution.firstShelf);
   };
 
-  const handleConfirmOperationAtShelf = async (
-    actionItems: ShelfActionItem[],
-  ) => {
+  const handleConfirmOperationAtShelf = async (actionItems: any[]) => {
     if (isProcessing) return;
     if (!selectedShelf) {
       AlertService.warning(
-        "Missing shelf information",
-        "Please reselect the shelf before confirming.",
+        t('warehouse.missingShelfInfo'),
+        t('warehouse.missingShelfInfoMsg'),
       );
       return;
     }
-    const refreshedStructureResult = await refetchStructure();
-    const refreshedStructure = refreshedStructureResult.data ?? structure;
-    const currentSelectedShelf =
-      refreshedStructure?.zones
-        ?.flatMap((zone) => zone.shelves ?? [])
-        ?.find((shelf) => shelf.id === selectedShelf.id) ?? selectedShelf;
+    const currentSelectedShelf = selectedShelf;
 
     if (!isPicking && inboundOrderId) {
       if (!ticketWarehouseId) {
         AlertService.warning(
-          "Undefined warehouse",
-          "Cannot determine the warehouse for this inbound ticket. Please refresh and try again.",
+          t('warehouse.undefinedWarehouse'),
+          t('warehouse.undefinedWarehouseMsg'),
         );
         return;
       }
       if (selectedWarehouseId && ticketWarehouseId !== selectedWarehouseId) {
         AlertService.warning(
-          "Wrong warehouse",
-          "The currently open warehouse does not match the inbound ticket. Please open the correct warehouse diagram.",
+          t('warehouse.wrongWarehouse'),
+          t('warehouse.wrongWarehouseMsg'),
         );
         return;
       }
@@ -531,8 +973,8 @@ export default function WarehouseDiagramScreen() {
       : undefined;
     if (!defaultBinId) {
       AlertService.warning(
-        "Missing bin location",
-        "This shelf does not have a valid bin to update.",
+        t('warehouse.missingBinTitle'),
+        t('warehouse.missingBinMsg'),
       );
       return;
     }
@@ -625,8 +1067,8 @@ export default function WarehouseDiagramScreen() {
         });
 
         AlertService.success(
-          "Recorded successfully",
-          `Items saved to ${selectedShelf.code || "shelf"}. You can select another Bin to continue.`,
+          t('warehouse.recordedSuccessfully'),
+          `${t('common.save')}: ${selectedShelf.code || t('warehouse.shelf')}.`,
         );
         syncLocalReceivedByItemId(inboundTicket);
         if (selectedShelf && inboundOrderId)
@@ -751,6 +1193,9 @@ export default function WarehouseDiagramScreen() {
             binCode: matchedBin?.code || firstBin?.code || selectedShelf.code,
             binId: matchedBin?.id || firstBin?.id || "",
             isRecommended: true,
+            productWidth: productDimensionsById.get(Number(item.productId || ticketItem?.productId || ticketItem?.product?.id || 0))?.width,
+            productHeight: productDimensionsById.get(Number(item.productId || ticketItem?.productId || ticketItem?.product?.id || 0))?.height,
+            productLength: productDimensionsById.get(Number(item.productId || ticketItem?.productId || ticketItem?.product?.id || 0))?.length,
           };
         });
 
@@ -777,6 +1222,9 @@ export default function WarehouseDiagramScreen() {
           binCode: firstBin?.code || selectedShelf.code,
           binId: firstBin?.id || "",
           isRecommended: false,
+          productWidth: productDimensionsById.get(Number(item.productId || item.product?.id || 0))?.width,
+          productHeight: productDimensionsById.get(Number(item.productId || item.product?.id || 0))?.height,
+          productLength: productDimensionsById.get(Number(item.productId || item.product?.id || 0))?.length,
         }));
     } else {
       const orderItems =
@@ -841,16 +1289,17 @@ export default function WarehouseDiagramScreen() {
     effectiveHighlightedBins,
     focusedItemId,
     getInboundCurrentReceived,
+    productDimensionsById,
   ]);
 
   if (warehousesLoading) {
     return (
       <View className="flex-1" style={{ backgroundColor: COLORS.background }}>
-        <ScreenHeader title="Warehouse Diagram" showBackButton={true} />
+        <ScreenHeader title={t('warehouse.map')} showBackButton={true} />
         <View className="flex-1 justify-center items-center p-5">
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text className="mt-3 text-sm" style={{ color: COLORS.textMuted }}>
-            Loading warehouse list...
+            {t('common.loading')}
           </Text>
         </View>
       </View>
@@ -860,11 +1309,11 @@ export default function WarehouseDiagramScreen() {
   if (!warehouses || warehouses.length === 0) {
     return (
       <View className="flex-1" style={{ backgroundColor: COLORS.background }}>
-        <ScreenHeader title="Warehouse Diagram" showBackButton={true} />
+        <ScreenHeader title={t('warehouse.map')} showBackButton={true} />
         <View className="flex-1 justify-center items-center p-5">
           <Feather name="inbox" size={64} color="#CCC" />
           <Text className="text-lg font-semibold text-slate-600 mt-4">
-            No warehouses available
+            {t('common.noData')}
           </Text>
         </View>
       </View>
@@ -874,9 +1323,9 @@ export default function WarehouseDiagramScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: COLORS.background }}>
       <ScreenHeader
-        title="Warehouse Diagram"
+        title={t('warehouse.map')}
         subtitle={
-          isStaff ? "View diagram and find path" : "View diagram and shelf info"
+          isStaff ? t('warehouse.map') : t('warehouse.map')
         }
         showBackButton={true}
         rightButton={
@@ -885,16 +1334,16 @@ export default function WarehouseDiagramScreen() {
             <TouchableOpacity
               onPress={() => {
                 AlertService.confirm(
-                  "Clear all progress?",
-                  "Are you sure you want to clear all placed quantities for all items in this inbound ticket?",
+                  t('warehouse.clearProgressTitle'),
+                  t('warehouse.clearProgressMsg'),
                   () => {
                     useInboundStagingStore
                       .getState()
                       .clearTicket(inboundOrderId);
                     setLocalReceivedByItemId({});
                     AlertService.success(
-                      "Cleared",
-                      "All local progress has been reset.",
+                      t('warehouse.clearedTitle'),
+                      t('warehouse.clearedMsg'),
                     );
                   },
                 );
@@ -950,15 +1399,15 @@ export default function WarehouseDiagramScreen() {
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text className="mt-3 text-sm" style={{ color: COLORS.textMuted }}>
               {isFetchingPath
-                ? "Calculating optimized path..."
-                : "Loading warehouse diagram..."}
+                ? t('warehouse.findingPath') || "Calculating optimized path..."
+                : t('common.loading')}
             </Text>
           </View>
         ) : structureError ? (
           <View className="flex-1 justify-center items-center p-5">
             <Feather name="alert-circle" size={64} color="#FF6B6B" />
             <Text className="text-lg font-semibold text-slate-800 mt-4">
-              Cannot load warehouse diagram
+              {t('common.noData')}
             </Text>
             <TouchableOpacity
               className="mt-5 px-6 py-3 rounded-lg"
@@ -970,58 +1419,6 @@ export default function WarehouseDiagramScreen() {
           </View>
         ) : structure ? (
           <>
-            {isCounting && stockCountTicket && (
-              <View
-                className="mx-3 mb-2.5 mt-0.5 px-3 py-2.5 rounded-xl bg-white border-[1.5px]"
-                style={{ borderColor: COLORS.info + "20" }}
-              >
-                <View className="flex-row items-center gap-2 mb-2">
-                  <Feather name="clipboard" size={14} color={COLORS.info} />
-                  <Text
-                    className="text-[13px] font-bold"
-                    style={{ color: COLORS.info }}
-                  >
-                    {focusedItemName
-                      ? `Count: ${focusedItemName}`
-                      : `Count: ${stockCountTicket.name || "Ticket #" + stockCountTicket.id}`}
-                  </Text>
-                </View>
-                {effectiveHighlightedBins.length === 0 ? (
-                  <Text
-                    className="text-xs leading-[18px]"
-                    style={{ color: COLORS.textMuted }}
-                  >
-                    No count locations found for these products.
-                  </Text>
-                ) : (
-                  <>
-                    <Text
-                      className="text-xs leading-[18px]"
-                      style={{ color: COLORS.textMuted }}
-                    >
-                      {focusedItemName
-                        ? inventoryBins.length > 0
-                          ? `Assigned count locations: ${inventoryBins.join(", ")}`
-                          : `Suggested inventory locations: ${suggestedBins.join(", ")}`
-                        : `Found ${effectiveHighlightedBins.length} shelf locations (${inventoryBins.length} assigned, ${suggestedBins.length} suggested).`}
-                    </Text>
-                    {recommendationResolution.firstShelf && (
-                      <TouchableOpacity
-                        className="mt-2.5 h-[34px] rounded-lg flex-row items-center justify-center gap-1.5"
-                        style={{ backgroundColor: COLORS.info }}
-                        onPress={handleFindPathToRecommended}
-                      >
-                        <Feather name="navigation" size={14} color="#fff" />
-                        <Text className="text-white text-xs font-bold">
-                          Find path to count shelf
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </>
-                )}
-              </View>
-            )}
-
             {!isCounting && !!operationId && (
               <View
                 className="mx-3 mb-2.5 mt-0.5 px-3 py-2.5 rounded-xl bg-white border-[1.5px]"
@@ -1042,10 +1439,10 @@ export default function WarehouseDiagramScreen() {
                     style={!isPicking ? { color: COLORS.successText } : {}}
                   >
                     {focusedItemName
-                      ? `${isPicking ? "Pick location" : "Stow shelf"}: ${focusedItemName}`
+                      ? `${isPicking ? t('tasks.outbound') : t('tasks.inbound')}: ${focusedItemName}`
                       : isPicking
-                        ? "Suggested pick locations"
-                        : "Suggested stow locations"}
+                        ? t('warehouse.suggestedPickLocations')
+                        : t('warehouse.suggestedStowLocations')}
                   </Text>
                 </View>
                 {recommendationsLoading ? (
@@ -1053,14 +1450,14 @@ export default function WarehouseDiagramScreen() {
                     className="text-xs leading-[18px]"
                     style={{ color: COLORS.textMuted }}
                   >
-                    Loading suggestions from ticket...
+                    {t('warehouse.loadingSuggestions')}
                   </Text>
                 ) : effectiveHighlightedBins.length === 0 ? (
                   <Text
                     className="text-xs leading-[18px]"
                     style={{ color: COLORS.textMuted }}
                   >
-                    No system suggestions for this ticket yet.
+                    {t('warehouse.noSuggestions')}
                   </Text>
                 ) : (
                   <>
@@ -1076,7 +1473,7 @@ export default function WarehouseDiagramScreen() {
                             style={{ color: COLORS.text }}
                             numberOfLines={1}
                           >
-                            {entry.itemName || `Item ${index + 1}`}
+                            {entry.itemName || `${t('common.item')} ${index + 1}`}
                           </Text>
                           <Text
                             className="text-[11px] border rounded-full px-2.5 py-0.5 font-bold"
@@ -1120,7 +1517,7 @@ export default function WarehouseDiagramScreen() {
                       >
                         <Feather name="navigation" size={14} color="#fff" />
                         <Text className="text-white text-xs font-bold">
-                          Find path to suggested location
+                          {t('warehouse.findPathToSuggested')}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -1141,7 +1538,7 @@ export default function WarehouseDiagramScreen() {
                   <Feather name="grid" size={14} color={COLORS.infoText} />
                 </View>
                 <Text className="text-[13px] text-slate-700 font-semibold">
-                  {structure.zones?.length || 0} zones
+                  {structure.zones?.length || 0} {t('warehouse.zones')}
                 </Text>
               </View>
               <View
@@ -1160,7 +1557,7 @@ export default function WarehouseDiagramScreen() {
                     (acc, zone) => acc + (zone.shelves?.length || 0),
                     0,
                   ) || 0}{" "}
-                  shelves
+                  {t('warehouse.shelves')}
                 </Text>
               </View>
               <View
@@ -1169,7 +1566,18 @@ export default function WarehouseDiagramScreen() {
               />
               <View className="flex-row items-center gap-1.5 bg-slate-100 rounded-lg p-1">
                 <TouchableOpacity
-                  className={`w-9 h-9 rounded-lg items-center justify-center ${viewMode === "map" ? "bg-blue-500 shadow-[0_2px_4px_rgba(59,130,246,0.3)] elevation-3" : "bg-transparent"}`}
+                  className={`w-9 h-9 rounded-lg items-center justify-center ${viewMode === "map" ? "bg-blue-500" : "bg-transparent"}`}
+                  style={
+                    viewMode === "map"
+                      ? {
+                          shadowColor: "rgba(59, 130, 246, 0.3)",
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 1,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }
+                      : {}
+                  }
                   onPress={() => setViewMode("map")}
                 >
                   <Feather
@@ -1179,7 +1587,18 @@ export default function WarehouseDiagramScreen() {
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className={`w-9 h-9 rounded-lg items-center justify-center ${viewMode === "grid" ? "bg-blue-500 shadow-[0_2px_4px_rgba(59,130,246,0.3)] elevation-3" : "bg-transparent"}`}
+                  className={`w-9 h-9 rounded-lg items-center justify-center ${viewMode === "grid" ? "bg-blue-500" : "bg-transparent"}`}
+                  style={
+                    viewMode === "grid"
+                      ? {
+                          shadowColor: "rgba(59, 130, 246, 0.3)",
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 1,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }
+                      : {}
+                  }
                   onPress={() => setViewMode("grid")}
                 >
                   <Feather
@@ -1200,6 +1619,7 @@ export default function WarehouseDiagramScreen() {
                 optimizedPath={optimizedPath}
                 onShelfPress={handleShelfPress}
                 onZonePress={handleZonePress}
+                isCounting={isCounting}
               />
             ) : (
               <WarehouseGridView
@@ -1207,7 +1627,9 @@ export default function WarehouseDiagramScreen() {
                 highlightedShelf={activeHighlightedShelf}
                 recommendedShelves={recommendedShelvesForRender}
                 highlightedBins={effectiveHighlightedBins}
+                inventorySummary={focusedInventorySummary}
                 onShelfPress={handleShelfPress}
+                isCounting={isCounting}
               />
             )}
           </>
@@ -1215,7 +1637,7 @@ export default function WarehouseDiagramScreen() {
           <View className="flex-1 justify-center items-center p-5">
             <Feather name="map-pin" size={64} color="#CCC" />
             <Text className="text-lg font-semibold text-slate-600 mt-4">
-              No warehouse diagram available
+              {t('warehouse.noDiagram')}
             </Text>
           </View>
         )}
@@ -1225,8 +1647,12 @@ export default function WarehouseDiagramScreen() {
           shelf={selectedShelf}
           zone={selectedZone}
           recommendedItems={availableItemsForModal}
-          onConfirmOperation={handleConfirmOperationAtShelf}
-          operationType={isPicking ? "outbound" : "inbound"}
+          countItems={countItemsForSelectedShelf}
+          countExpectedByItemId={countExpectedByItemId}
+          inventorySummary={focusedInventorySummary}
+          focusedItemName={focusedItemName}
+          onConfirmOperation={isCounting ? undefined : handleConfirmOperationAtShelf}
+          operationType={isCounting ? "count" : isPicking ? "outbound" : "inbound"}
           isProcessing={isProcessing}
           ticketId={operationId}
           shelfId={selectedShelf?.id}
@@ -1240,7 +1666,7 @@ export default function WarehouseDiagramScreen() {
         <PathInstructionsModal
           visible={pathModalVisible}
           pathResult={currentPath}
-          toLocation={selectedShelf?.code || "Shelf"}
+          toLocation={selectedShelf?.code || t('warehouse.shelf')}
           onClose={() => setPathModalVisible(false)}
         />
       </RefreshContainer>

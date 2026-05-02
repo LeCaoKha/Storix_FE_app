@@ -1,13 +1,43 @@
 import { Feather } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import { Tabs } from "expo-router";
 import React from "react";
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from "@/constants/color";
+import { useTranslation } from "@/hooks/useTranslation";
+import { getUserNotifications } from "@/services/notification.api";
+import { useAuthStore } from "@/stores/auth.store";
 import { useRefreshStore } from "@/stores/refresh.store";
+
+function NotificationTabIcon({ color }: { color: string }) {
+    const userId = useAuthStore((state) => state.user?.id ?? 0);
+
+    const { data: unreadCount = 0 } = useQuery({
+        queryKey: ['notifications', 'badge', userId],
+        queryFn: async () => {
+            if (!userId) return 0;
+            const items = await getUserNotifications(userId);
+            return items.filter((item) => !(item.isRead ?? item.notification?.isRead)).length;
+        },
+        enabled: !!userId,
+        staleTime: 0,
+    });
+
+    return (
+        <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="bell" size={28} color={color} />
+            {unreadCount > 0 && (
+                <View style={{ position: 'absolute', top: 0, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
+            )}
+        </View>
+    );
+}
 
 export default function StaffTabLayout() {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
 
     return (
         <Tabs
@@ -34,7 +64,7 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="tasks/index"
                 options={{
-                    title: "Nhiệm vụ",
+                    title: t('tabs.tasks'),
                     tabBarIcon: ({ color }) => <Feather name="clipboard" size={28} color={color} />,
                 }}
                 listeners={({ navigation }) => ({
@@ -48,9 +78,10 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="warehouse"
                 options={{
-                    title: "Sơ đồ kho",
+                    title: t('tabs.map'),
                     href: null,
                     tabBarIcon: ({ color }) => <Feather name="map" size={28} color={color} />,
+                    tabBarStyle: { display: 'none' },
                 }}
             />
             {/* Hide nested warehouse from tab bar but keep it in stack */}
@@ -77,8 +108,8 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="notifications"
                 options={{
-                    title: "Thông báo",
-                    tabBarIcon: ({ color }) => <Feather name="bell" size={28} color={color} />,
+                    title: t('tabs.notifications'),
+                    tabBarIcon: ({ color }) => <NotificationTabIcon color={color} />,
                 }}
                 listeners={({ navigation }) => ({
                     tabPress: (e) => {
@@ -91,7 +122,7 @@ export default function StaffTabLayout() {
             <Tabs.Screen
                 name="profile"
                 options={{
-                    title: "Profile",
+                    title: t('tabs.profile'),
                     tabBarIcon: ({ color }) => <Feather name="user" size={28} color={color} />,
                 }}
                 listeners={({ navigation }) => ({
@@ -119,13 +150,6 @@ export default function StaffTabLayout() {
             />
             <Tabs.Screen
                 name="tasks/outbound/[id]"
-                options={{
-                    href: null,
-                    tabBarStyle: { display: 'none' },
-                }}
-            />
-            <Tabs.Screen
-                name="tasks/putaway/[id]"
                 options={{
                     href: null,
                     tabBarStyle: { display: 'none' },

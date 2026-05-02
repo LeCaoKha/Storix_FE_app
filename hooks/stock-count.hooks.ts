@@ -1,4 +1,6 @@
 import {
+    cancelStockCountTicket,
+    createStockCountTicket,
     getStockCountTicketById,
     getStockCountTickets,
     getStockCountTicketsByStaff,
@@ -89,7 +91,28 @@ export const useUpdateStockCountItem = () => {
             }),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: stockCountKeys.tickets() });
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
             queryClient.invalidateQueries({ queryKey: stockCountKeys.ticket(variables.ticketId) });
+        },
+    });
+};
+
+export const useCreateStockCountTicket = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: createStockCountTicket,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: stockCountKeys.tickets() });
+        },
+    });
+};
+
+export const useCancelStockCountTicket = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: cancelStockCountTicket,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: stockCountKeys.tickets() });
         },
     });
 };

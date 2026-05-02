@@ -31,7 +31,7 @@ export default function PaymentStatusScreen() {
                 <Card style={styles.statusCard}>
                     <View style={[styles.iconContainer, { backgroundColor: isPaid ? COLORS.success + '20' : COLORS.warning + '20' }]}>
                         <Feather
-                            name={isPaid ? "check-shield" : "alert-triangle"}
+                            name={isPaid ? "shield" : "alert-triangle"}
                             size={48}
                             color={isPaid ? COLORS.success : COLORS.warning}
                         />

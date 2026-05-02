@@ -23,7 +23,7 @@ interface PathInstructionsModalProps {
 export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
   visible,
   pathResult,
-  fromLocation = 'Vị trí hiện tại',
+  fromLocation = 'Current location',
   toLocation,
   onClose,
 }) => {
@@ -43,7 +43,7 @@ export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
             <View style={styles.headerLeft}>
               <Feather name="navigation" size={24} color={COLORS.primary} />
               <View style={styles.headerText}>
-                <Text style={styles.title}>Hướng dẫn đường đi</Text>
+                <Text style={styles.title}>Route Instructions</Text>
                 <Text style={styles.subtitle}>
                   {fromLocation} → {toLocation}
                 </Text>
@@ -59,9 +59,9 @@ export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
             <View style={styles.summaryItem}>
               <Feather name="map-pin" size={18} color={COLORS.primary} />
               <View>
-                <Text style={styles.summaryLabel}>Số bước</Text>
+                <Text style={styles.summaryLabel}>Steps</Text>
                 <Text style={styles.summaryValue}>
-                  {pathResult.instructions.length - 2} bước
+                  {pathResult.instructions.length - 2} steps
                 </Text>
               </View>
             </View>
@@ -69,7 +69,7 @@ export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
             <View style={styles.summaryItem}>
               <Feather name="navigation" size={18} color={COLORS.primary} />
               <View>
-                <Text style={styles.summaryLabel}>Khoảng cách</Text>
+                <Text style={styles.summaryLabel}>Distance</Text>
                 <Text style={styles.summaryValue}>
                   ~{pathResult.totalDistance.toFixed(1)}m
                 </Text>
@@ -115,7 +115,7 @@ export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
           {/* Actions */}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.actionButton} onPress={onClose}>
-              <Text style={styles.actionButtonText}>Đóng</Text>
+              <Text style={styles.actionButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>

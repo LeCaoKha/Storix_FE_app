@@ -7,7 +7,9 @@ import React, { useMemo, useState } from 'react';
 import {
     FlatList,
     Image,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     StyleSheet,
     Text,
     TextInput,
@@ -67,7 +69,10 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
 
     return (
         <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
-            <View style={styles.modalContainer}>
+            <KeyboardAvoidingView 
+                style={styles.modalContainer}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
                 <View style={[styles.modalHeader, { paddingTop: getTopSafePadding(insets.top, 12) }]}>
                     <Text style={styles.modalTitle}>{title}</Text>
                     <TouchableOpacity onPress={handleClose}>
@@ -137,7 +142,7 @@ export const ProductPickerModal: React.FC<ProductPickerModalProps> = ({
                         contentContainerStyle={[styles.productList, { paddingBottom: getBottomSafePadding(insets.bottom, 24) }]}
                     />
                 )}
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 };

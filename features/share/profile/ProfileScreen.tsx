@@ -8,24 +8,18 @@ import { COLORS } from '@/constants/color';
 import { useLogout } from '@/hooks/auth.hooks';
 import { useTasks } from '@/hooks/task.hooks';
 import { useProfile } from '@/hooks/user.hooks';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { TaskStatus } from '@/types/order';
 
-// Map backend English role names to Vietnamese display names
-const ROLE_DISPLAY_NAMES: Record<string, string> = {
-    'Manager': 'Quản lý',
-    'Staff': 'Nhân viên',
-    'Company Administrator': 'Quản trị viên',
-    'Super Admin': 'Quản trị hệ thống',
-};
-
-const getRoleDisplayName = (roleName?: string, roleId?: number): string => {
-    if (roleName && ROLE_DISPLAY_NAMES[roleName]) return ROLE_DISPLAY_NAMES[roleName];
-    if (roleId === 4) return 'Nhân viên';
-    if (roleId === 3) return 'Quản lý';
-    if (roleId === 2) return 'Quản trị viên';
-    return roleName || 'Người dùng';
+// Map backend English role names to localized display names
+const getRoleDisplayName = (roleName?: string, roleId?: number, t?: (p: string) => string): string => {
+    if (!t) return roleName || 'User';
+    if (roleId === 4) return t('profile.staff');
+    if (roleId === 3) return t('profile.manager');
+    if (roleId === 2) return t('profile.admin');
+    return roleName || t('profile.user');
 };
 
 export default function ProfileScreen() {
@@ -35,6 +29,7 @@ export default function ProfileScreen() {
     const isStaff = user?.roleId === 4;
     const { data: profile, isLoading: isFetchingProfile, refetch: refetchProfile } = useProfile(user?.id);
     const { data: tasks = [], isLoading: isFetchingTasks, refetch: refetchTasks } = useTasks();
+    const { t, language, setLanguage } = useTranslation();
 
     const handleRefresh = async () => {
         await Promise.all([
@@ -45,8 +40,8 @@ export default function ProfileScreen() {
 
     const handleLogout = () => {
         AlertService.confirm(
-            'Đăng xuất',
-            'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng?',
+            t('profile.logout'),
+            t('profile.logoutConfirm') || 'Are you sure you want to log out?',
             async () => {
                 try {
                     await logout();
@@ -62,26 +57,24 @@ export default function ProfileScreen() {
     const menuItems = [
         {
             icon: 'user',
-            title: 'Thông tin cá nhân',
-            subtitle: 'Cập nhật hồ sơ',
+            title: t('profile.editProfile'),
+            subtitle: t('profile.personalInfo'),
             onPress: () => router.push('/profile/edit' as any),
         },
         {
             icon: 'map',
-            title: 'Sơ đồ kho',
-            subtitle: 'Xem sơ đồ mặt bằng kho',
+            title: t('outbound.warehouseMap'),
+            subtitle: t('outbound.tapToNavigate'),
             onPress: () => {
-                const targetPath = user?.roleId === 4 ? '/(staff-tabs)/warehouse' : '/(manager-tabs)/warehouse';
-                router.push(targetPath as any);
+                router.push('/warehouse-view' as any);
             },
         },
         {
             icon: 'lock',
-            title: 'Đổi mật khẩu',
-            subtitle: 'Cập nhật mật khẩu',
+            title: t('profile.changePassword'),
+            subtitle: t('profile.changePassword'),
             onPress: () => router.push('/profile/change-password' as any),
         },
-        // Removed non-functional items: Thông báo, Ngôn ngữ, Trợ giúp, Giới thiệu
     ];
 
     if (isFetchingProfile || (isStaff && isFetchingTasks)) {
@@ -97,7 +90,7 @@ export default function ProfileScreen() {
     return (
         <View style={styles.container}>
             <SafeAreaHeader backgroundColor="#fff" showBackButton={false} style={styles.safeHeader}>
-                <Text style={styles.headerTitle}>Tài khoản</Text>
+                <Text style={styles.headerTitle}>{t('profile.title')}</Text>
             </SafeAreaHeader>
 
             <RefreshContainer 
@@ -126,36 +119,36 @@ export default function ProfileScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.userName}>{profile?.fullName || getRoleDisplayName(undefined, user?.roleId)}</Text>
+                        <Text style={styles.userName}>{profile?.fullName || getRoleDisplayName(undefined, user?.roleId, t)}</Text>
                         <Text style={styles.userRole}>
-                            {getRoleDisplayName(profile?.roleName, user?.roleId)}
+                            {getRoleDisplayName(profile?.roleName, user?.roleId, t)}
                         </Text>
 
                         {isStaff && (
                             <View style={styles.userStats}>
                                 <View style={styles.statItem}>
                                     <Text style={styles.statValue}>{tasks.length}</Text>
-                                    <Text style={styles.statLabel}>Nhiệm vụ</Text>
+                                    <Text style={styles.statLabel}>{t('tabs.tasks')}</Text>
                                 </View>
                                 <View style={styles.statDivider} />
                                 <View style={styles.statItem}>
                                     <Text style={styles.statValue}>{completedTasksCount}</Text>
-                                    <Text style={styles.statLabel}>Hoàn thành</Text>
+                                    <Text style={styles.statLabel}>{t('common.done')}</Text>
                                 </View>
                             </View>
                         )}
                     </Card>
 
-                    {/* Employee Information */}
+                    {/* Account Information */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Thông tin tài khoản</Text>
+                        <Text style={styles.sectionTitle}>{t('profile.personalInfo')}</Text>
                         <Card style={styles.infoCard}>
                             <View style={styles.infoRow}>
                                 <View style={styles.infoIconBox}>
                                     <Feather name="credit-card" size={18} color={COLORS.textMuted} />
                                 </View>
                                 <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>ID người dùng</Text>
+                                    <Text style={styles.infoLabel}>{t('profile.userId')}</Text>
                                     <Text style={styles.infoValue}>{user?.id}</Text>
                                 </View>
                             </View>
@@ -165,7 +158,7 @@ export default function ProfileScreen() {
                                     <Feather name="mail" size={18} color={COLORS.textMuted} />
                                 </View>
                                 <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Email</Text>
+                                    <Text style={styles.infoLabel}>{t('profile.email')}</Text>
                                     <Text style={styles.infoValue}>{profile?.email || user?.email}</Text>
                                 </View>
                             </View>
@@ -177,7 +170,7 @@ export default function ProfileScreen() {
                                             <Feather name="phone" size={18} color={COLORS.textMuted} />
                                         </View>
                                         <View style={styles.infoContent}>
-                                            <Text style={styles.infoLabel}>Số điện thoại</Text>
+                                            <Text style={styles.infoLabel}>{t('profile.phone')}</Text>
                                             <Text style={styles.infoValue}>{profile.phone}</Text>
                                         </View>
                                     </View>
@@ -189,7 +182,7 @@ export default function ProfileScreen() {
                                     <Feather name="home" size={18} color={COLORS.textMuted} />
                                 </View>
                                 <View style={styles.infoContent}>
-                                    <Text style={styles.infoLabel}>Mã công ty</Text>
+                                    <Text style={styles.infoLabel}>{t('profile.company')}</Text>
                                     <Text style={styles.infoValue}>{user?.companyId || '-'}</Text>
                                 </View>
                             </View>
@@ -198,7 +191,7 @@ export default function ProfileScreen() {
 
                     {/* Settings Menu */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Cài đặt</Text>
+                        <Text style={styles.sectionTitle}>{t('profile.settings')}</Text>
                         <Card style={styles.menuCard}>
                             {menuItems.map((item, index) => (
                                 <View key={index}>
@@ -215,9 +208,28 @@ export default function ProfileScreen() {
                                         </View>
                                         <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
                                     </TouchableOpacity>
-                                    {index < menuItems.length - 1 && <View style={styles.menuDivider} />}
+                                    <View style={styles.menuDivider} />
                                 </View>
                             ))}
+                            
+                            {/* Language Toggle */}
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => setLanguage(language === 'en' ? 'vi' : 'en')}
+                            >
+                                <View style={styles.menuIconContainer}>
+                                    <Feather name="globe" size={20} color={COLORS.primary} />
+                                </View>
+                                <View style={styles.menuContent}>
+                                    <Text style={styles.menuTitle}>{t('profile.language')}</Text>
+                                    <Text style={styles.menuSubtitle}>{language === 'en' ? 'English' : 'Tiếng Việt'}</Text>
+                                </View>
+                                <View style={styles.languageSelector}>
+                                    <Text style={[styles.langOption, language === 'en' && styles.activeLang]}>EN</Text>
+                                    <View style={styles.langDivider} />
+                                    <Text style={[styles.langOption, language === 'vi' && styles.activeLang]}>VI</Text>
+                                </View>
+                            </TouchableOpacity>
                         </Card>
                     </View>
 
@@ -227,7 +239,7 @@ export default function ProfileScreen() {
                         onPress={handleLogout}
                     >
                         <Feather name="log-out" size={18} color="#EF4444" />
-                        <Text style={styles.logoutText}>Đăng xuất</Text>
+                        <Text style={styles.logoutText}>{t('profile.logout')}</Text>
                     </TouchableOpacity>
                 </View>
             </RefreshContainer>
@@ -238,7 +250,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc', // Slightly cleaner background
+        backgroundColor: '#f8fafc', 
     },
     loadingContainer: {
         flex: 1,
@@ -259,11 +271,11 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     content: {
-        padding: 16, // Consistent 8pt
+        padding: 16, 
     },
     profileCard: {
         alignItems: 'center',
-        paddingVertical: 16, // Reduced height
+        paddingVertical: 16, 
         marginBottom: 16,
     },
     avatarContainer: {
@@ -271,7 +283,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     avatar: {
-        width: 86, // Shrink avatar ~15%
+        width: 86, 
         height: 86,
         borderRadius: 43,
         backgroundColor: '#CCFBF1',
@@ -305,7 +317,7 @@ const styles = StyleSheet.create({
         borderColor: '#fff',
     },
     userName: {
-        fontSize: 20, // Slightly smaller
+        fontSize: 20, 
         fontWeight: 'bold',
         color: COLORS.text,
         marginBottom: 4,
@@ -333,30 +345,30 @@ const styles = StyleSheet.create({
         backgroundColor: '#f1f5f9',
     },
     statValue: {
-        fontSize: 22, // Increased font size
+        fontSize: 22, 
         fontWeight: '700',
         color: COLORS.text,
     },
     statLabel: {
         fontSize: 12,
         color: COLORS.textMuted,
-        fontWeight: '500', // Better hierarchy
+        fontWeight: '500', 
         opacity: 0.8,
     },
     section: {
-        marginTop: 24, // 8pt Rhythm
+        marginTop: 24, 
     },
     sectionTitle: {
         fontSize: 14,
         fontWeight: '700',
         color: COLORS.textMuted,
-        textTransform: 'uppercase', // Section labels often look better in caps
+        textTransform: 'uppercase', 
         letterSpacing: 0.5,
-        marginBottom: 12, // 8pt
+        marginBottom: 12, 
         paddingLeft: 4,
     },
     infoCard: {
-        padding: 0, // Control padding per row
+        padding: 0, 
     },
     infoRow: {
         flexDirection: 'row',
@@ -372,7 +384,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     infoLabel: {
-        fontSize: 11, // 2-3px difference
+        fontSize: 11, 
         color: COLORS.textMuted,
         fontWeight: '500',
         marginBottom: 2,
@@ -385,7 +397,7 @@ const styles = StyleSheet.create({
     infoDivider: {
         height: 1,
         backgroundColor: '#f1f5f9',
-        marginLeft: 56, // Inset divider (matches text start)
+        marginLeft: 56, 
     },
     menuCard: {
         padding: 0,
@@ -420,7 +432,7 @@ const styles = StyleSheet.create({
     menuDivider: {
         height: 1,
         backgroundColor: '#f1f5f9',
-        marginLeft: 60, // Inset to match text start
+        marginLeft: 60, 
     },
     logoutButton: {
         flexDirection: 'row',
@@ -430,7 +442,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         paddingVertical: 14,
         borderRadius: 12,
-        marginTop: 32, // Increase spacing
+        marginTop: 32, 
         borderWidth: 1,
         borderColor: '#fee2e2',
         shadowColor: '#EF4444',
@@ -444,4 +456,34 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#EF4444',
     },
+    languageSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f1f5f9',
+        borderRadius: 8,
+        padding: 4,
+    },
+    langOption: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: COLORS.textMuted,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    activeLang: {
+        backgroundColor: '#fff',
+        color: COLORS.primary,
+        borderRadius: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 1,
+        elevation: 1,
+    },
+    langDivider: {
+        width: 1,
+        height: 10,
+        backgroundColor: COLORS.border,
+        marginHorizontal: 2,
+    }
 });

@@ -9,7 +9,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -154,7 +154,10 @@ export default function CreateTransferScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
                 title="Tạo luân chuyển kho"
                 subtitle="Tạo luân chuyển giữa các kho"
@@ -263,7 +266,7 @@ export default function CreateTransferScreen() {
                     style={{ flex: 1 }}
                 />
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

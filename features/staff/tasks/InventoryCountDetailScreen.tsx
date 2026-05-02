@@ -2,13 +2,14 @@ import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useStockCountTicket, useUpdateStockCountItem } from '@/hooks/stock-count.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { StockCountItem } from '@/types/stock-count';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InventoryCountDetailScreen() {
@@ -18,63 +19,54 @@ export default function InventoryCountDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const ticketId = parseInt(id || '0');
     const user = useAuthStore((state) => state.user);
+    const { t } = useTranslation();
     const companyId = user?.companyId ?? 0;
+    const isStaff = user?.roleId === 4;
 
     const { data: ticket, isLoading, error, refetch } = useStockCountTicket(ticketId, companyId);
     const updateItem = useUpdateStockCountItem();
 
-    const [counts, setCounts] = useState<Record<number, string>>({});
-    const [revealedItems, setRevealedItems] = useState<Record<number, boolean>>({});
-    const [isProcessing, setIsProcessing] = useState(false);
     const [editingItems, setEditingItems] = useState<Record<number, boolean>>({});
+    const [localCounts, setLocalCounts] = useState<Record<number, string>>({});
 
-    const handleCountChange = (itemId: number, value: string) => {
-        const cleanValue = value.replace(/[^0-9]/g, '');
-        setCounts(prev => ({ ...prev, [itemId]: cleanValue }));
+
+    const handleEditItem = (itemId: number) => {
+        const item = ticket?.items.find(i => i.id === itemId);
+        if (item) {
+            setLocalCounts(prev => ({ ...prev, [itemId]: item.countedQuantity?.toString() || '' }));
+        }
+        setEditingItems(prev => ({ ...prev, [itemId]: true }));
     };
 
-    const handleConfirmItem = async (item: StockCountItem) => {
-        const countStr = counts[item.id] || '';
-        if (countStr === '') {
-            AlertService.warning('Lưu ý', 'Vui lòng nhập số lượng trước khi xác nhận');
+    const handleConfirmCount = async (item: StockCountItem) => {
+        const countStr = localCounts[item.id];
+        if (countStr === undefined || countStr.trim() === '') {
+            AlertService.warning(t('common.error'), t('inventoryCount.enterQty'));
             return;
         }
 
-        const count = parseInt(countStr);
-        setIsProcessing(true);
+        const count = parseFloat(countStr);
+        if (isNaN(count)) {
+            AlertService.warning(t('common.error'), t('common.failed'));
+            return;
+        }
 
         try {
-            if (!ticket) return;
             await updateItem.mutateAsync({
-                ticketId: ticket.id,
-                performedBy: user?.id ?? 0,
+                ticketId,
                 itemId: item.id,
                 payload: {
                     countedQuantity: count,
+                    productId: item.productId,
+                    locationId: item.locationId
                 }
             });
-
-            setRevealedItems(prev => ({ ...prev, [item.id]: true }));
             setEditingItems(prev => ({ ...prev, [item.id]: false }));
-
-            const diff = Math.abs(count - item.systemQuantity);
-            if (diff > item.systemQuantity * 0.2) {
-                AlertService.warning(
-                    'Cảnh báo sai lệch lớn',
-                    `Số lượng đếm (${count}) lệch quá 20% so với hệ thống (${item.systemQuantity}). Vui lòng kiểm tra lại.`
-                );
-            }
-        } catch (err: any) {
-            console.error('Failed to update count:', err);
-            const errorMessage = err.response?.data?.message || 'Không thể cập nhật số lượng. Vui lòng thử lại.';
-            AlertService.error('Lỗi kiểm kê', errorMessage);
-        } finally {
-            setIsProcessing(false);
+            AlertService.success(t('common.success'), `${t('common.save')}: ${item.name || 'item'}`);
+        } catch (err) {
+            console.error(err);
+            AlertService.error(t('common.error'), t('common.failed'));
         }
-    };
-
-    const handleEditItem = (itemId: number) => {
-        setEditingItems(prev => ({ ...prev, [itemId]: true }));
     };
 
     const handleRefresh = async () => {
@@ -89,18 +81,6 @@ export default function InventoryCountDetailScreen() {
             .join(',');
     }, [ticket]);
 
-    const openWarehouseForTicket = () => {
-        if (!ticket) return;
-        router.push({
-            pathname: '/warehouse-view',
-            params: {
-                warehouseId: String(ticket.warehouseId || ''),
-                inventoryCountTicketId: String(ticket.id),
-                focusedBins: focusedBinsString,
-            },
-        } as any);
-    };
-
     const openWarehouseForItem = (item: StockCountItem) => {
         if (!ticket) return;
         router.push({
@@ -110,7 +90,7 @@ export default function InventoryCountDetailScreen() {
                 inventoryCountTicketId: String(ticket.id),
                 focusedBins: String(item.locationId || ''),
                 focusedItemId: String(item.productId),
-                focusedItemName: item.name || `SP #${item.productId}`,
+                focusedItemName: item.name || `${t('common.item')} #${item.productId}`,
             },
         } as any);
     };
@@ -121,7 +101,7 @@ export default function InventoryCountDetailScreen() {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>Đang tải chi tiết phiếu kiểm kê...</Text>
+                <Text style={styles.loadingText}>{t('common.loading')}</Text>
             </View>
         );
     }
@@ -130,39 +110,42 @@ export default function InventoryCountDetailScreen() {
         return (
             <View style={styles.errorContainer}>
                 <Feather name="alert-circle" size={48} color={COLORS.danger} />
-                <Text style={styles.errorText}>Không thể tải thông tin phiếu kiểm kê</Text>
+                <Text style={styles.errorText}>{t('common.noData')}</Text>
                 <TouchableOpacity style={styles.retryBtn} onPress={goBack}>
-                    <Text style={styles.retryBtnText}>Quay lại</Text>
+                    <Text style={styles.retryBtnText}>{t('common.back')}</Text>
                 </TouchableOpacity>
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
-                title="Kiểm kê hàng hóa"
+                title={t('inventoryCount.ticketTitle')}
                 subtitle={ticket.name || `CNT-${ticket.id}`}
             />
 
-            <RefreshContainer 
-                style={styles.content} 
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]} 
+            <RefreshContainer
+                style={styles.content}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
                 showsVerticalScrollIndicator={false}
                 onRefresh={handleRefresh}
             >
                 <Card style={styles.infoCard}>
                     <View style={styles.statusSection}>
-                        <View style={[styles.statusBadge, { 
-                            backgroundColor: isTicketFinished ? COLORS.success + '20' : COLORS.warning + '20' 
+                        <View style={[styles.statusBadge, {
+                            backgroundColor: isTicketFinished ? COLORS.success + '20' : COLORS.warning + '20'
                         }]}>
-                            <View style={[styles.statusDot, { 
-                                backgroundColor: isTicketFinished ? COLORS.success : COLORS.warning 
+                            <View style={[styles.statusDot, {
+                                backgroundColor: isTicketFinished ? COLORS.success : COLORS.warning
                             }]} />
-                            <Text style={[styles.statusBadgeText, { 
+                            <Text style={[styles.statusBadgeText, {
                                 color: isTicketFinished ? COLORS.success : COLORS.warning
                             }]}>
-                                {isTicketFinished ? 'Đã hoàn tất' : 'Đang thực hiện'}
+                                {isTicketFinished ? t('common.done') : t('common.pending')}
                             </Text>
                         </View>
                     </View>
@@ -172,7 +155,7 @@ export default function InventoryCountDetailScreen() {
                             <Feather name="info" size={16} color={COLORS.primary} />
                         </View>
                         <View>
-                            <Text style={styles.infoLabel}>Loại kiểm kê</Text>
+                            <Text style={styles.infoLabel}>{t('inventoryCount.countType')}</Text>
                             <Text style={styles.infoValue}>{ticket.type || 'Manual'}</Text>
                         </View>
                     </View>
@@ -182,37 +165,23 @@ export default function InventoryCountDetailScreen() {
                             <Feather name="calendar" size={16} color={COLORS.primary} />
                         </View>
                         <View>
-                            <Text style={styles.infoLabel}>Ngày tạo</Text>
+                            <Text style={styles.infoLabel}>{t('common.loading')}</Text>
                             <Text style={styles.infoValue}>
-                                {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+                                {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A'}
                             </Text>
                         </View>
                     </View>
                 </Card>
 
-                <TouchableOpacity
-                    style={styles.warehouseCard}
-                    onPress={openWarehouseForTicket}
-                >
-                    <View style={styles.warehouseIconWrap}>
-                        <Feather name="map" size={18} color={COLORS.primary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.warehouseTitle}>Sơ đồ kho thông minh</Text>
-                        <Text style={styles.warehouseSubtitle}>Nhấn để xem các vị trí cần kiểm kê trên sơ đồ</Text>
-                    </View>
-                    <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
-                </TouchableOpacity>
-
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionHeaderRow}>
                         <View>
-                            <Text style={styles.sectionTitle}>Danh sách hàng hóa</Text>
-                            <Text style={styles.sectionSubtitle}>{ticket.items.length} mặt hàng cần đếm</Text>
+                            <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
+                            <Text style={styles.sectionSubtitle}>{ticket.items.length} {t('tabs.tasks').toLowerCase()}</Text>
                         </View>
                         <View style={styles.progressBadge}>
                             <Text style={styles.progressBadgeText}>
-                                {ticket.items.filter(i => i.countedQuantity != null || revealedItems[i.id]).length}/{ticket.items.length}
+                                {ticket.items.filter(i => i.countedQuantity != null).length}/{ticket.items.length}
                             </Text>
                         </View>
                     </View>
@@ -221,74 +190,73 @@ export default function InventoryCountDetailScreen() {
                 {ticket.items
                     .map(item => {
                         const isBeingEdited = editingItems[item.id];
-                        const isConfirmed = item.countedQuantity != null || revealedItems[item.id];
+                        const isConfirmed = item.countedQuantity != null;
                         const isRevealed = (isConfirmed && !isBeingEdited) || isTicketFinished;
 
-                        const count = isRevealed 
-                            ? (item.countedQuantity ?? parseInt(counts[item.id] || '0')) 
-                            : parseInt(counts[item.id] || (item.countedQuantity?.toString() ?? '0'));
-                        
+                        const count = item.countedQuantity ?? 0;
                         const diff = count - item.systemQuantity;
 
                         return (
                             <Card key={item.id} style={[styles.itemCard, isRevealed && styles.itemCardRevealed]}>
-                                <View style={styles.itemHeader}>
+                                <View style={itemHeaderStyle.itemHeader}>
                                     <View style={styles.itemInfo}>
-                                        <Text style={styles.productName}>{item.name || `Sản phẩm #${item.productId}`}</Text>
+                                        <Text style={styles.productName}>{item.name || `Product #${item.productId}`}</Text>
                                         <View style={styles.skuBadge}>
                                             <Text style={styles.skuText}>{item.sku || 'N/A'}</Text>
                                         </View>
                                     </View>
-                                    
+
                                     <View style={[styles.statusBadgeItem, {
                                         backgroundColor: isConfirmed ? COLORS.success + '20' : COLORS.warning + '20'
                                     }]}>
                                         <Text style={[styles.statusBadgeItemText, {
                                             color: isConfirmed ? COLORS.success : COLORS.warning
                                         }]}>
-                                            {isConfirmed ? 'Đã đếm' : 'Chờ'}
+                                            {isConfirmed ? t('inventoryCount.counted') : t('common.pending')}
                                         </Text>
                                     </View>
                                 </View>
 
                                 <View style={styles.countGrid}>
-                                    <View style={styles.countColumn}>
-                                        <Text style={styles.countLabel}>Hệ thống</Text>
-                                        <TouchableOpacity 
-                                            activeOpacity={isRevealed ? 1 : 0.7}
-                                            style={[styles.qtyBox, isRevealed && styles.qtyBoxRevealed]}
-                                            onPress={() => {
-                                                if (!isRevealed) {
-                                                    AlertService.warning(
-                                                        'Chế độ Blind Count',
-                                                        'Hệ thống đang ẩn số lượng dữ liệu để đảm bảo tính khách quan. Số lượng sẽ hiện ra sau khi bạn xác nhận kết quả đếm.'
-                                                    );
-                                                }
-                                            }}
-                                        >
-                                            <Text style={isRevealed ? styles.systemQtyValue : styles.hiddenQtyValue}>
-                                                {isRevealed ? item.systemQuantity : '??'}
-                                            </Text>
-                                            {!isRevealed && <Feather name="lock" size={14} color={COLORS.textMuted} />}
-                                        </TouchableOpacity>
-                                    </View>
+                                    {!isStaff && (
+                                        <View style={styles.countColumn}>
+                                            <Text style={styles.countLabel}>{t('inventoryCount.system')}</Text>
+                                            <TouchableOpacity
+                                                activeOpacity={isRevealed ? 1 : 0.7}
+                                                style={[styles.qtyBox, isRevealed && styles.qtyBoxRevealed]}
+                                                onPress={() => {
+                                                    if (!isRevealed) {
+                                                        AlertService.warning(
+                                                            t('inventoryCount.blindCountMode'),
+                                                            t('inventoryCount.blindCountMsg')
+                                                        );
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={isRevealed ? styles.systemQtyValue : styles.hiddenQtyValue}>
+                                                    {isRevealed ? item.systemQuantity : '??'}
+                                                </Text>
+                                                {!isRevealed && <Feather name="lock" size={14} color={COLORS.textMuted} />}
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
 
                                     <View style={styles.countColumn}>
-                                        <Text style={styles.countLabel}>Thực tế</Text>
-                                        <View style={[styles.inputContainer, isRevealed && styles.inputContainerDisabled]}>
+                                        <View style={[styles.compactCountRow, isRevealed && styles.compactCountRowRevealed]}>
+                                            <Text style={styles.compactCountLabel}>{t('inventoryCount.counted')}:</Text>
                                             <TextInput
-                                                style={[styles.countInput, isRevealed && styles.revealedInput]}
+                                                style={[styles.compactCountInput, (isRevealed || isBeingEdited || !isConfirmed) && styles.revealedInput]}
                                                 keyboardType="numeric"
                                                 placeholder="0"
-                                                value={isRevealed ? (item.countedQuantity?.toString() || counts[item.id] || '') : (counts[item.id] || '')}
-                                                onChangeText={(v) => handleCountChange(item.id, v)}
-                                                editable={!isRevealed}
+                                                value={isBeingEdited || !isConfirmed ? (localCounts[item.id] ?? '') : (item.countedQuantity?.toString() || '0')}
+                                                onChangeText={(val) => setLocalCounts(prev => ({ ...prev, [item.id]: val }))}
+                                                editable={!isTicketFinished && (!isConfirmed || isBeingEdited)}
                                             />
                                         </View>
                                     </View>
                                 </View>
 
-                                {isRevealed ? (
+                                {isRevealed && !isStaff && (
                                     <View style={styles.revealedFooterRow}>
                                         <View style={[styles.diffBadge, {
                                             backgroundColor: diff === 0 ? '#DCFCE7' : (diff > 0 ? '#FEF3C7' : '#FEE2E2'),
@@ -303,61 +271,100 @@ export default function InventoryCountDetailScreen() {
                                             />
                                             <Text style={[styles.diffBadgeText, {
                                                 color: diff === 0 ? '#166534' : (diff > 0 ? '#B45309' : '#991B1B')
-                                            }]}>
-                                                {diff === 0 ? 'Khớp' : (diff > 0 ? `Dư: +${diff}` : `Thiếu: ${diff}`)}
+                                            }]} numberOfLines={1} adjustsFontSizeToFit>
+                                                {diff === 0 ? t('inventoryCount.match') : (diff > 0 ? `${t('inventoryCount.over')}: +${diff}` : `${t('inventoryCount.short')}: ${diff}`)}
                                             </Text>
                                         </View>
 
                                         {!isTicketFinished && (
-                                            <TouchableOpacity 
+                                            <TouchableOpacity
                                                 style={[styles.editBtn, { flex: 1, height: 38, justifyContent: 'center' }]}
                                                 onPress={() => handleEditItem(item.id)}
                                             >
                                                 <Feather name="edit-2" size={13} color={COLORS.primary} />
-                                                <Text style={styles.editBtnText}>Sửa lại</Text>
+                                                <Text style={styles.editBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('profile.editProfile').split(' ')[0]}</Text>
                                             </TouchableOpacity>
                                         )}
                                     </View>
-                                ) : (
-                                    !isTicketFinished && (
+                                )}
+
+                                <View style={styles.itemActionRow}>
+                                    {isRevealed && isStaff && !isTicketFinished && (
                                         <TouchableOpacity
-                                            style={[styles.confirmItemBtn, isProcessing && { opacity: 0.7 }]}
-                                            onPress={() => handleConfirmItem(item)}
-                                            disabled={isProcessing}
+                                            style={styles.flexActionBtn}
+                                            onPress={() => handleEditItem(item.id)}
                                         >
-                                            {isProcessing ? (
+                                            <Feather name="edit-2" size={14} color={COLORS.primary} />
+                                            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('profile.editProfile').split(' ')[0]}</Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {(!isConfirmed || isBeingEdited) && !isTicketFinished && (
+                                        <TouchableOpacity
+                                            style={[styles.flexActionBtn, { backgroundColor: COLORS.success }]}
+                                            onPress={() => handleConfirmCount(item)}
+                                            disabled={updateItem.isPending}
+                                        >
+                                            {updateItem.isPending ? (
                                                 <ActivityIndicator size="small" color="#fff" />
                                             ) : (
-                                                <Feather name="check" size={18} color="#fff" />
+                                                <>
+                                                    <Feather name="check" size={14} color="#fff" />
+                                                    <Text style={[styles.actionBtnText, { color: '#fff' }]} numberOfLines={1} adjustsFontSizeToFit>{t('common.confirm')}</Text>
+                                                </>
                                             )}
-                                            <Text style={styles.confirmItemBtnText}>
-                                                {isProcessing ? 'Đang lưu...' : 'Xác nhận kết quả'}
-                                            </Text>
                                         </TouchableOpacity>
-                                    )
-                                )}
-                                
-                                {item.locationId && (
-                                    <TouchableOpacity 
-                                        style={styles.locationContainer}
-                                        onPress={() => openWarehouseForItem(item)}
-                                    >
-                                        <View style={styles.locationLeft}>
+                                    )}
+
+                                    {item.locationId ? (
+                                        <TouchableOpacity
+                                            style={[styles.flexActionBtn, { backgroundColor: COLORS.primary + '10' }]}
+                                            onPress={() => openWarehouseForItem(item)}
+                                        >
                                             <Feather name="map-pin" size={14} color={COLORS.primary} />
-                                            <Text style={styles.locationText}>Vị trí: <Text style={styles.boldText}>Bin #{item.locationId}</Text></Text>
-                                        </View>
-                                        <Text style={styles.viewOnMapText}>Tìm trên sơ đồ</Text>
-                                        <Feather name="chevron-right" size={14} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                )}
+                                            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('inventoryCount.findOnMap')}</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={[styles.flexActionBtn, { backgroundColor: COLORS.info + '10' }]}
+                                            onPress={() => {
+                                                if (!ticket?.warehouseId) {
+                                                    AlertService.warning(t('common.error'), t('common.failed'));
+                                                    return;
+                                                }
+                                                router.push({
+                                                    pathname: '/warehouse-view',
+                                                    params: {
+                                                        warehouseId: String(ticket.warehouseId || ''),
+                                                        inventoryCountTicketId: String(ticket.id),
+                                                        focusedItemId: String(item.productId),
+                                                        focusedItemName: item.name || `Item #${item.productId}`,
+                                                    },
+                                                } as any);
+                                            }}
+                                        >
+                                            <Feather name="search" size={14} color={COLORS.info} />
+                                            <Text style={[styles.actionBtnText, { color: COLORS.info }]} numberOfLines={1} adjustsFontSizeToFit>{t('common.search')}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </Card>
                         );
                     })}
                 <View style={{ height: 40 }} />
             </RefreshContainer>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
+
+const itemHeaderStyle = StyleSheet.create({
+    itemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+    },
+});
 
 const styles = StyleSheet.create({
     loadingContainer: {
@@ -634,23 +641,34 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: COLORS.textMuted,
     },
-    inputContainer: {
-        height: 48,
+    compactCountRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        height: 42,
         backgroundColor: '#fff',
         borderRadius: 10,
-        borderWidth: 2,
+        borderWidth: 1.5,
         borderColor: COLORS.primary,
+        gap: 8,
     },
-    inputContainerDisabled: {
+    compactCountRowRevealed: {
         borderColor: '#E5E7EB',
         backgroundColor: '#F9FAFB',
+        borderWidth: 1,
     },
-    countInput: {
+    compactCountLabel: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        fontWeight: '600',
+    },
+    compactCountInput: {
         flex: 1,
-        textAlign: 'center',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
         color: COLORS.primary,
+        textAlign: 'right',
+        padding: 0,
     },
     revealedInput: {
         color: COLORS.text,
@@ -751,5 +769,28 @@ const styles = StyleSheet.create({
     boldText: {
         fontWeight: 'bold',
         color: COLORS.text,
+    },
+    itemActionRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+    },
+    flexActionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: COLORS.primary + '08',
+    },
+    actionBtnText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: COLORS.primary,
     },
 });

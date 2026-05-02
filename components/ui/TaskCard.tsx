@@ -1,8 +1,9 @@
 import { COLORS } from '@/constants/color';
 import { Task, TaskStatus } from '@/types/order';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface TaskCardProps {
@@ -15,6 +16,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onPress,
 }) => {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {
@@ -26,7 +28,62 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     }
   };
 
+  const getStatusLabel = (status: TaskStatus) => {
+    switch (status) {
+      case TaskStatus.COMPLETED: return t('tasks.completed');
+      case TaskStatus.IN_PROGRESS: return t('tasks.inProgress');
+      case TaskStatus.PENDING: return t('tasks.pending');
+      default: return status;
+    }
+  };
 
+  const getTypeLabel = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'inbound': return t('tasks.inbound');
+      case 'outbound': return t('tasks.outbound');
+      case 'inventory_count':
+      case 'count': 
+        return t('tasks.inventoryCount');
+      case 'transfer': return t('tasks.transfer');
+      default: return type;
+    }
+  };
+
+  // Attempt to localize title and description if they match English patterns
+  const localizedContent = useMemo(() => {
+    let title = task.title;
+    let description = task.description;
+
+    // Localize Title
+    if (title.startsWith('Inbound:')) {
+      title = title.replace('Inbound:', `${t('tasks.inbound')}:`);
+    } else if (title.startsWith('Outbound:')) {
+      title = title.replace('Outbound:', `${t('tasks.outbound')}:`);
+    } else if (title.startsWith('Inventory Count:')) {
+      title = title.replace('Inventory Count:', `${t('tasks.inventoryCount')}:`);
+    }
+
+    // Localize Description
+    // Receive goods from SUPPLIER with COUNT items
+    const receiveMatch = description.match(/Receive goods from (.*) with (\d+) items/);
+    if (receiveMatch) {
+      description = t('tasks.receiveDesc', { supplier: receiveMatch[1], count: receiveMatch[2] });
+    }
+
+    // Pick items to deliver to DESTINATION with COUNT items
+    const pickMatch = description.match(/Pick items to deliver to (.*) with (\d+) items/);
+    if (pickMatch) {
+      description = t('tasks.pickDesc', { destination: pickMatch[1], count: pickMatch[2] });
+    }
+
+    // Count COUNT items in the inventory count ticket
+    const countMatch = description.match(/Count (\d+) items in the inventory count ticket/);
+    if (countMatch) {
+      description = t('tasks.countDesc', { count: countMatch[1] });
+    }
+
+    return { title, description };
+  }, [task, t]);
 
   const handlePress = () => {
     if (onPress) {
@@ -48,15 +105,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       case 'outbound':
         router.push({
           pathname: '/(staff-tabs)/tasks/outbound/[id]',
-          params: {
-            id: String(task.relatedOrderId || task.id),
-            from: '/(staff-tabs)/tasks',
-          },
-        } as any);
-        break;
-      case 'putaway':
-        router.push({
-          pathname: '/(staff-tabs)/tasks/inbound/[id]',
           params: {
             id: String(task.relatedOrderId || task.id),
             from: '/(staff-tabs)/tasks',
@@ -90,21 +138,21 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     <TouchableOpacity style={styles.card} onPress={handlePress}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>{task.title}</Text>
+          <Text style={styles.title} numberOfLines={1}>{localizedContent.title}</Text>
         </View>
         <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
       </View>
 
-      <Text style={styles.description} numberOfLines={2}>{task.description}</Text>
+      <Text style={styles.description} numberOfLines={2}>{localizedContent.description}</Text>
 
       <View style={styles.footer}>
         <View style={styles.typeTag}>
           <Feather name="tag" size={12} color={COLORS.textMuted} />
-          <Text style={styles.typeText}>{task.type}</Text>
+          <Text style={styles.typeText}>{getTypeLabel(task.type)}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '10' }]}>
           <View style={[styles.statusDot, { backgroundColor: getStatusColor(task.status) }]} />
-          <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>{task.status}</Text>
+          <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>{getStatusLabel(task.status)}</Text>
         </View>
       </View>
     </TouchableOpacity>

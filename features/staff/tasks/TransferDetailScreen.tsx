@@ -7,6 +7,7 @@ import {
     useStartTransferPicking,
     useTransferOrder
 } from '@/hooks/transfer.hooks';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAuthStore } from '@/stores/auth.store';
 import { TransferOrderItem } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
@@ -21,6 +22,7 @@ export default function StaffTransferDetailScreen() {
     const transferId = parseInt(id || '0', 10);
     const insets = useSafeAreaInsets();
     const user = useAuthStore((state) => state.user);
+    const { t } = useTranslation();
 
     const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
 
@@ -36,7 +38,7 @@ export default function StaffTransferDetailScreen() {
     if (isLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Đang tải...</Text>
+                <Text>{t('common.loading')}</Text>
             </View>
         );
     }
@@ -46,8 +48,8 @@ export default function StaffTransferDetailScreen() {
             <View style={styles.container}>
                 <View style={styles.errorContainer}>
                     <Feather name="alert-circle" size={64} color={COLORS.border} />
-                    <Text style={styles.errorTitle}>Không tìm thấy phiếu luân chuyển</Text>
-                    <Button title="Quay lại" onPress={() => router.back()} />
+                    <Text style={styles.errorTitle}>{t('common.noData')}</Text>
+                    <Button title={t('common.back')} onPress={() => router.back()} />
                 </View>
             </View>
         );
@@ -106,7 +108,7 @@ export default function StaffTransferDetailScreen() {
         <View key={item.id} style={styles.itemContainer}>
             <View style={styles.itemMainInfo}>
                 <View style={styles.itemHeader}>
-                    <Text style={styles.productName} numberOfLines={1}>{item.productName || `Sản phẩm #${item.productId}`}</Text>
+                    <Text style={styles.productName} numberOfLines={1}>{item.productName || `${t('common.product')} #${item.productId}`}</Text>
                     <Text style={styles.itemSku}>SKU: {item.sku || 'N/A'}</Text>
                 </View>
                 <View style={styles.qtyBadge}>
@@ -119,8 +121,8 @@ export default function StaffTransferDetailScreen() {
     return (
         <View style={styles.container}>
             <ScreenHeader
-                title="Chi tiết luân chuyển"
-                subtitle={transfer.referenceCode || `Phiếu #${transfer.id}`}
+                title={t('transfer.ticketTitle')}
+                subtitle={transfer.referenceCode || `${t('tasks.transfer')} #${transfer.id}`}
             />
 
             <RefreshContainer 
@@ -136,8 +138,8 @@ export default function StaffTransferDetailScreen() {
                                 <Feather name="repeat" size={28} color={COLORS.primary} />
                             </View>
                             <View>
-                                <Text style={styles.typeLabel}>Luân chuyển kho</Text>
-                                <Text style={styles.transferNumber}>{transfer.referenceCode || `Phiếu #${transfer.id}`}</Text>
+                                <Text style={styles.typeLabel}>{t('transfer.warehouseTransfer')}</Text>
+                                <Text style={styles.transferNumber}>{transfer.referenceCode || `${t('tasks.transfer')} #${transfer.id}`}</Text>
                             </View>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: COLORS.primary + '10' }]}>
@@ -149,7 +151,7 @@ export default function StaffTransferDetailScreen() {
 
                 {/* Locations Card */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Thông tin kho</Text>
+                    <Text style={styles.sectionTitle}>{t('transfer.warehouseInfo')}</Text>
                 </View>
                 <Card style={styles.card}>
                     <View style={styles.detailRow}>
@@ -157,8 +159,8 @@ export default function StaffTransferDetailScreen() {
                             <Feather name="log-out" size={16} color={COLORS.danger} />
                         </View>
                         <View style={styles.detailContent}>
-                            <Text style={styles.detailLabel}>Kho xuất (Từ)</Text>
-                            <Text style={styles.detailValue}>{transfer.sourceWarehouse?.name || `Kho ${transfer.sourceWarehouseId}`}</Text>
+                            <Text style={styles.detailLabel}>{t('transfer.sourceWarehouse')}</Text>
+                            <Text style={styles.detailValue}>{transfer.sourceWarehouse?.name || `${t('tasks.warehouse')} ${transfer.sourceWarehouseId}`}</Text>
                         </View>
                     </View>
                     <View style={styles.detailDivider} />
@@ -167,8 +169,8 @@ export default function StaffTransferDetailScreen() {
                             <Feather name="log-in" size={16} color={COLORS.success} />
                         </View>
                         <View style={styles.detailContent}>
-                            <Text style={styles.detailLabel}>Kho nhập (Đến)</Text>
-                            <Text style={styles.detailValue}>{transfer.destinationWarehouse?.name || `Kho ${transfer.destinationWarehouseId}`}</Text>
+                            <Text style={styles.detailLabel}>{t('transfer.destinationWarehouse')}</Text>
+                            <Text style={styles.detailValue}>{transfer.destinationWarehouse?.name || `${t('tasks.warehouse')} ${transfer.destinationWarehouseId}`}</Text>
                         </View>
                     </View>
                 </Card>
@@ -182,8 +184,8 @@ export default function StaffTransferDetailScreen() {
                         <Feather name="map" size={18} color={COLORS.primary} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.slate800 }}>Sơ đồ kho</Text>
-                        <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>Nhấn để xem vị trí trên sơ đồ</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.slate800 }}>{t('warehouse.map')}</Text>
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>{t('outbound.tapToNavigate')}</Text>
                     </View>
                     <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
                 </TouchableOpacity>
@@ -191,7 +193,7 @@ export default function StaffTransferDetailScreen() {
 
                 {/* Items */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Danh sách sản phẩm ({transfer.items?.length || 0})</Text>
+                    <Text style={styles.sectionTitle}>{t('outbound.productList')} ({transfer.items?.length || 0})</Text>
                 </View>
                 <View style={styles.list}>
                     {(transfer.items || []).map((item, index) => (
@@ -207,58 +209,58 @@ export default function StaffTransferDetailScreen() {
             <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
                 {normalizedStatus === 'approved' && canProcessSourceFlow && (
                     <Button 
-                        title="Bắt đầu lấy hàng" 
+                        title={t('transfer.startPicking')} 
                         onPress={handleStartPicking} 
                         loading={startPickingMutation.isPending} 
                     />
                 )}
                 {normalizedStatus === 'picking' && canProcessSourceFlow && (
                     <Button 
-                        title="Xác nhận đã đóng gói" 
+                        title={t('transfer.confirmPacked')} 
                         onPress={handleMarkPacked} 
                         loading={markPackedMutation.isPending} 
                     />
                 )}
                 {normalizedStatus === 'packed' && canProcessSourceFlow && (
                     <Button 
-                        title="Giao cho vận chuyển" 
+                        title={t('transfer.handOver')} 
                         onPress={handleShip} 
                         loading={shipMutation.isPending} 
                     />
                 )}
                 {normalizedStatus === 'in_transit' && canProcessDestinationFlow && (
                     <Button 
-                        title="Kiểm nhận hàng" 
+                        title={t('transfer.checkReceive')} 
                         onPress={handleReceive} 
                     />
                 )}
                 {normalizedStatus === 'completed' && canProcessSourceFlow && (
                     <Button 
-                        title="Xác nhận kiểm hàng" 
+                        title={t('transfer.confirmQC')} 
                         onPress={handleQualityCheck}
                         variant="outline"
                         style={{ marginTop: 8 }}
                     />
                 )}
                 {normalizedStatus === 'approved' && !canProcessSourceFlow && (
-                    <Text style={styles.permissionNotice}>Bạn không phụ trách bước lấy hàng của phiếu này.</Text>
+                    <Text style={styles.permissionNotice}>{t('transfer.permissionNoticeSource')}</Text>
                 )}
                 {normalizedStatus === 'picking' && !canProcessSourceFlow && (
-                    <Text style={styles.permissionNotice}>Bạn không phụ trách bước đóng gói của phiếu này.</Text>
+                    <Text style={styles.permissionNotice}>{t('transfer.permissionNoticeSource')}</Text>
                 )}
                 {normalizedStatus === 'packed' && !canProcessSourceFlow && (
-                    <Text style={styles.permissionNotice}>Bạn không phụ trách bước giao vận của phiếu này.</Text>
+                    <Text style={styles.permissionNotice}>{t('transfer.permissionNoticeSource')}</Text>
                 )}
                 {normalizedStatus === 'in_transit' && !canProcessDestinationFlow && (
-                    <Text style={styles.permissionNotice}>Chỉ staff kho đích mới được kiểm nhận hàng.</Text>
+                    <Text style={styles.permissionNotice}>{t('transfer.permissionNoticeDest')}</Text>
                 )}
                 {normalizedStatus === 'completed' && !canProcessSourceFlow && (
-                    <Text style={styles.permissionNotice}>Bước kiểm hàng hiện chỉ mở cho staff kho nguồn.</Text>
+                    <Text style={styles.permissionNotice}>{t('transfer.permissionNoticeQC')}</Text>
                 )}
                 {(normalizedStatus === 'quality_checked' || normalizedStatus === 'quality_issue') && (
                     <View style={styles.completedNotice}>
                         <Feather name="check-circle" size={20} color={COLORS.success} />
-                        <Text style={styles.completedText}>Phiếu luân chuyển đã hoàn tất kiểm hàng.</Text>
+                        <Text style={styles.completedText}>{t('transfer.completedQC')}</Text>
                     </View>
                 )}
             </View>

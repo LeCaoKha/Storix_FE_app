@@ -1,3 +1,4 @@
+import { useTranslation } from "@/hooks/useTranslation";
 import { Shelf, WarehouseStructure, WarehouseZone } from "@/types/warehouse";
 import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
@@ -10,7 +11,9 @@ interface WarehouseGridViewProps {
   highlightedShelf?: string;
   recommendedShelves?: string[];
   highlightedBins?: (string | number)[];
+  inventorySummary?: { shelfId?: string | number; shelfCode?: string; quantity: number }[];
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
+  isCounting?: boolean;
 }
 
 export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
@@ -18,8 +21,11 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
   highlightedShelf,
   recommendedShelves,
   highlightedBins,
+  inventorySummary,
   onShelfPress,
+  isCounting = false,
 }) => {
+  const { t } = useTranslation();
   const [selectedZone, setSelectedZone] = useState<string | null>(
     (structure.zones ?? [])[0]?.id || null,
   );
@@ -36,18 +42,25 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
       (acc, level) => acc + (level.bins?.length ?? 0),
       0,
     );
+    const shelfInventory = inventorySummary?.find(
+      (entry) =>
+        String(entry.shelfId ?? "").trim() === String(shelf.id).trim() ||
+        String(entry.shelfCode ?? "").trim() === String(shelf.code).trim(),
+    );
 
     return (
       <TouchableOpacity
         activeOpacity={0.92}
         onPress={() => onShelfPress?.(shelf, zone)}
-        className="bg-white rounded-2xl border-[1.5px] overflow-hidden shadow-sm elevation-2"
+        className="bg-white rounded-2xl border-[1.5px] overflow-hidden"
         style={[
           {
             borderColor: COLORS.borderLight,
             shadowColor: COLORS.slate900,
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.04,
+            shadowRadius: 2,
+            elevation: 2,
           },
           isRecommendedShelf && {
             borderColor: COLORS.success + "60",
@@ -108,8 +121,21 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
                 {shelf.code}
               </Text>
               <Text className="text-[11px] text-slate-400 font-medium mt-px">
-                {levels.length} levels · {totalBins} bins
+                {levels.length} {t('warehouse.levels')} · {totalBins} {t('warehouse.bins')}
               </Text>
+              {shelfInventory && shelfInventory.quantity > 0 && (
+                <View
+                  className="mt-1 self-start px-2 py-1 rounded-md border"
+                  style={{
+                    borderColor: COLORS.info + "30",
+                    backgroundColor: COLORS.info + "12",
+                  }}
+                >
+                  <Text className="text-[10px] font-bold" style={{ color: COLORS.info }}>
+                    {t('warehouse.itemsInShelf', { count: shelfInventory.quantity })}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -122,12 +148,12 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
                   borderColor: COLORS.success + "30",
                 }}
               >
-                <Feather name="star" size={10} color={COLORS.success} />
+                <Feather name={isCounting ? "check-circle" : "star"} size={10} color={COLORS.success} />
                 <Text
                   className="text-[11px] font-extrabold tracking-[0.3px]"
                   style={{ color: COLORS.success }}
                 >
-                  Recommended
+                  {isCounting ? t('tasks.countItems') : t('warehouse.recommended')}
                 </Text>
               </View>
             )}
@@ -162,7 +188,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
           <View className="flex-row items-center justify-center gap-2 py-4 px-[14px] bg-slate-50">
             <Feather name="inbox" size={20} color={COLORS.slate300} />
             <Text className="text-[13px] text-slate-400 font-medium">
-              No bins available
+              {t('warehouse.noInventoryData')}
             </Text>
           </View>
         ) : (
@@ -193,60 +219,75 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
 
                 {/* Bins */}
                 <View className="flex-1 flex-row flex-wrap gap-1.5">
-                  {(level.bins ?? []).map((bin) => {
-                    const isRecommendedBin = (highlightedBins ?? []).some(
-                      (code) =>
-                        String(code) === bin.code || String(code) === bin.id,
-                    );
-                    const hasAnyRecommendations =
-                      (recommendedShelves?.length ?? 0) > 0 ||
-                      (highlightedBins?.length ?? 0) > 0;
-                    const isSuggested = isRecommendedShelf || isRecommendedBin;
-                    const isDimmed = hasAnyRecommendations && !isSuggested;
+                    {(level.bins ?? []).map((bin) => {
+                      const isRecommendedBin = (highlightedBins ?? []).some(
+                        (code) =>
+                          String(code) === bin.code || String(code) === bin.id,
+                      );
+                      const hasAnyRecommendations =
+                        (recommendedShelves?.length ?? 0) > 0 ||
+                        (highlightedBins?.length ?? 0) > 0;
+                      const isSuggested = isRecommendedShelf || isRecommendedBin;
+                      const isDimmed = hasAnyRecommendations && !isSuggested;
 
-                    return (
-                      <View
-                        key={bin.id}
-                        className={`px-2.5 py-1.5 rounded-lg border-[1.5px] items-center justify-center min-w-[44px] ${isDimmed ? "opacity-30" : ""}`}
-                        style={[
-                          {
-                            borderColor: COLORS.slate200,
-                            backgroundColor: COLORS.slate50,
-                          },
-                          isSuggested && {
-                            borderColor: COLORS.success + "70",
-                            backgroundColor: COLORS.success + "10",
-                          },
-                          isHighlighted &&
-                            !isSuggested &&
-                            !isDimmed && {
-                              borderColor: COLORS.primary + "60",
-                              backgroundColor: COLORS.primaryLight,
-                            },
-                        ]}
-                      >
-                        <Text
-                          className={`text-xs tracking-[0.2px] ${isSuggested || (isHighlighted && !isDimmed) ? "font-bold" : "font-semibold"}`}
+                      const occupancy = Math.min(100, Math.max(0, Number(bin.percentage ?? bin.occupancyPercentage ?? 0)));
+                      const isFull = occupancy >= 100;
+
+                      return (
+                        <View
+                          key={bin.id}
+                          className="px-2.5 py-1.5 rounded-lg border-[1.5px] items-center justify-center min-w-[44px]"
                           style={[
-                            { color: COLORS.slate600 },
-                            isSuggested && { color: COLORS.successText },
-                            isDimmed && { color: COLORS.slate300 },
+                            {
+                              borderColor: COLORS.slate200,
+                              backgroundColor: COLORS.slate50,
+                              opacity: isDimmed ? 0.3 : 1,
+                            },
+                            isFull && {
+                              borderColor: COLORS.danger + "60",
+                              backgroundColor: COLORS.danger + "10",
+                            },
+                            isSuggested && !isFull && {
+                              borderColor: COLORS.success + "70",
+                              backgroundColor: COLORS.success + "10",
+                            },
                             isHighlighted &&
                               !isSuggested &&
-                              !isDimmed && { color: COLORS.primary },
+                              !isFull &&
+                              !isDimmed && {
+                                borderColor: COLORS.primary + "60",
+                                backgroundColor: COLORS.primaryLight,
+                              },
                           ]}
                         >
-                          {bin.code}
-                        </Text>
-                        {isRecommendedBin && (
-                          <View
-                            className="absolute top-[3px] right-[3px] w-[5px] h-[5px] rounded-full"
-                            style={{ backgroundColor: COLORS.success }}
-                          />
-                        )}
-                      </View>
-                    );
-                  })}
+                          <Text
+                            className={`text-xs tracking-[0.2px] ${isSuggested || (isHighlighted && !isDimmed) ? "font-bold" : "font-semibold"}`}
+                            style={[
+                              { color: COLORS.slate600 },
+                              isFull && { color: COLORS.danger },
+                              isSuggested && !isFull && { color: COLORS.successText },
+                              isDimmed && { color: COLORS.slate300 },
+                              isHighlighted &&
+                                !isSuggested &&
+                                !isFull &&
+                                !isDimmed && { color: COLORS.primary },
+                            ]}
+                          >
+                            {bin.code}
+                          </Text>
+                          {isFull ? (
+                            <View className="absolute top-[-4px] right-[-4px] bg-white rounded-full">
+                              <Feather name="x-circle" size={10} color={COLORS.danger} />
+                            </View>
+                          ) : isRecommendedBin && (
+                            <View
+                              className="absolute top-[3px] right-[3px] w-[5px] h-[5px] rounded-full"
+                              style={{ backgroundColor: COLORS.success }}
+                            />
+                          )}
+                        </View>
+                      );
+                    })}
                 </View>
               </View>
             ))}
@@ -267,7 +308,12 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerClassName="px-4 py-2.5 flex-row gap-2"
+            contentContainerStyle={{
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              flexDirection: "row",
+              gap: 8,
+            }}
           >
             {(structure.zones ?? []).map((zone) => (
               <TouchableOpacity
@@ -318,7 +364,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
               (acc, s) => acc + (s.levels?.length ?? 0),
               0,
             ) || 0}{" "}
-            levels
+            {t('warehouse.levels')}
           </Text>
         </View>
         <View
@@ -337,7 +383,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
                 ),
               0,
             ) || 0}{" "}
-            bins
+            {t('warehouse.bins')}
           </Text>
         </View>
         <View
@@ -347,7 +393,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
         <View className="flex-row items-center justify-center gap-1 flex-1">
           <Feather name="layers" size={13} color={COLORS.slate400} />
           <Text className="text-xs text-slate-500 font-semibold">
-            {currentZone?.shelves?.length || 0} shelves
+            {currentZone?.shelves?.length || 0} {t('warehouse.shelf').toLowerCase() + 's'}
           </Text>
         </View>
       </View>
@@ -355,7 +401,11 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
       {/* Racks grid */}
       <ScrollView
         className="flex-1"
-        contentContainerClassName="p-[14px] gap-2.5 pb-8"
+        contentContainerStyle={{
+          padding: 14,
+          gap: 10,
+          paddingBottom: 32,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {currentZone?.shelves?.map((shelf) => (
@@ -368,7 +418,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
               <Feather name="inbox" size={32} color={COLORS.slate300} />
             </View>
             <Text className="text-sm text-slate-400 font-medium">
-              No shelves in this zone
+              {t('warehouse.noItemsForShelf')}
             </Text>
           </View>
         )}

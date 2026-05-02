@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 
+import { translations } from '@/locales/translations';
+import { usePreferencesStore } from '@/stores/preferences.store';
+
 export type AlertType = 'success' | 'error' | 'warning' | 'info' | 'confirm';
 
 interface AlertButton {
@@ -69,13 +72,16 @@ export const AlertService = {
         useAlertStore.getState().showAlert({ title, message, type: 'info', onDismiss });
     },
     confirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) => {
+        const language = usePreferencesStore.getState().language;
+        const commonTranslations = translations[language]?.common ?? translations.en.common;
+
         useAlertStore.getState().showAlert({
             title,
             message,
             type: 'confirm',
             buttons: [
-                { text: 'Hủy', onPress: onCancel, style: 'cancel' },
-                { text: 'Đồng ý', onPress: onConfirm, style: 'default' },
+                { text: commonTranslations.cancel, onPress: onCancel, style: 'cancel' },
+                { text: commonTranslations.confirm, onPress: onConfirm, style: 'default' },
             ],
         });
     },

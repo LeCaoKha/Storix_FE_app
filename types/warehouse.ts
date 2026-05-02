@@ -47,6 +47,13 @@ export interface ShelfLevel {
 export interface Bin {
   id: string;
   code: string;
+  status?: string;
+  percentage?: number;
+  occupancyPercentage?: number;
+  width?: number;
+  height?: number;
+  length?: number;
+  productId?: number;
 }
 
 export interface NavigationNode {

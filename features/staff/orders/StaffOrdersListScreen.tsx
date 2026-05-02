@@ -1,6 +1,7 @@
 import { RefreshContainer, TabScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff } from '@/hooks';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAuthStore } from '@/stores/auth.store';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,15 +11,16 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 type TabType = 'all' | 'waiting' | 'partial' | 'completed';
 
 const TABS: { key: TabType; label: string }[] = [
-    { key: 'all', label: 'Tất cả' },
-    { key: 'waiting', label: 'Chờ nhận hàng' },
-    { key: 'partial', label: 'Đang nhập' },
-    { key: 'completed', label: 'Hoàn tất' },
+    { key: 'all', label: 'all' },
+    { key: 'waiting', label: 'pending' },
+    { key: 'partial', label: 'inProgress' },
+    { key: 'completed', label: 'completed' },
 ];
 
 export default function StaffOrdersListScreen() {
     const router = useRouter();
     const user = useAuthStore((state) => state.user);
+    const { t } = useTranslation();
     const { data: tickets = [], isLoading, refetch } = useInboundOrdersByStaff(user?.companyId ?? 0, user?.id ?? 0);
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -60,7 +62,7 @@ export default function StaffOrdersListScreen() {
     if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
-                <Text>Đang tải...</Text>
+                <Text>{t('common.loading')}</Text>
             </View>
         );
     }
@@ -82,13 +84,13 @@ export default function StaffOrdersListScreen() {
     const getStatusBadgeStyle = (status: string) => {
         switch (status) {
             case 'Waiting for payment':
-                return { bg: '#EFF6FF', text: '#1E40AF', label: 'Chờ nhận hàng' };
+                return { bg: '#EFF6FF', text: '#1E40AF', label: t('common.pending') };
             case 'Partially Completed':
-                return { bg: '#FEF3C7', text: '#92400E', label: 'Đang nhập' };
+                return { bg: '#FEF3C7', text: '#92400E', label: t('common.inProgress') };
             case 'Completed':
-                return { bg: '#D1FAE5', text: '#065F46', label: 'Hoàn tất' };
+                return { bg: '#D1FAE5', text: '#065F46', label: t('common.completed') };
             default:
-                return { bg: '#F3F4F6', text: '#6B7280', label: status || 'N/A' };
+                return { bg: '#F3F4F6', text: '#6B7280', label: status || t('common.notAvailable') };
         }
     };
 
@@ -96,7 +98,7 @@ export default function StaffOrdersListScreen() {
         <View style={styles.container}>
             <TabScreenHeader
                 showSearch
-                searchPlaceholder="Tìm theo mã phiếu, kho, sản phẩm..."
+                searchPlaceholder={t('tasks.searchOrders')}
                 searchValue={searchQuery}
                 onSearchChange={setSearchQuery}
             >
@@ -127,7 +129,7 @@ export default function StaffOrdersListScreen() {
                                 onPress={() => setActiveTab(tab.key)}
                             >
                                 <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                                    {tab.label}
+                                    {t(`common.${tab.label}`)}
                                 </Text>
                                 <View style={[styles.tabCount, isActive && styles.tabCountActive]}>
                                     <Text style={[styles.tabCountText, isActive && styles.tabCountTextActive]}>
@@ -149,13 +151,10 @@ export default function StaffOrdersListScreen() {
                     <View style={styles.emptyState}>
                         <Feather name="package" size={64} color={COLORS.border} />
                         <Text style={styles.emptyTitle}>
-                            {searchQuery ? 'Không tìm thấy kết quả' : 'Chưa có phiếu nhập kho'}
+                            {searchQuery ? t('tasks.noResults') : t('tasks.noInboundTickets')}
                         </Text>
                         <Text style={styles.emptyText}>
-                            {searchQuery
-                                ? 'Thử tìm kiếm với từ khóa khác'
-                                : 'Đợi Manager tạo phiếu nhập kho mới'
-                            }
+                            {searchQuery ? t('tasks.noResultsDesc') : t('tasks.noInboundTicketsDesc')}
                         </Text>
                     </View>
                 ) : (
@@ -173,7 +172,7 @@ export default function StaffOrdersListScreen() {
                                     <View style={styles.ticketInfo}>
                                         <Text style={styles.ticketCode}>{ticket.referenceCode || `INB-${ticket.id}`}</Text>
                                         <Text style={styles.ticketDate}>
-                                            {new Date(ticket.createdAt).toLocaleDateString('vi-VN')}
+                                            {new Date(ticket.createdAt).toLocaleDateString('en-US')}
                                         </Text>
                                     </View>
                                     <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -188,25 +187,25 @@ export default function StaffOrdersListScreen() {
                                 <View style={styles.ticketDetails}>
                                     <View style={styles.detailRow}>
                                         <Feather name="map-pin" size={16} color={COLORS.textMuted} />
-                                        <Text style={styles.detailLabel}>Kho:</Text>
-                                        <Text style={styles.detailValue}>{ticket.warehouse?.name || 'N/A'}</Text>
+                                        <Text style={styles.detailLabel}>{t('tasks.warehouse')}:</Text>
+                                        <Text style={styles.detailValue}>{ticket.warehouse?.name || t('common.notAvailable')}</Text>
                                     </View>
                                     
                                     <View style={styles.detailRow}>
                                         <Feather name="truck" size={16} color={COLORS.textMuted} />
-                                        <Text style={styles.detailLabel}>NCC:</Text>
-                                        <Text style={styles.detailValue}>{ticket.supplier?.name || 'N/A'}</Text>
+                                        <Text style={styles.detailLabel}>{t('inbound.supplier')}:</Text>
+                                        <Text style={styles.detailValue}>{ticket.supplier?.name || t('common.notAvailable')}</Text>
                                     </View>
                                     
                                     <View style={styles.detailRow}>
                                         <Feather name="package" size={16} color={COLORS.textMuted} />
-                                        <Text style={styles.detailLabel}>Sản phẩm:</Text>
-                                        <Text style={styles.detailValue}>{itemCount} mặt hàng</Text>
+                                        <Text style={styles.detailLabel}>{t('common.products')}:</Text>
+                                        <Text style={styles.detailValue}>{itemCount} {t('common.items')}</Text>
                                     </View>
                                 </View>
 
                                 <View style={styles.ticketFooter}>
-                                    <Text style={styles.viewDetailText}>Xem chi tiết</Text>
+                                    <Text style={styles.viewDetailText}>{t('common.viewDetails')}</Text>
                                     <Feather name="chevron-right" size={18} color={COLORS.primary} />
                                 </View>
                             </TouchableOpacity>

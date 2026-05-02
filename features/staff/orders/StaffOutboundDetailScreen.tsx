@@ -2,6 +2,7 @@ import { Card, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useOutboundOrder, useUpdateOutboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AlertService } from '@/stores/alert.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function StaffOutboundDetailScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const goBack = useAppBack('/(staff-tabs)/tasks');
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,7 +59,7 @@ export default function StaffOutboundDetailScreen() {
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Đang tải..." />
+                <ScreenHeader title={t('common.loading')} />
             </View>
         );
     }
@@ -65,12 +67,12 @@ export default function StaffOutboundDetailScreen() {
     if (!order || error) {
         return (
             <View style={styles.container}>
-                <ScreenHeader title="Lỗi" />
+                <ScreenHeader title={t('common.error')} />
                 <View style={styles.centered}>
                     <Feather name="alert-circle" size={48} color={COLORS.danger} />
-                    <Text style={styles.errorText}>Không tìm thấy thông tin đơn hàng</Text>
+                    <Text style={styles.errorText}>{t('common.orderNotFound')}</Text>
                     <TouchableOpacity style={styles.backButton} onPress={goBack}>
-                        <Text style={styles.backButtonText}>Quay lại</Text>
+                        <Text style={styles.backButtonText}>{t('common.back')}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -83,13 +85,13 @@ export default function StaffOutboundDetailScreen() {
         setTimeout(() => {
             setIsSaving(false);
             setVerifiedItems(prev => ({ ...prev, [itemId]: true }));
-            AlertService.success('Thành công', 'Đã xác nhận đúng sản phẩm');
+            AlertService.success(t('common.success'), t('outbound.productVerified'));
         }, 600);
     };
 
     const handleUpdateQty = (itemId: number, increment: boolean) => {
         if (!verifiedItems[itemId]) {
-            AlertService.warning('Lưu ý', 'Vui lòng quét mã sản phẩm để xác minh trước khi lấy hàng');
+            AlertService.warning(t('common.noticeTitle'), t('outbound.scanToVerifyMsg'));
             return;
         }
         setLocalQuantities(prev => {
@@ -124,11 +126,11 @@ export default function StaffOutboundDetailScreen() {
                 items: updatedItems,
             });
 
-            AlertService.success('Thành công', allPicked ? 'Đã hoàn tất lấy hàng' : 'Đã cập nhật số lượng lấy hàng', () => {
+            AlertService.success(t('common.success'), allPicked ? t('outbound.pickingCompleted') : t('outbound.pickingUpdated'), () => {
                 goBack();
             });
         } catch {
-            AlertService.error('Lỗi', 'Không thể cập nhật số lượng');
+            AlertService.error(t('common.error'), t('outbound.updateQuantityFailed'));
         } finally {
             setIsSaving(false);
         }
@@ -137,7 +139,7 @@ export default function StaffOutboundDetailScreen() {
     return (
         <View style={styles.container}>
             <ScreenHeader
-                title="Xuất Kho"
+                title={t('tasks.outbound')}
                 subtitle={order.note || `OUT-${order.id}`}
             />
 
@@ -149,17 +151,17 @@ export default function StaffOutboundDetailScreen() {
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="user" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Người tạo: <Text style={styles.boldText}>{order.createdByNavigation?.email || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>{t('tasks.createdBy')}: <Text style={styles.boldText}>{order.createdByNavigation?.email || t('common.notAvailable')}</Text></Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Feather name="map-pin" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>Giao đến: <Text style={styles.boldText}>{order.destination || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>{t('tasks.destination')}: <Text style={styles.boldText}>{order.destination || t('common.notAvailable')}</Text></Text>
                     </View>
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Danh sách sản phẩm</Text>
-                    <Text style={styles.sectionSubtitle}>{orderItems.length} mặt hàng</Text>
+                    <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
+                    <Text style={styles.sectionSubtitle}>{orderItems.length} {t('common.items')}</Text>
                 </View>
 
                 {sortedItems.map((item: OutboundOrderItem) => {
@@ -171,10 +173,10 @@ export default function StaffOutboundDetailScreen() {
                         <Card key={item.id} style={cardStyle}>
                             <View style={styles.itemHeader}>
                                 <View style={styles.itemInfo}>
-                                    <Text style={styles.productName}>{item.product?.name || `Sản phẩm #${item.productId}`}</Text>
+                                    <Text style={styles.productName}>{item.product?.name || `Product #${item.productId}`}</Text>
                                     <View style={styles.skuRow}>
                                         <View style={styles.skuBadge}>
-                                            <Text style={styles.skuText}>{item.product?.sku || 'N/A'}</Text>
+                                            <Text style={styles.skuText}>{t('common.sku')}: {item.product?.sku || t('common.notAvailable')}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -184,16 +186,16 @@ export default function StaffOutboundDetailScreen() {
                                     <Text style={[styles.statusBadgeText, {
                                         color: (localQuantities[item.id] || 0) >= (item.quantity || 0) ? '#059669' : '#D97706'
                                     }]}>
-                                        {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? 'Xong' : 'Chờ'}
+                                        {(localQuantities[item.id] || 0) >= (item.quantity || 0) ? t('common.done') : t('common.pending')}
                                     </Text>
                                 </View>
                             </View>
 
                             <View style={styles.counterRow}>
                                 <View style={styles.qtyLabelContainer}>
-                                    <Text style={styles.qtyLabel}>Số lượng đã lấy:</Text>
+                                    <Text style={styles.qtyLabel}>{t('outbound.pickedQty')}</Text>
                                     {!verifiedItems[item.id] && (
-                                        <Text style={styles.verificationPrompt}>Quét để xác minh</Text>
+                                        <Text style={styles.verificationPrompt}>{t('outbound.scanToVerifyMsg')}</Text>
                                     )}
                                 </View>
                                 <View style={[styles.counter, !verifiedItems[item.id] && styles.disabledCounter]}>
@@ -227,7 +229,7 @@ export default function StaffOutboundDetailScreen() {
                             >
                                 <Feather name={verifiedItems[item.id] ? "check-circle" : "maximize"} size={16} color={verifiedItems[item.id] ? "#059669" : COLORS.primary} />
                                 <Text style={[styles.scanItemBtnText, verifiedItems[item.id] && { color: '#059669' }]}>
-                                    {verifiedItems[item.id] ? 'Đã xác minh sản phẩm' : 'Verify Scan (Quét mã xác nhận)'}
+                                    {verifiedItems[item.id] ? t('outbound.productVerified') : t('outbound.verifyScan')}
                                 </Text>
                             </TouchableOpacity>
                         </Card>
@@ -236,17 +238,13 @@ export default function StaffOutboundDetailScreen() {
             </RefreshContainer>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.reportBtn}>
-                    <Feather name="alert-triangle" size={20} color={COLORS.danger} />
-                    <Text style={styles.reportBtnText}>Báo lỗi</Text>
-                </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.saveBtn, isSaving && styles.disabledBtn]}
                     onPress={handleSave}
                     disabled={isSaving}
                 >
                     <Text style={styles.saveBtnText}>
-                        {isSaving ? 'Đang lưu...' : 'Hoàn tất lấy hàng'}
+                        {isSaving ? t('common.loading') : t('outbound.finishPicking')}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -469,22 +467,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
     },
-    reportBtn: {
-        width: 56,
-        height: 56,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.danger + '30',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.danger + '05',
-    },
-    reportBtnText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: COLORS.danger,
-        marginTop: 2,
-    },
+
     saveBtn: {
         flex: 1,
         height: 56,

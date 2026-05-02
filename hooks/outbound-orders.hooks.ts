@@ -304,7 +304,7 @@ export const useConfirmOutboundOrder = () => {
 
   return useMutation({
     mutationFn: ({ ticketId, performedBy }: { ticketId: number; performedBy: number }) =>
-      confirmOutboundOrder(ticketId, performedBy),
+      confirmOutboundOrder(ticketId, { performedBy, allocations: [] }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.all });
       queryClient.invalidateQueries({ queryKey: outboundOrderKeys.detail(variables.ticketId) });

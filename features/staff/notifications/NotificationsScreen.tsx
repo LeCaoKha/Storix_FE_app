@@ -1,10 +1,12 @@
 import { Card, RefreshContainer, SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
+import { useTranslation } from '@/hooks/useTranslation';
 import { deleteNotification, getUserNotifications, markNotificationAsRead, type NotificationItem } from '@/services/notification.api';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/stores/auth.store';
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,32 +19,56 @@ interface Notification {
   time: string;
   isRead: boolean;
   date: string;
+  referenceId?: number;
+  referenceType?: string;
 }
-
-const mapNotification = (item: NotificationItem): Notification => {
-  const source = item.notification ?? item;
-  const createdAtValue = item.createdAt || source.createdAt;
-  const createdAt = createdAtValue ? new Date(createdAtValue) : new Date();
-  const normalizedType = String(item.type || source.type || '').toLowerCase();
-
-  return {
-    id: Number(item.id),
-    type: normalizedType === 'outbound' ? 'outbound' : normalizedType === 'inventory' ? 'inventory' : normalizedType === 'system' ? 'system' : 'inbound',
-    title: item.title || source.title || 'Thông báo',
-    message: item.message || source.message || '',
-    time: createdAt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-    isRead: !!(item.isRead ?? source.isRead),
-    date: createdAt.toLocaleDateString('vi-VN'),
-  };
-};
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const { t, language } = useTranslation();
+
+  const mapNotification = (item: NotificationItem): Notification => {
+    const source = item.notification ?? item;
+    const createdAtValue = item.createdAt || source.createdAt;
+    const createdAt = createdAtValue ? new Date(createdAtValue) : new Date();
+    const normalizedType = String(item.type || source.type || '').toLowerCase();
+    
+    let title = item.title || source.title || t('notifications.defaultTitle');
+    let message = item.message || source.message || '';
+
+    // Localize dynamic content
+    if (title === 'New outbound ticket assigned') {
+      title = t('notifications.newOutboundTitle');
+      const idMatch = message.match(/#(\d+)/);
+      if (idMatch) message = t('notifications.newOutboundMsg', { id: idMatch[1] });
+    } else if (title === 'New inbound ticket assigned') {
+      title = t('notifications.newInboundTitle');
+      const idMatch = message.match(/#(\d+)/);
+      if (idMatch) message = t('notifications.newInboundMsg', { id: idMatch[1] });
+    } else if (title === 'New inventory count assigned') {
+      title = t('notifications.newCountTitle');
+      const idMatch = message.match(/#(\d+)/);
+      if (idMatch) message = t('notifications.newCountMsg', { id: idMatch[1] });
+    }
+
+    return {
+      id: Number(item.id),
+      type: normalizedType === 'outbound' ? 'outbound' : normalizedType === 'inventory' ? 'inventory' : normalizedType === 'system' ? 'system' : 'inbound',
+      title,
+      message,
+      time: createdAt.toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
+      isRead: !!(item.isRead ?? source.isRead),
+      date: createdAt.toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US'),
+      referenceId: item.referenceId || source.referenceId,
+      referenceType: item.referenceType || source.referenceType,
+    };
+  };
 
   const { data: notifications = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['notifications', user?.id],
+    queryKey: ['notifications', user?.id, language],
     queryFn: async () => {
       if (!user?.id) return [] as Notification[];
       const items = await getUserNotifications(user.id);
@@ -55,14 +81,14 @@ export default function NotificationsScreen() {
   const markReadMutation = useMutation({
     mutationFn: (notificationId: number) => markNotificationAsRead(user?.id ?? 0, notificationId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (notificationId: number) => deleteNotification(user?.id ?? 0, notificationId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
   });
@@ -74,64 +100,116 @@ export default function NotificationsScreen() {
   const markAllAsRead = async () => {
     const unread = notifications.filter((notification) => !notification.isRead);
     if (unread.length === 0) return;
+    
+    // Use mutateAsync but don't wait for internal invalidations on every step
     await Promise.all(unread.map((notification) => markReadMutation.mutateAsync(notification.id)));
-    await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+    
+    // Invalidate once at the end
+    await queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
 
   const clearAllNotifications = async () => {
     if (notifications.length === 0) return;
     try {
       await Promise.all(notifications.map((notification) => deleteMutation.mutateAsync(notification.id)));
-      await queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      // Invalidate once at the end
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       console.error(err);
     }
   };
 
-  const errorMessage = error instanceof Error ? error.message : 'Không tải được danh sách thông báo.';
+  const errorMessage = error instanceof Error ? error.message : t('common.failed');
 
   const getCategoryTheme = (type: Notification['type']) => {
     switch (type) {
-      case 'inbound': return { label: 'Nhập kho', color: COLORS.primary };
-      case 'outbound': return { label: 'Xuất kho', color: COLORS.warning };
-      case 'inventory': return { label: 'Kiểm kê', color: COLORS.success };
-      case 'system': return { label: 'Hệ thống', color: COLORS.info };
-      default: return { label: 'Thông báo', color: COLORS.slate500 };
+      case 'inbound': return { label: t('tasks.inbound'), color: COLORS.primary };
+      case 'outbound': return { label: t('tasks.outbound'), color: COLORS.warning };
+      case 'inventory': return { label: t('tasks.inventoryCount'), color: COLORS.success };
+      case 'system': return { label: t('profile.role'), color: COLORS.info }; // Placeholder for system
+      default: return { label: t('tabs.notifications'), color: COLORS.slate500 };
+    }
+  };
+
+  const handleNotificationPress = (item: Notification) => {
+    // Mark as read if not already
+    if (!item.isRead) {
+      markReadMutation.mutate(item.id);
+    }
+
+    // Navigate based on referenceType and id
+    if (!item.referenceId) return;
+
+    const id = item.referenceId;
+    const isStaff = user?.roleId === 4;
+
+    switch (item.referenceType) {
+      case 'InboundOrder':
+        if (isStaff) {
+          router.push(`/(staff-tabs)/tasks/inbound/${id}`);
+        } else {
+          router.push(`/(manager-tabs)/(orders-inbound)/${id}`);
+        }
+        break;
+      case 'OutboundOrder':
+        if (isStaff) {
+          router.push(`/(staff-tabs)/tasks/outbound/${id}`);
+        } else {
+          router.push(`/(manager-tabs)/(orders-outbound)/${id}`);
+        }
+        break;
+      case 'StockCountTicket':
+        // Primary route for stock count is in staff app
+        router.push(`/(staff-tabs)/tasks/count/${id}`);
+        break;
+      case 'InboundRequest':
+        // Requests are for managers
+        router.push(`/(manager-tabs)/requisitions/${id}`);
+        break;
+      default:
+        console.log('[Notification] No navigation route for type:', item.referenceType);
     }
   };
 
   const renderItem = (item: Notification) => {
     const theme = getCategoryTheme(item.type);
     return (
-      <Card key={item.id} style={[styles.notificationCard, !item.isRead && styles.unreadCard]}>
-        <View style={styles.cardHeader}>
-          <View style={styles.titleWrapper}>
-            <Text style={[styles.title, !item.isRead && styles.unreadText]} numberOfLines={1}>
-              {item.title}
-            </Text>
+      <TouchableOpacity 
+        key={item.id} 
+        onPress={() => handleNotificationPress(item)}
+        activeOpacity={0.7}
+      >
+        <Card style={[styles.notificationCard, !item.isRead && styles.unreadCard]}>
+          <View style={styles.cardHeader}>
+            <View style={styles.titleWrapper}>
+              {!item.isRead && <View style={styles.unreadIndicator} />}
+              <Text style={[styles.title, !item.isRead && styles.unreadText]} numberOfLines={1}>
+                {item.title}
+              </Text>
+            </View>
+            <View style={styles.headerRight}>
+              <Text style={styles.timeText}>{item.time}</Text>
+              <TouchableOpacity 
+                onPress={() => deleteMutation.mutate(item.id)}
+                style={styles.deleteButton}
+              >
+                <Ionicons name="trash-outline" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.headerRight}>
-            <Text style={styles.timeText}>{item.time}</Text>
-            <TouchableOpacity 
-              onPress={() => deleteMutation.mutate(item.id)}
-              style={styles.deleteButton}
-            >
-              <Ionicons name="trash-outline" size={18} color="#94A3B8" />
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        <Text style={styles.messageText} numberOfLines={3}>
-          {item.message}
-        </Text>
+          <Text style={styles.messageText} numberOfLines={3}>
+            {item.message}
+          </Text>
 
-        <View style={styles.cardFooter}>
-          <View style={[styles.typeBadge, { backgroundColor: theme.color + '10' }]}>
-            <View style={[styles.typeDot, { backgroundColor: theme.color }]} />
-            <Text style={[styles.typeText, { color: theme.color }]}>{theme.label}</Text>
+          <View style={styles.cardFooter}>
+            <View style={[styles.typeBadge, { backgroundColor: theme.color + '10' }]}>
+              <View style={[styles.typeDot, { backgroundColor: theme.color }]} />
+              <Text style={[styles.typeText, { color: theme.color }]}>{theme.label}</Text>
+            </View>
           </View>
-        </View>
-      </Card>
+        </Card>
+      </TouchableOpacity>
     );
   };
 
@@ -150,7 +228,7 @@ export default function NotificationsScreen() {
     return (
       <View style={[styles.container, styles.loadingState]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.emptyTitle}>Đang tải thông báo...</Text>
+        <Text style={styles.emptyTitle}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -158,7 +236,7 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaHeader backgroundColor="#fff" showBackButton={false} style={styles.header}>
-        <Text style={styles.titleHeader}>Thông báo</Text>
+        <Text style={styles.titleHeader}>{t('notifications.title')}</Text>
       </SafeAreaHeader>
       
       <RefreshContainer 
@@ -168,22 +246,22 @@ export default function NotificationsScreen() {
       >
         <View style={styles.actionHeader}>
           <Text style={styles.totalText}>
-            {notifications.filter(n => !n.isRead).length} Thông báo mới
+            {t('notifications.newCount', { count: notifications.filter(n => !n.isRead).length })}
           </Text>
           <View style={styles.actionButtons}>
             <TouchableOpacity onPress={markAllAsRead}>
-              <Text style={styles.markReadText}>Đọc tất cả</Text>
+              <Text style={styles.markReadText}>{t('notifications.markAllRead')}</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
             <TouchableOpacity onPress={clearAllNotifications}>
-              <Text style={styles.clearAllText}>Xóa tất cả</Text>
+              <Text style={styles.clearAllText}>{t('notifications.deleteAll')}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {isError && (
           <View style={styles.errorState}>
-            <Text style={styles.emptyTitle}>Không tải được thông báo</Text>
+            <Text style={styles.emptyTitle}>{t('common.error')}</Text>
             <Text style={styles.emptySubtitle}>{errorMessage}</Text>
           </View>
         )}
@@ -197,8 +275,8 @@ export default function NotificationsScreen() {
 
         {!isError && notifications.length === 0 && !isLoading && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Hộp thư trống</Text>
-            <Text style={styles.emptySubtitle}>Bạn không có thông báo nào vào lúc này.</Text>
+            <Text style={styles.emptyTitle}>{t('notifications.noNotifications')}</Text>
+            <Text style={styles.emptySubtitle}>{t('notifications.noNotificationsDesc')}</Text>
           </View>
         )}
       </RefreshContainer>

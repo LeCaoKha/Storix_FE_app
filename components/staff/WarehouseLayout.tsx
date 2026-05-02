@@ -49,6 +49,7 @@ interface WarehouseLayoutProps {
   onShelfPress?: (shelf: Shelf, zone: WarehouseZone) => void;
   onZonePress?: (zone: WarehouseZone) => void;
   optimizedPath?: string[];
+  isCounting?: boolean;
 }
 
 export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
@@ -59,6 +60,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   onShelfPress,
   onZonePress,
   optimizedPath = [],
+  isCounting = false,
 }) => {
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -391,24 +393,24 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       : isRecommended
         ? COLORS.success
         : isDimmed
-          ? COLORS.slate200
-          : "#E2E8F0";
+          ? "#cbd5e1" // slate-300
+          : "#94a3b8"; // slate-400
 
     const faceColor = isHighlighted
       ? COLORS.primaryLight
       : isRecommended
         ? COLORS.successLight
         : isDimmed
-          ? COLORS.slate50
-          : "#F8FAFC";
+          ? "#e2e8f0" // slate-200
+          : "#cbd5e1"; // slate-300
 
     const strokeColor = isHighlighted
       ? COLORS.primary
       : isRecommended
         ? COLORS.success
         : isDimmed
-          ? COLORS.slate300
-          : COLORS.slate400;
+          ? "#94a3b8" // slate-400
+          : "#64748b"; // slate-500
 
     const { x: absX, y: absY } = resolveShelfAbsolutePosition(shelf, zone);
     const shelfLength = shelf.length ?? shelf.width; // Sử dụng length cho chiều Y
@@ -421,7 +423,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     return (
       <G
         key={`shelf-${zone.id}-${shelf.id}-${shelfIndex}`}
-        opacity={isDimmed ? 0.4 : 1}
+        opacity={isDimmed ? 0.9 : 1}
       >
         <Rect
           x={hitX}
@@ -501,9 +503,11 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
                 ? COLORS.successText
                 : isHighlighted
                   ? COLORS.primary
-                  : "#1E293B"
+                  : isDimmed
+                    ? "#475569" // slate-600
+                    : "#1E293B" // slate-800
             }
-            opacity={isDimmed ? 0.4 : 0.95}
+            opacity={0.95}
           />
           <SvgText
             x={absX + shelf.width / 2}
@@ -534,7 +538,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           rx={12}
           ry={12}
           fill={COLORS.primary}
-          opacity={0.02}
+          opacity={0.08}
           onPress={() => onZonePress?.(zone)}
         />
 
@@ -549,7 +553,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
           stroke={COLORS.primary}
           strokeWidth={1}
           strokeDasharray="6,4"
-          opacity={0.2}
+          opacity={0.4}
         />
 
         <G>
@@ -560,7 +564,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             height={24}
             rx={12}
             fill={COLORS.primary}
-            opacity={0.15}
+            opacity={0.25}
           />
           <SvgText
             x={
@@ -672,7 +676,16 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   const mapYMax = (structure as any).length ?? structure.height;
 
   return (
-    <View className="flex-1 bg-slate-100 rounded-[32px] mx-4 mb-5 overflow-hidden border-[1.5px] border-white shadow-[0_12px_24px_rgba(15,23,42,0.15)] elevation-8">
+    <View
+      className="flex-1 bg-slate-100 rounded-[32px] mx-4 mb-5 overflow-hidden border-[1.5px] border-white"
+      style={{
+        shadowColor: "rgba(15, 23, 42, 0.15)",
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 1,
+        shadowRadius: 24,
+        elevation: 8,
+      }}
+    >
       <GestureDetector gesture={composedGesture}>
         <Animated.View className="flex-1" onLayout={onMapLayout}>
           <Animated.View style={animatedStyle}>
@@ -780,7 +793,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             style={{ backgroundColor: COLORS.success }}
           />
           <Text className="text-[13px] font-bold text-slate-500">
-            Suggested Position
+            {isCounting ? "Count locations" : "Suggested locations"}
           </Text>
         </View>
         <View className="flex-row items-center gap-2">

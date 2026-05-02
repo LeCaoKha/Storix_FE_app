@@ -17,8 +17,12 @@ export interface Product {
     image?: string;
     category?: string;
     weight?: number;
+    width?: number;
+    height?: number;
+    length?: number;
     createdAt?: string;
     updatedAt?: string;
+    totalQuantity?: number;
     productPrices?: ProductPrice[];
 }
 
@@ -59,6 +63,9 @@ export interface ProductResponse {
     image?: string;
     category?: string;
     weight?: number;
+    width?: number;
+    height?: number;
+    length?: number;
     createdAt?: string;
     updatedAt?: string;
     productPrices?: ProductPrice[];
@@ -68,4 +75,15 @@ export interface ProductType {
     id: number;
     companyId: number;
     name: string;
+}
+
+export interface ProductInventoryLocation {
+    inventoryLocationId: number;
+    inventoryId: number;
+    shelfId: number;
+    shelfCode?: string | null;
+    shelfIdCode?: string | null;
+    zoneId?: number | null;
+    quantity: number;
+    updatedAt?: string | null;
 }

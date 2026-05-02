@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -16,13 +15,14 @@ import {
 import { SafeAreaHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useUpdateProfile } from '@/hooks/user.hooks';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function ChangePasswordScreen() {
-    const router = useRouter();
     const goBack = useAppBack('/(manager-tabs)/profile');
+    const { t } = useTranslation();
     const { user } = useAuthStore();
     const updateProfileMutation = useUpdateProfile();
 
@@ -32,17 +32,17 @@ export default function ChangePasswordScreen() {
 
     const handleSave = async () => {
         if (!password) {
-            AlertService.warning('Lỗi', 'Vui lòng nhập mật khẩu mới.');
+            AlertService.warning(t('common.error'), t('profile.enterNewPassword'));
             return;
         }
 
         if (password.length < 6) {
-            AlertService.warning('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự.');
+            AlertService.warning(t('common.error'), t('profile.passwordMinLength'));
             return;
         }
 
         if (password !== confirmPassword) {
-            AlertService.warning('Lỗi', 'Mật khẩu xác nhận không khớp.');
+            AlertService.warning(t('common.error'), t('profile.passwordMismatch'));
             return;
         }
 
@@ -55,12 +55,12 @@ export default function ChangePasswordScreen() {
                 formData,
             });
 
-            AlertService.success('Thành công', 'Mật khẩu đã được thay đổi.', () => {
+            AlertService.success(t('common.success'), t('profile.passwordChanged'), () => {
                 goBack();
             });
         } catch (error: any) {
             console.error('[ChangePassword] Error:', error);
-            AlertService.error('Lỗi', 'Không thể đổi mật khẩu. Vui lòng thử lại.');
+            AlertService.error(t('common.error'), t('profile.changePasswordFailed'));
         }
     };
 
@@ -69,28 +69,26 @@ export default function ChangePasswordScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <SafeAreaHeader title="Đổi mật khẩu" onBack={goBack} />
+            <SafeAreaHeader title={t('profile.changePassword')} onBack={goBack} />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
                     <View style={styles.iconContainer}>
                         <Feather name="lock" size={40} color={COLORS.primary} />
                     </View>
-                    <Text style={styles.title}>Cập nhật mật khẩu</Text>
-                    <Text style={styles.subtitle}>
-                        Vui lòng nhập mật khẩu mới để bảo mật tài khoản của bạn.
-                    </Text>
+                    <Text style={styles.title}>{t('profile.updatePassword')}</Text>
+                    <Text style={styles.subtitle}>{t('profile.updatePasswordSubtitle')}</Text>
                 </View>
 
                 <View style={styles.form}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Mật khẩu mới</Text>
+                        <Text style={styles.label}>{t('profile.newPassword')}</Text>
                         <View style={styles.passwordInputContainer}>
                             <TextInput
                                 style={styles.passwordInput}
                                 value={password}
                                 onChangeText={setPassword}
-                                placeholder="Ít nhất 6 ký tự"
+                                placeholder={t('profile.passwordMinPlaceholder')}
                                 secureTextEntry={!showPassword}
                             />
                             <TouchableOpacity
@@ -107,12 +105,12 @@ export default function ChangePasswordScreen() {
                     </View>
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Xác nhận mật khẩu</Text>
+                        <Text style={styles.label}>{t('profile.confirmPassword')}</Text>
                         <TextInput
                             style={styles.input}
                             value={confirmPassword}
                             onChangeText={setConfirmPassword}
-                            placeholder="Nhập lại mật khẩu mới"
+                            placeholder={t('profile.reenterPassword')}
                             secureTextEntry={!showPassword}
                         />
                     </View>
@@ -125,7 +123,7 @@ export default function ChangePasswordScreen() {
                         {updateProfileMutation.isPending ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <Text style={styles.saveButtonText}>Cập nhật mật khẩu</Text>
+                            <Text style={styles.saveButtonText}>{t('profile.updatePassword')}</Text>
                         )}
                     </TouchableOpacity>
                 </View>

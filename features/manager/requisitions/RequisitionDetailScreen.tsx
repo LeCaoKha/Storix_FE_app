@@ -55,11 +55,6 @@ export default function RequisitionDetailScreen() {
     const canEdit = normalizedStatus === 'pending';
     const canCreateOrder = (normalizedStatus === 'approved' || normalizedStatus === 'approve') && !requisition.linkedOrderId;
 
-    const handleEdit = () => {
-        // TODO: Navigate to edit screen
-        AlertService.info('Chức năng đang phát triển', 'Tính năng chỉnh sửa sẽ sớm được cập nhật');
-    };
-
     const handleCreateOrder = () => {
         const route = requisition.type === 'inbound'
             ? `/(manager-tabs)/(orders-inbound)/create?requisitionId=${requisition.id}`
@@ -77,17 +72,10 @@ export default function RequisitionDetailScreen() {
             <ScreenHeader
                 title="Chi tiết đề xuất"
                 subtitle={requisition.requisitionNumber}
-                rightButton={
-                    canEdit ? (
-                        <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-                            <Feather name="edit-2" size={20} color={COLORS.primary} />
-                        </TouchableOpacity>
-                    ) : undefined
-                }
             />
 
-            <RefreshContainer 
-                style={styles.content} 
+            <RefreshContainer
+                style={styles.content}
                 contentContainerStyle={[styles.contentContainer, { paddingBottom: 120 + insets.bottom }]}
                 onRefresh={handleRefresh}
             >

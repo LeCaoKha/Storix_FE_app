@@ -17,8 +17,6 @@ export interface Task {
 export enum TaskType {
   INBOUND = 'inbound',
   OUTBOUND = 'outbound',
-  PUTAWAY = 'putaway',
-  PICKING = 'picking',
   TRANSFER = 'transfer',
   INVENTORY_COUNT = 'count',
 }

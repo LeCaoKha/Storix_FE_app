@@ -3,12 +3,13 @@ import { getBottomSafePadding } from '@/components/ui/safeArea';
 import { COLORS } from '@/constants/color';
 import { useReceiveTransfer, useTransferOrder } from '@/hooks/transfer.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AlertService } from '@/stores/alert.store';
 import { ReceiveTransferItemRequest, ReceiveTransferOrderRequest } from '@/types/transfer';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReceiveTransferScreen() {
@@ -17,6 +18,7 @@ export default function ReceiveTransferScreen() {
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const transferId = parseInt(id || '0', 10);
+    const { t } = useTranslation();
 
     const { data: transfer, isLoading, refetch } = useTransferOrder(transferId);
 
@@ -48,7 +50,7 @@ export default function ReceiveTransferScreen() {
     if (isLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Đang tải...</Text>
+                <Text>{t('common.loading')}</Text>
             </View>
         );
     }
@@ -58,8 +60,8 @@ export default function ReceiveTransferScreen() {
             <View style={styles.container}>
                 <View style={styles.errorContainer}>
                     <Feather name="alert-circle" size={64} color={COLORS.border} />
-                    <Text style={styles.errorTitle}>Lỗi tải dữ liệu</Text>
-                    <Button title="Quay lại" onPress={goBack} />
+                    <Text style={styles.errorTitle}>{t('common.error')}</Text>
+                    <Button title={t('common.back')} onPress={goBack} />
                 </View>
             </View>
         );
@@ -88,11 +90,11 @@ export default function ReceiveTransferScreen() {
             { id: transferId, payload },
             {
                 onSuccess: () => {
-                    AlertService.success('Thành công', 'Đã lưu thông tin nhận hàng.');
+                    AlertService.success(t('common.success'), t('common.save'));
                     goBack();
                 },
                 onError: (error: any) => {
-                    AlertService.error('Lỗi', error.response?.data?.message || 'Không thể xác nhận.');
+                    AlertService.error(t('common.error'), error.response?.data?.message || t('common.failed'));
                 }
             }
         );
@@ -106,12 +108,12 @@ export default function ReceiveTransferScreen() {
             <View key={item.id} style={styles.itemContainer}>
                 <View style={styles.itemHeader}>
                     <Text style={styles.productName} numberOfLines={1}>{item.productName}</Text>
-                    <Text style={styles.itemExpected}>Giao tới: {item.quantity} {item.unit || ''}</Text>
+                    <Text style={styles.itemExpected}>{t('transfer.destinationWarehouse')}: {item.quantity} {item.unit || ''}</Text>
                 </View>
 
                 <View style={styles.inputsRow}>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Thực nhận</Text>
+                        <Text style={styles.inputLabel}>{t('transfer.receivedQty')}</Text>
                         <TextInput
                             style={styles.numericInput}
                             keyboardType="numeric"
@@ -120,7 +122,7 @@ export default function ReceiveTransferScreen() {
                         />
                     </View>
                     <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Hư hỏng</Text>
+                        <Text style={styles.inputLabel}>{t('transfer.damagedQty')}</Text>
                         <TextInput
                             style={[styles.numericInput, styles.damageInput]}
                             keyboardType="numeric"
@@ -134,10 +136,13 @@ export default function ReceiveTransferScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
             <ScreenHeader
-                title="Kiểm nhận luân chuyển"
-                subtitle={`Phiếu #${transfer.id}`}
+                title={t('transfer.qualityCheck')}
+                subtitle={`${t('common.item')} #${transfer.id}`}
             />
 
             <RefreshContainer 
@@ -148,12 +153,12 @@ export default function ReceiveTransferScreen() {
                 <Card style={styles.card}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={20} color={COLORS.primary} />
-                        <Text style={styles.infoText}>Từ: {transfer.sourceWarehouse?.name}</Text>
+                        <Text style={styles.infoText}>{t('transfer.sourceWarehouse')}: {transfer.sourceWarehouse?.name}</Text>
                     </View>
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Xác nhận số lượng</Text>
+                    <Text style={styles.sectionTitle}>{t('putaway.placementLocation')}</Text>
                 </View>
                 
                 <View style={styles.list}>
@@ -166,12 +171,12 @@ export default function ReceiveTransferScreen() {
                 </View>
 
                 <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-                    <Text style={styles.sectionTitle}>Ghi chú thêm</Text>
+                    <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
                 </View>
                 <Card style={styles.card}>
                     <TextInput
                         style={styles.noteInput}
-                        placeholder="Có vấn đề gì về hàng hóa hoặc vận chuyển không?"
+                        placeholder={t('common.note')}
                         value={note}
                         onChangeText={setNote}
                         multiline
@@ -182,12 +187,12 @@ export default function ReceiveTransferScreen() {
 
             <View style={[styles.actionBar, { paddingBottom: getBottomSafePadding(insets.bottom, 16) }]}>
                 <Button 
-                    title="Xác nhận & Lưu" 
+                    title={t('transfer.confirmSave')} 
                     onPress={handleReceive} 
                     loading={receiveMutation.isPending} 
                 />
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

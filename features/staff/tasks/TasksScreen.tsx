@@ -1,27 +1,42 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HorizontalFilterBar, RefreshContainer, SafeAreaHeader, TaskCard, type FilterOption } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useTasks } from '@/hooks/task.hooks';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useRefreshStore } from '@/stores/refresh.store';
 import { Task, TaskStatus, TaskType } from '@/types/order';
 
 export default function TasksScreen() {
     const [activeFilter, setActiveFilter] = useState<'all' | TaskType>('all');
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
     const { data: tasks = [], isLoading, refetch } = useTasks();
+    const { t } = useTranslation();
+    const refreshSignal = useRefreshStore((state) => state.refreshSignal);
 
     // Helper functions
-    const getFilterLabel = (type: 'all' | TaskType) => {
+    const getFilterLabel = React.useCallback((type: 'all' | TaskType) => {
         switch (type) {
-            case 'all': return 'Tất cả';
-            case TaskType.OUTBOUND: return 'Xuất kho';
-            case TaskType.INBOUND: return 'Nhập kho';
-            case TaskType.INVENTORY_COUNT: return 'Kiểm kê';
+            case 'all': return t('common.all');
+            case TaskType.OUTBOUND: return t('tasks.outbound');
+            case TaskType.INBOUND: return t('tasks.inbound');
+            case TaskType.INVENTORY_COUNT: return t('tasks.inventoryCount');
             default: return type.charAt(0).toUpperCase() + type.slice(1);
         }
-    };
+    }, [t]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            void refetch();
+        }, [refetch])
+    );
+
+    useEffect(() => {
+        void refetch();
+    }, [refreshSignal, refetch]);
 
     // Prepare filter options with counts - MUST be before early return
     const filterOptions = useMemo<FilterOption<'all' | TaskType>[]>(() => {
@@ -36,13 +51,14 @@ export default function TasksScreen() {
             label: getFilterLabel(filter),
             count: filter === 'all' ? tasks.length : tasks.filter((t: Task) => t.type === filter).length,
         }));
-    }, [tasks]);
+    }, [tasks, getFilterLabel]);
 
     // Early return AFTER all hooks
     if (isLoading) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Đang tải...</Text>
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={{ marginTop: 12, color: COLORS.textMuted }}>{t('common.loading')}</Text>
             </View>
         );
     }
@@ -70,7 +86,7 @@ export default function TasksScreen() {
         <View style={styles.container}>
             {/* Header */}
             <SafeAreaHeader backgroundColor="#fff" showBackButton={false} style={styles.header}>
-                <Text style={styles.title}>Nhiệm Vụ Của Tôi</Text>
+                <Text style={styles.title}>{t('tasks.myTasks')}</Text>
             </SafeAreaHeader>
 
             {/* Summary Cards and Filter */}
@@ -86,7 +102,7 @@ export default function TasksScreen() {
                         onPress={() => setStatusFilter(statusFilter === TaskStatus.PENDING ? 'all' : TaskStatus.PENDING)}
                     >
                         <Text style={[styles.summaryNumber, { color: COLORS.warning }]}>{summary.pending}</Text>
-                        <Text style={styles.summaryLabel}>Chờ xử lý</Text>
+                        <Text style={styles.summaryLabel}>{t('tasks.pending')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[
@@ -98,7 +114,7 @@ export default function TasksScreen() {
                         onPress={() => setStatusFilter(statusFilter === TaskStatus.IN_PROGRESS ? 'all' : TaskStatus.IN_PROGRESS)}
                     >
                         <Text style={[styles.summaryNumber, { color: COLORS.primary }]}>{summary.inProgress}</Text>
-                        <Text style={styles.summaryLabel}>Đang làm</Text>
+                        <Text style={styles.summaryLabel}>{t('tasks.inProgress')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[
@@ -110,7 +126,7 @@ export default function TasksScreen() {
                         onPress={() => setStatusFilter(statusFilter === TaskStatus.COMPLETED ? 'all' : TaskStatus.COMPLETED)}
                     >
                         <Text style={[styles.summaryNumber, { color: COLORS.success }]}>{summary.completed}</Text>
-                        <Text style={styles.summaryLabel}>Hoàn thành</Text>
+                        <Text style={styles.summaryLabel}>{t('tasks.completed')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -135,11 +151,11 @@ export default function TasksScreen() {
                 ) : (
                     <View style={styles.emptyState}>
                         <Feather name="inbox" size={48} color={COLORS.textMuted} />
-                        <Text style={styles.emptyText}>Không có nhiệm vụ nào</Text>
+                        <Text style={styles.emptyText}>{t('common.noData')}</Text>
                         <Text style={styles.emptySubtext}>
                             {activeFilter === 'all'
-                                ? 'Bạn chưa có nhiệm vụ nào được giao'
-                                : `Không có nhiệm vụ ${getFilterLabel(activeFilter).toLowerCase()} nào`}
+                                ? t('common.noData')
+                                : `${t('common.noData')} (${getFilterLabel(activeFilter).toLowerCase()})`}
                         </Text>
                     </View>
                 )}
