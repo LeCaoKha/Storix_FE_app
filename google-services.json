@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "896310242626",
+    "project_id": "storix-warehouse",
+    "storage_bucket": "storix-warehouse.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:896310242626:android:571b16e4a4d9d57cfa6cdb",
+        "android_client_info": {
+          "package_name": "com.storix.warehouse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzrX34o3tf0au2GYmUbznJMyj77rCPB0U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
