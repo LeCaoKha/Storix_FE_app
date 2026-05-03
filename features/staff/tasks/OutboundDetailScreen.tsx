@@ -2,9 +2,9 @@ import { RefreshContainer, ScreenHeader } from "@/components";
 import { getBottomSafePadding } from "@/components/ui/safeArea";
 import { COLORS } from "@/constants/color";
 import {
-    useOutboundTasksByStaff,
-    useUpdateOutboundTicketItems,
-    useUpdateOutboundTicketStatus,
+  useOutboundTasksByStaff,
+  useUpdateOutboundTicketItems,
+  useUpdateOutboundTicketStatus,
 } from "@/hooks";
 import { useAppBack } from "@/hooks/useAppBack";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -15,12 +15,12 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -180,6 +180,11 @@ export default function OutboundDetailScreen() {
   // ===== ADDED CODE START =====
   const [optimizedPath, setOptimizedPath] = useState<string[]>([]);
   const [itemsToPick, setItemsToPick] = useState<any[]>([]);
+
+  useEffect(() => {
+    console.log("DEBUG - itemsToPick updated:", JSON.stringify(itemsToPick, null, 2));
+  }, [itemsToPick]);
+
   // ===== ADDED CODE END =====
 
   const currentStatus = (order?.status as TicketStatus) || "Created";
@@ -219,8 +224,10 @@ export default function OutboundDetailScreen() {
   // FEATURE 1: FETCH PATH OPTIMIZATION ON LOAD
   useEffect(() => {
     const fetchPathOptimization = async () => {
+      console.log("=================================");
       if (!numericId) return;
       try {
+        console.log("++++++++++++++++++++++++++++");
         const response = await fetch(
           `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${numericId}/path-optimization`,
         );
@@ -228,6 +235,8 @@ export default function OutboundDetailScreen() {
 
         const responseData = await response.json();
         const payloadData = responseData?.payload?.[0];
+
+        console.log("DEBUG - payloadData:", JSON.stringify(payloadData, null, 2));
 
         if (payloadData && payloadData.status === "success") {
           setOptimizedPath(payloadData.fullOptimizedPath || []);
@@ -446,7 +455,7 @@ export default function OutboundDetailScreen() {
 
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       className="flex-1 bg-slate-50"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
@@ -602,7 +611,7 @@ export default function OutboundDetailScreen() {
                     style={{
                       backgroundColor:
                         (Number(localQuantities[item.id]) || 0) >=
-                        (item.quantity || 0)
+                          (item.quantity || 0)
                           ? COLORS.success + "20"
                           : COLORS.warning + "20",
                     }}
@@ -612,13 +621,13 @@ export default function OutboundDetailScreen() {
                       style={{
                         color:
                           (Number(localQuantities[item.id]) || 0) >=
-                          (item.quantity || 0)
+                            (item.quantity || 0)
                             ? COLORS.success
                             : COLORS.warning,
                       }}
                     >
                       {(Number(localQuantities[item.id]) || 0) >=
-                      (item.quantity || 0)
+                        (item.quantity || 0)
                         ? t('common.done')
                         : t('common.pending')}
                     </Text>
@@ -732,9 +741,8 @@ export default function OutboundDetailScreen() {
 
         {prevAction && (
           <TouchableOpacity
-            className={`flex-1 h-14 rounded-xl border justify-center items-center flex-row shadow-sm ${
-              isTransitioning ? "opacity-60" : ""
-            }`}
+            className={`flex-1 h-14 rounded-xl border justify-center items-center flex-row shadow-sm ${isTransitioning ? "opacity-60" : ""
+              }`}
             style={{
               borderColor: COLORS.borderLight,
               backgroundColor: "#f8fafc",
@@ -761,14 +769,13 @@ export default function OutboundDetailScreen() {
 
         {showSaveBtn && (
           <TouchableOpacity
-            className={`flex-[1.5] h-14 rounded-xl justify-center items-center shadow-sm ml-3 ${
-              isSaving ? "opacity-60" : ""
-            }`}
+            className={`flex-[1.5] h-14 rounded-xl justify-center items-center shadow-sm ml-3 ${isSaving ? "opacity-60" : ""
+              }`}
             style={{ backgroundColor: COLORS.primary }}
             onPress={handleSaveItems}
             disabled={isSaving}
           >
-            <Text 
+            <Text
               className="text-base font-bold text-white"
               numberOfLines={1}
               adjustsFontSizeToFit
@@ -780,9 +787,8 @@ export default function OutboundDetailScreen() {
 
         {nextAction && (
           <TouchableOpacity
-            className={`flex-[1.5] h-14 rounded-xl flex-row justify-center items-center shadow-sm ml-3 ${
-              isTransitioning ? "opacity-60" : ""
-            }`}
+            className={`flex-[1.5] h-14 rounded-xl flex-row justify-center items-center shadow-sm ml-3 ${isTransitioning ? "opacity-60" : ""
+              }`}
             style={{ backgroundColor: nextAction.color }}
             onPress={handleTransition}
             disabled={isTransitioning}
@@ -793,7 +799,7 @@ export default function OutboundDetailScreen() {
               color="#fff"
               className="mr-2"
             />
-            <Text 
+            <Text
               className="text-base font-bold text-white"
               numberOfLines={1}
               adjustsFontSizeToFit
