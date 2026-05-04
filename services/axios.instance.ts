@@ -1,16 +1,21 @@
-import { useAuthStore } from '@/stores';
-import axios from 'axios';
+import { useAuthStore } from "@/stores";
+import axios from "axios";
 
 let refreshPromise: Promise<string | null> | null = null;
 
 // Create axios instance with base configuration
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://api.example.com',
+  baseURL: process.env.EXPO_PUBLIC_API_URL || "https://api.example.com",
   timeout: 120000, // Tăng lên 120s cho server cold start
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
+
+// ===== THÊM LOG Ở ĐÂY =====
+console.log("[ENV] EXPO_PUBLIC_API_URL:", process.env.EXPO_PUBLIC_API_URL);
+console.log("[ENV] Axios Base URL đang dùng:", api.defaults.baseURL);
+// ==========================
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
@@ -23,7 +28,7 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 const refreshAccessToken = async (): Promise<string | null> => {
@@ -40,18 +45,21 @@ const refreshAccessToken = async (): Promise<string | null> => {
       { refreshToken },
       {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         timeout: 120000,
-      }
+      },
     );
 
-    const nextAccessToken = response.data?.accessToken ?? response.data?.AccessToken;
+    const nextAccessToken =
+      response.data?.accessToken ?? response.data?.AccessToken;
     const nextRefreshToken =
-      response.data?.refreshToken ?? response.data?.RefreshToken ?? refreshToken;
+      response.data?.refreshToken ??
+      response.data?.RefreshToken ??
+      refreshToken;
 
     if (!nextAccessToken) {
-      throw new Error('Refresh endpoint did not return access token');
+      throw new Error("Refresh endpoint did not return access token");
     }
 
     useAuthStore.setState({
@@ -62,7 +70,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
 
     return nextAccessToken;
   } catch (refreshError) {
-    console.error('[AUTH] Refresh token failed, logging out', refreshError);
+    console.error("[AUTH] Refresh token failed, logging out", refreshError);
     logout();
     return null;
   }
@@ -74,11 +82,13 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    const requestUrl = error.config?.url || '';
+    const requestUrl = error.config?.url || "";
     const status = error.response?.status;
-    const errorMessage = String(error.response?.data?.message || error.message || '');
+    const errorMessage = String(
+      error.response?.data?.message || error.message || "",
+    );
     const isWarehouseStructureSchemaMismatch =
-      requestUrl.includes('/api/get-warehouse-structure/') &&
+      requestUrl.includes("/api/get-warehouse-structure/") &&
       status === 400 &&
       /column\s+.*isvulnerable\s+does not exist/i.test(errorMessage);
 
@@ -94,10 +104,14 @@ api.interceptors.response.use(
     } else {
       console.error(`[AXIOS ERROR] ${requestUrl}`, logPayload);
 
-      if (requestUrl.includes('/api/InventoryInbound/update-tickets/') && requestUrl.includes('/items')) {
+      if (
+        requestUrl.includes("/api/InventoryInbound/update-tickets/") &&
+        requestUrl.includes("/items")
+      ) {
         try {
           const rawData = error.config?.data;
-          const parsedData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+          const parsedData =
+            typeof rawData === "string" ? JSON.parse(rawData) : rawData;
 
           const binPayload = Array.isArray(parsedData)
             ? parsedData.map((item: any) => ({
@@ -112,23 +126,33 @@ api.interceptors.response.use(
               }))
             : parsedData;
 
-          console.log('[INBOUND UPDATE BIN PAYLOAD]', binPayload);
+          console.log("[INBOUND UPDATE BIN PAYLOAD]", binPayload);
         } catch (parseError) {
-          console.warn('[INBOUND UPDATE BIN PAYLOAD] unable to parse request payload', parseError);
+          console.warn(
+            "[INBOUND UPDATE BIN PAYLOAD] unable to parse request payload",
+            parseError,
+          );
         }
       }
     }
 
-    const originalRequest = error.config as (typeof error.config & { _retry?: boolean }) | undefined;
-    const url = originalRequest?.url || '';
+    const originalRequest = error.config as
+      | (typeof error.config & { _retry?: boolean })
+      | undefined;
+    const url = originalRequest?.url || "";
     const isAuthEndpoint =
-      url.includes('/Login') ||
-      url.includes('/logout') ||
-      url.includes('/refresh') ||
-      url.includes('/auth/') ||
-      url.includes('/token');
+      url.includes("/Login") ||
+      url.includes("/logout") ||
+      url.includes("/refresh") ||
+      url.includes("/auth/") ||
+      url.includes("/token");
 
-    if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
+    if (
+      status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !isAuthEndpoint
+    ) {
       originalRequest._retry = true;
 
       if (!refreshPromise) {
@@ -147,5 +171,5 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
