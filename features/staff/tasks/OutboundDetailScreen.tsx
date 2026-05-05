@@ -2,9 +2,9 @@ import { RefreshContainer, ScreenHeader } from "@/components";
 import { getBottomSafePadding } from "@/components/ui/safeArea";
 import { COLORS } from "@/constants/color";
 import {
-  useOutboundTasksByStaff,
-  useUpdateOutboundTicketItems,
-  useUpdateOutboundTicketStatus,
+    useOutboundTicket,
+    useUpdateOutboundTicketItems,
+    useUpdateOutboundTicketStatus
 } from "@/hooks";
 import { useAppBack } from "@/hooks/useAppBack";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -15,12 +15,12 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -164,13 +164,13 @@ export default function OutboundDetailScreen() {
   const companyId = user?.companyId ?? 0;
   const staffId = user?.id ?? 0;
 
+  const numericId = typeof id === "string" ? parseInt(id, 10) : id;
   const {
-    data: staffTasks,
+    data: order,
     isLoading,
     refetch,
-  } = useOutboundTasksByStaff(companyId, staffId);
-  const numericId = typeof id === "string" ? parseInt(id, 10) : id;
-  const order = staffTasks?.find((t) => t.id === numericId) ?? null;
+  } = useOutboundTicket(numericId);
+
   const error = !isLoading && !order;
 
   const updateItems = useUpdateOutboundTicketItems();
@@ -652,7 +652,7 @@ export default function OutboundDetailScreen() {
           </Text>
           <Text className="text-sm" style={{ color: COLORS.textMuted }}>
             {(order.items || order.outboundOrderItems)?.length ?? 0}{" "}
-            {t("tabs.tasks").toLowerCase()}
+            {t("common.items")}
           </Text>
         </View>
 
