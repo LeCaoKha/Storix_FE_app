@@ -347,6 +347,7 @@ export const translations = {
       all: 'Tất cả',
       product: 'Sản phẩm',
       item: 'Sản phẩm',
+      items: 'sản phẩm',
       approved: 'Đã duyệt',
       rejected: 'Từ chối',
       transported: 'Đang vận chuyển',
