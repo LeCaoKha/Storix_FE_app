@@ -250,7 +250,7 @@ export default function InboundDetailScreen() {
 
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
-                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} {t('tabs.tasks').toLowerCase()}</Text>
+                    <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} {t('common.items')}</Text>
                 </View>
 
                 {order.inboundOrderItems.map((item: InboundOrderItem) => (

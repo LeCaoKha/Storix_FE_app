@@ -1428,14 +1428,15 @@ export default function WarehouseDiagramScreen() {
                     : COLORS.success + "20",
                 }}
               >
-                <View className="flex-row items-center gap-2 mb-2">
+                <View className="flex-row items-start gap-2 mb-2">
                   <Feather
                     name={isPicking ? "shopping-cart" : "map-pin"}
                     size={14}
                     color={isPicking ? COLORS.primary : COLORS.success}
+                    style={{ marginTop: 2 }}
                   />
                   <Text
-                    className="text-[13px] font-bold text-slate-800"
+                    className="flex-1 text-[13px] font-bold text-slate-800"
                     style={!isPicking ? { color: COLORS.successText } : {}}
                   >
                     {focusedItemName

@@ -177,7 +177,7 @@ export default function InventoryCountDetailScreen() {
                     <View style={styles.sectionHeaderRow}>
                         <View>
                             <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
-                            <Text style={styles.sectionSubtitle}>{ticket.items.length} {t('tabs.tasks').toLowerCase()}</Text>
+                            <Text style={styles.sectionSubtitle}>{ticket.items.length} {t('common.items')}</Text>
                         </View>
                         <View style={styles.progressBadge}>
                             <Text style={styles.progressBadgeText}>
