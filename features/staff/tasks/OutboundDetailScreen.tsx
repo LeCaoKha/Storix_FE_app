@@ -2,25 +2,29 @@ import { RefreshContainer, ScreenHeader } from "@/components";
 import { getBottomSafePadding } from "@/components/ui/safeArea";
 import { COLORS } from "@/constants/color";
 import {
-    useOutboundTicket,
-    useUpdateOutboundTicketItems,
-    useUpdateOutboundTicketStatus
+  useOutboundTicket,
+  useUpdateOutboundTicketItems,
+  useUpdateOutboundTicketStatus
 } from "@/hooks";
 import { useAppBack } from "@/hooks/useAppBack";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useWarehouseStructure } from "@/hooks/warehouse.hooks";
 import { AlertService } from "@/stores/alert.store";
 import { useAuthStore } from "@/stores/auth.store";
+import { api } from "@/services/axios.instance";
 import type { OutboundOrderItem } from "@/types/outbound-order";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -161,15 +165,15 @@ export default function OutboundDetailScreen() {
         return null;
     }
   };
-  const companyId = user?.companyId ?? 0;
-  const staffId = user?.id ?? 0;
-
   const numericId = typeof id === "string" ? parseInt(id, 10) : id;
   const {
     data: order,
     isLoading,
     refetch,
   } = useOutboundTicket(numericId);
+  const { data: warehouseStructure } = useWarehouseStructure(
+    order?.warehouseId || order?.warehouse?.id,
+  );
 
   const error = !isLoading && !order;
 
@@ -181,10 +185,77 @@ export default function OutboundDetailScreen() {
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isFifoLoading, setIsFifoLoading] = useState(false);
+  const [fifoBins, setFifoBins] = useState<string[]>([]);
+  const [fifoSuggestionsMap, setFifoSuggestionsMap] = useState<Record<number, any[]>>({});
+  const [fifoSummaryMap, setFifoSummaryMap] = useState<Record<number, { requiredQuantity: number; totalAvailableQuantity: number; remainingQuantity: number }>>({});
+
+  const locationLabelIndex = React.useMemo(() => {
+    const index = new Map<
+      string,
+      { zoneLabel?: string; shelfLabel?: string; levelLabel?: string }
+    >();
+
+    (warehouseStructure?.zones ?? []).forEach((zone, zoneIndex) => {
+      const zoneLabel = String(zone.code ?? `${t('warehouse.zone')} ${zoneIndex + 1}`);
+      (zone.shelves ?? []).forEach((shelf, shelfIndex) => {
+        const shelfLabel = String(shelf.code ?? `${t('warehouse.shelf')} ${shelfIndex + 1}`);
+        (shelf.levels ?? []).forEach((level, levelIndex) => {
+          const levelLabel = String(level.code ?? `${t('warehouse.level')} ${levelIndex + 1}`);
+          (level.bins ?? []).forEach((bin) => {
+            const keys = [bin.id, bin.code, shelf.id, shelf.code, level.id, level.code]
+              .map((value) => String(value ?? "").trim())
+              .filter(Boolean);
+
+            keys.forEach((key) => {
+              if (!index.has(key)) {
+                index.set(key, {
+                  zoneLabel,
+                  shelfLabel,
+                  levelLabel,
+                });
+              }
+            });
+          });
+        });
+      });
+    });
+
+    return index;
+  }, [warehouseStructure]);
 
   // ===== ADDED CODE START =====
-  const [optimizedPath, setOptimizedPath] = useState<string[]>([]);
   const [itemsToPick, setItemsToPick] = useState<any[]>([]);
+
+  const getLocationLabels = (suggestion: any) => {
+    const locationKeyCandidates = [
+      suggestion?.binCode,
+      suggestion?.binIdCode,
+      suggestion?.binId,
+      suggestion?.shelfCode,
+      suggestion?.shelfId,
+      suggestion?.zoneId,
+    ]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean);
+
+    for (const key of locationKeyCandidates) {
+      const matched = locationLabelIndex.get(key);
+      if (matched) {
+        return {
+          zoneLabel: matched.zoneLabel || t('common.notAvailable'),
+          shelfLabel: matched.shelfLabel || suggestion?.shelfCode || t('common.notAvailable'),
+          levelLabel: matched.levelLabel || suggestion?.binCode || t('common.notAvailable'),
+        };
+      }
+    }
+
+    return {
+      zoneLabel: suggestion?.zoneId != null ? `${t('warehouse.zone')} ${suggestion.zoneId}` : t('common.notAvailable'),
+      shelfLabel: suggestion?.shelfCode || t('common.notAvailable'),
+      levelLabel: suggestion?.binCode || t('common.notAvailable'),
+    };
+  };
 
   // Thêm cái useEffect này để log itemsToPick mỗi khi nó thay đổi
   useEffect(() => {
@@ -196,7 +267,59 @@ export default function OutboundDetailScreen() {
   }, [itemsToPick]);
   // ===== ADDED CODE END =====
 
-  const currentStatus = (order?.status as TicketStatus) || "Created";
+  useEffect(() => {
+    const fetchFifoSuggestions = async () => {
+      if (!numericId) {
+        setFifoBins([]);
+        return;
+      }
+
+      setIsFifoLoading(true);
+      try {
+        const response = await api.get(`/api/InventoryOutbound/tickets/${numericId}/fifo-suggestions`);
+        const data = response.data;
+        const bins = new Set<string>();
+        const map: Record<number, any[]> = {};
+        const summaryMap: Record<number, { requiredQuantity: number; totalAvailableQuantity: number; remainingQuantity: number }> = {};
+
+        (Array.isArray(data) ? data : []).forEach((item: any) => {
+          const productId = Number(item.productId || item.product?.id || 0);
+          const suggestions = item.suggestions || [];
+          map[productId] = suggestions;
+          summaryMap[productId] = {
+            requiredQuantity: Number(item.requiredQuantity || 0),
+            totalAvailableQuantity: Number(item.totalAvailableQuantity || 0),
+            remainingQuantity: Number(item.remainingQuantity || 0),
+          };
+
+          suggestions.forEach((suggestion: any) => {
+            [suggestion.binCode, suggestion.binIdCode, suggestion.shelfCode]
+              .map((value) => String(value ?? '').trim())
+              .filter(Boolean)
+              .forEach((value) => bins.add(value));
+          });
+        });
+
+        setFifoBins(Array.from(bins));
+        setFifoSuggestionsMap(map);
+        setFifoSummaryMap(summaryMap);
+      } catch (error) {
+        console.error('Fetch FIFO suggestions error:', error);
+        setFifoBins([]);
+        setFifoSuggestionsMap({});
+        setFifoSummaryMap({});
+      } finally {
+        setIsFifoLoading(false);
+      }
+    };
+
+    fetchFifoSuggestions();
+  }, [numericId]);
+
+  const rawStatus = order?.status as string;
+  const currentStatus =
+    (rawStatus === "READY" ? "Created" : (rawStatus as TicketStatus)) ||
+    "Created";
   const statusConfig = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.Created;
   const nextAction = getNextAction(currentStatus);
   const prevAction = getPreviousAction(currentStatus);
@@ -238,31 +361,11 @@ export default function OutboundDetailScreen() {
           `\n--- GỌI API PATH OPTIMIZATION CHO TICKET ID: ${numericId} ---`,
         );
 
-        // 1. Lấy token trực tiếp từ store
-        const token = useAuthStore.getState().token;
-
-        const response = await fetch(
-          `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${numericId}/path-optimization`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              // 2. Gắn token vào Authorization header
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
+        const response = await api.get(`/api/InventoryOutbound/tickets/${numericId}/path-optimization`);
 
         console.log("-> Mã trạng thái HTTP (Status):", response.status);
-        console.log("-> Response OK (200-299)?:", response.ok);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("-> Lỗi từ Backend trả về:", errorText);
-          return;
-        }
-
-        const responseData = await response.json();
+        const responseData = response.data;
 
         console.log("-> Dữ liệu JSON bóc từ Response:");
         console.log(JSON.stringify(responseData, null, 2));
@@ -273,7 +376,6 @@ export default function OutboundDetailScreen() {
         const payloadData = responseData?.payload?.[0];
 
         if (payloadData && payloadData.status === "success") {
-          setOptimizedPath(payloadData.fullOptimizedPath || []);
           setItemsToPick(payloadData.itemsToPick || []);
         }
       } catch (err) {
@@ -342,7 +444,17 @@ export default function OutboundDetailScreen() {
       const current = Number(prev[itemId]) || 0;
       const orderItems = order?.items || order?.outboundOrderItems || [];
       const item = orderItems.find((i: OutboundOrderItem) => i.id === itemId);
-      const maxQty = item?.quantity || 9999;
+      
+      // Lấy giới hạn tối đa: Ưu tiên số lượng sẵn sàng trong kho (FIFO) nếu có
+      const productId = item?.productId || 0;
+      const availableInWarehouse = fifoSummaryMap[Number(productId)]?.totalAvailableQuantity;
+      const requiredQty = item?.quantity || 0;
+      
+      // Giới hạn trên là số nhỏ hơn giữa (Yêu cầu) và (Thực tế có sẵn)
+      const maxQty = availableInWarehouse !== undefined 
+        ? Math.min(requiredQty, availableInWarehouse) 
+        : requiredQty;
+
       const newValue = increment
         ? Math.min(current + 1, maxQty)
         : Math.max(current - 1, 0);
@@ -387,40 +499,40 @@ export default function OutboundDetailScreen() {
     if (!numericId || !itemsToPick || itemsToPick.length === 0) return;
 
     try {
-      const payload = itemsToPick.map((item) => {
-        // 1. LẤY SỐ LƯỢNG TỪ UI (Giao diện)
-        // Lấy chính xác con số đang hiển thị trên Text Input của FE
+      const orderItems = order?.items || order?.outboundOrderItems || [];
+      const payload = orderItems.map((item: any) => {
         const uiQuantity = Number(localQuantities[item.id]) || 0;
-
-        // 2. THUẬT TOÁN RẢI SỐ LƯỢNG VÀO CÁC RỔ
         let remainingQty = uiQuantity;
         const mappedLocations: any[] = [];
-        const suggestions = item.locationData?.rawFifoSuggestions || [];
+        
+        // Prioritize optimized path suggestions if available
+        const optimizedItem = itemsToPick.find(it => it.productId === item.productId);
+        const suggestions = optimizedItem?.locationData?.rawFifoSuggestions || fifoSuggestionsMap[item.productId] || [];
 
         for (const suggestion of suggestions) {
-          if (remainingQty <= 0) break; // Rải hết số lượng của UI rồi thì dừng
+          if (remainingQty <= 0) break;
 
-          // Lấy số nhỏ hơn giữa "Lượng còn cần rải" và "Sức chứa của rổ"
           const qtyForThisBin = Math.min(
             remainingQty,
-            suggestion.suggestedPickQty,
+            suggestion.suggestedPickQty || suggestion.availableInBin || 0,
           );
 
-          mappedLocations.push({
-            binId: suggestion.binIdCode,
-            quantity: qtyForThisBin,
-          });
-
-          remainingQty -= qtyForThisBin; // Trừ lùi đi
+          if (qtyForThisBin > 0) {
+            mappedLocations.push({
+              binId: suggestion.binIdCode || suggestion.binCode || suggestion.binId,
+              quantity: qtyForThisBin,
+              batchId: suggestion.batchId, // Crucial for FIFO tracking
+            });
+            remainingQty -= qtyForThisBin;
+          }
         }
 
-        // 3. ĐÓNG GÓI PAYLOAD CHUẨN LOGIC
         return {
           id: item.id,
           productId: item.productId,
-          expectedQuantity: item.quantityToPick,
-          receivedQuantity: uiQuantity, // Lấy từ FE chuẩn ý ông nhé!
-          locations: mappedLocations, // Đã tự động khớp tổng với receivedQuantity
+          expectedQuantity: item.quantity,
+          receivedQuantity: uiQuantity,
+          locations: mappedLocations,
         };
       });
 
@@ -428,26 +540,7 @@ export default function OutboundDetailScreen() {
       console.log(JSON.stringify(payload, null, 2));
       console.log("======================================");
 
-      const token = useAuthStore.getState().token;
-
-      const response = await fetch(
-        `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${numericId}/items`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Lỗi 400 từ Backend:", errorText);
-        // Ném lỗi để block luôn cái hàm updateStatus bên dưới, không cho chuyển state bậy bạ
-        throw new Error("API Handover bị từ chối");
-      }
+      await api.put(`/api/InventoryOutbound/tickets/${numericId}/items`, payload);
     } catch (err) {
       console.log("Handover API error:", err);
       throw err; // Quăng lỗi lên cho hàm handleTransition bắt
@@ -462,7 +555,7 @@ export default function OutboundDetailScreen() {
       setIsTransitioning(true);
       try {
         // ===== ADDED CODE START =====
-        if (nextAction.nextStatus === "LoadHandover") {
+        if (nextAction.nextStatus === "QualityCheck" || nextAction.nextStatus === "LoadHandover") {
           await handleHandover();
         }
         // ===== ADDED CODE END =====
@@ -540,6 +633,7 @@ export default function OutboundDetailScreen() {
         subtitle={order.note || `OUT-${order.id}`}
       />
 
+
       <RefreshContainer
         onRefresh={async () => {
           await refetch();
@@ -584,7 +678,7 @@ export default function OutboundDetailScreen() {
                 {order.createdByUser?.fullName ||
                   order.createdByUser?.email ||
                   order.createdByNavigation?.email ||
-                  "N/A"}
+                  t('common.notAvailable')}
               </Text>
             </Text>
           </View>
@@ -598,15 +692,14 @@ export default function OutboundDetailScreen() {
             <Text className="text-sm" style={{ color: COLORS.textMuted }}>
               {t("tasks.destination")}:{" "}
               <Text className="font-semibold text-slate-800">
-                {order.destination || "N/A"}
+                {order.destination || t('common.notAvailable')}
               </Text>
             </Text>
           </View>
         </View>
 
-        {/* Warehouse Location Shortcut - CHỈ HIỂN THỊ Ở CREATED & PICKING */}
-        {(currentStatus === "Created" || currentStatus === "Picking") && (
-          <TouchableOpacity
+        {/* Warehouse Location Shortcut - HIỂN THỊ Ở TẤT CẢ TRẠNG THÁI */}
+        <TouchableOpacity
             className="flex-row items-center bg-white mb-4 p-3.5 rounded-xl shadow-sm border border-slate-100"
             onPress={() => {
               const allBins: string[] = [];
@@ -644,7 +737,7 @@ export default function OutboundDetailScreen() {
             </View>
             <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
           </TouchableOpacity>
-        )}
+
 
         <View className="flex-row justify-between items-end mb-3 mt-2">
           <Text className="text-base font-bold text-slate-800">
@@ -658,62 +751,144 @@ export default function OutboundDetailScreen() {
 
         {/* Item Cards */}
         {sortedItems.map((item: OutboundOrderItem) => {
-          // console.log("Check item data: ", item);
+          const pickedLocations = (item as any).pickedLocations || (item as any).selectedPickLocations || [];
+          const optimizedItem = itemsToPick?.find(it => it.productId === item.productId);
+          const optimizedLocations = optimizedItem?.locationData?.rawFifoSuggestions || [];
+          const rawFifoSuggestions = fifoSuggestionsMap[Number(item.productId || 0)] || [];
+
+          const displayLocations = pickedLocations.length > 0 
+            ? pickedLocations 
+            : (optimizedLocations.length > 0 ? optimizedLocations : rawFifoSuggestions);
+
           return (
             <View
               key={item.id}
               className="mb-3 bg-white p-4 rounded-xl shadow-sm"
             >
-              <View className="flex-row justify-between items-start mb-4">
+              {/* Header Row: Product Name & Status Badge */}
+              <View className="flex-row justify-between items-start mb-3">
                 <View className="flex-1 pr-3">
-                  <Text className="text-base font-bold text-slate-800 mb-1.5">
+                  <Text className="text-base font-bold text-slate-800 mb-1">
                     {item.productName ||
                       item.name ||
                       item.product?.name ||
                       `${t("common.product")} #${item.productId}`}
                   </Text>
-                  <View className="flex-row flex-wrap">
-                    <View className="bg-slate-100 px-2 py-1 rounded">
+                  {(item.sku || item.product?.sku) && (
+                    <View className="bg-slate-100 px-2 py-1 rounded self-start">
                       <Text
                         className="text-xs font-semibold"
                         style={{ color: COLORS.textMuted }}
                       >
-                        {item.sku || item.product?.sku || "N/A"}
+                        {item.sku || item.product?.sku}
                       </Text>
                     </View>
-                  </View>
+                  )}
                 </View>
 
-                {currentStatus !== "Created" && (
-                  <View
-                    className="px-2 py-1 rounded-md"
-                    style={{
-                      backgroundColor:
-                        (Number(localQuantities[item.id]) || 0) >=
-                        (item.quantity || 0)
-                          ? COLORS.success + "20"
-                          : COLORS.warning + "20",
-                    }}
-                  >
-                    <Text
-                      className="text-xs font-bold"
-                      style={{
-                        color:
-                          (Number(localQuantities[item.id]) || 0) >=
-                          (item.quantity || 0)
-                            ? COLORS.success
-                            : COLORS.warning,
-                      }}
-                    >
-                      {(Number(localQuantities[item.id]) || 0) >=
-                      (item.quantity || 0)
-                        ? t("common.done")
-                        : t("common.pending")}
-                    </Text>
-                  </View>
-                )}
+                {(() => {
+                  const pickedQty = Number(localQuantities[item.id]) || 0;
+                  const requiredQty = item.quantity || 0;
+                  const availableInWarehouse = fifoSummaryMap[Number(item.productId)]?.totalAvailableQuantity;
+                  
+                  // Được coi là Xong nếu: Lấy đủ yêu cầu HOẶC đã lấy hết sạch hàng có trong kho
+                  const isFulfilled = pickedQty >= requiredQty;
+                  const isExhausted = availableInWarehouse !== undefined && pickedQty >= availableInWarehouse && pickedQty > 0;
+                  
+                  if (currentStatus !== "Created" && (isFulfilled || isExhausted)) {
+                    return (
+                      <View
+                        className="px-2 py-1 rounded-md"
+                        style={{ backgroundColor: COLORS.success + "20" }}
+                      >
+                        <Text className="text-xs font-bold" style={{ color: COLORS.success }}>
+                          {t("common.done")}
+                        </Text>
+                      </View>
+                    );
+                  }
+                  return null; // Ẩn nhãn "Chờ xử lý" theo yêu cầu của người dùng
+                })()}
               </View>
 
+              {/* Locations Row: Scrollable list of suggested/picked locations */}
+              {displayLocations.length > 0 ? (
+                <>
+                  <View className="flex-row items-center justify-between mb-2 px-1">
+                    <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      {t('warehouse.suggestedLocations')}
+                    </Text>
+                    {displayLocations.length > 2 && (
+                      <View className="flex-row items-center">
+                        <Text className="text-[10px] text-cyan-600 font-medium mr-1">
+                          {t('common.swipeHint')}
+                        </Text>
+                        <Feather name="chevron-right" size={12} color={COLORS.primary} />
+                      </View>
+                    )}
+                  </View>
+
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={true}
+                    className="mb-3"
+                    contentContainerStyle={{ paddingRight: 20 }}
+                  >
+                  {displayLocations.map((sug: any, index: number) => {
+                    const labels = getLocationLabels(sug);
+                    const isPicked = pickedLocations.length > 0;
+                    const zoneText = isPicked ? (sug.zoneCode || sug.zoneName) : labels.zoneLabel;
+                    const shelfText = isPicked ? (sug.shelfCode || sug.shelfName) : labels.shelfLabel;
+                    const levelText = isPicked ? (sug.binCode || sug.binName || sug.binIdCode) : labels.levelLabel;
+                    const qty = isPicked ? (sug.quantity ?? 0) : (sug.suggestedPickQty ?? sug.availableInBin ?? 0);
+
+                    return (
+                      <View
+                        key={`${item.id}-${sug.binId || sug.binCode || sug.binIdCode || index}-${sug.batchId || ''}`}
+                        className="bg-cyan-50/50 border border-cyan-100 px-3 py-2 rounded-lg mr-2"
+                        style={{ minWidth: 110 }}
+                      >
+                        <View className="flex-row items-center mb-1">
+                          <Feather name="map-pin" size={10} color={COLORS.primary} style={{ marginRight: 4 }} />
+                          <Text className="text-[11px] font-bold" style={{ color: COLORS.primary }}>
+                            {zoneText || t('common.notAvailable')}
+                          </Text>
+                        </View>
+                        
+                        <View className="flex-row items-center justify-between">
+                          <Text className="text-[10px] text-slate-500 font-medium">
+                            {shelfText || t('common.notAvailable')} • {levelText || t('common.notAvailable')}
+                          </Text>
+                        </View>
+
+                        <View className="mt-1.5 pt-1.5 border-t border-cyan-100/50 flex-row justify-between items-center">
+                          <Feather name="package" size={10} color={COLORS.primary} style={{ marginRight: 4 }} />
+                          <Text className="text-[11px] font-bold" style={{ color: COLORS.primary }}>
+                            {qty} pcs
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </>
+              ) : isFifoLoading ? (
+                <View className="flex-row items-center mb-3">
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text className="text-[11px] ml-2 text-slate-400 font-medium">
+                    {t('warehouse.loadingSuggestions')}
+                  </Text>
+                </View>
+              ) : (
+                <View className="flex-row items-center mb-3 bg-slate-50 border border-slate-100 px-3 py-2 rounded-lg">
+                   <Feather name="info" size={12} color={COLORS.textMuted} />
+                   <Text className="text-[11px] ml-1.5 text-slate-400 font-medium">
+                     {t('warehouse.noSuggestions')}
+                   </Text>
+                </View>
+              )}
+
+              {/* Quantity Input & Info Row */}
               <View className="flex-row justify-between items-center mt-2 border-t border-slate-50 pt-3">
                 <Text className="text-sm font-medium text-slate-700">
                   {currentStatus === "Created"
@@ -752,7 +927,15 @@ export default function OutboundDetailScreen() {
                           const num = parseInt(text.replace(/[^0-9]/g, ""), 10);
                           if (isNaN(num)) return;
 
-                          const maxQty = item.quantity || 9999;
+                          // Lấy giới hạn tối đa tương tự như handleUpdateQty
+                          const productId = item.productId || 0;
+                          const availableInWarehouse = fifoSummaryMap[Number(productId)]?.totalAvailableQuantity;
+                          const requiredQty = item.quantity || 0;
+                          
+                          const maxQty = availableInWarehouse !== undefined 
+                            ? Math.min(requiredQty, availableInWarehouse) 
+                            : requiredQty;
+
                           setLocalQuantities((prev) => ({
                             ...prev,
                             [item.id]: Math.min(num, maxQty),
@@ -787,10 +970,7 @@ export default function OutboundDetailScreen() {
                         <Text
                           className="text-lg font-bold"
                           style={{
-                            color:
-                              currentStatus === "Completed"
-                                ? COLORS.success
-                                : COLORS.primary,
+                            color: currentStatus === "Completed" ? COLORS.success : COLORS.primary,
                           }}
                         >
                           {Number(localQuantities[item.id]) || 0}
@@ -806,6 +986,20 @@ export default function OutboundDetailScreen() {
                   </View>
                 )}
               </View>
+
+              {/* FIFO Summary Row */}
+              {fifoSummaryMap[Number(item.productId || 0)] && (
+                <View className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 border border-emerald-100">
+                  <Text className="text-xs font-medium" style={{ color: COLORS.textMuted }}>
+                    {t("warehouse.readyQuantity")}: {fifoSummaryMap[Number(item.productId || 0)].totalAvailableQuantity} / {fifoSummaryMap[Number(item.productId || 0)].requiredQuantity || item.quantity || 0}
+                  </Text>
+                  {fifoSummaryMap[Number(item.productId || 0)].remainingQuantity > 0 && (
+                    <Text className="text-xs mt-0.5 font-semibold" style={{ color: COLORS.warning }}>
+                      {t("warehouse.shortage")}: {fifoSummaryMap[Number(item.productId || 0)].remainingQuantity}
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           );
         })}

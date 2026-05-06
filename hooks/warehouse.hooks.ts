@@ -7,6 +7,7 @@ import {
   getAccessibleWarehouses,
   getWarehouseStructure,
 } from "@/services/warehouse.api";
+import { normalizeWarehouseStructure } from "@/utils/warehouse.utils";
 import { useAuthStore } from "@/stores";
 import { useQuery } from "@tanstack/react-query";
 
@@ -133,12 +134,8 @@ export const useWarehouseStructure = (warehouseId?: number) => {
         warehouseId!,
       );
 
-      // console.log(
-      //   `[useWarehouseStructure] Result for warehouseId ${warehouseId}:`,
-      //   JSON.stringify(structureData, null, 2),
-      // );
-
-      return structureData;
+      // Chuẩn hóa tọa độ các node để tránh bị lệch
+      return normalizeWarehouseStructure(structureData);
     },
     // ===== FIX END =====
     enabled: !!companyId && !!warehouseId,

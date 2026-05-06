@@ -62,7 +62,7 @@ export default function InventoryCountDetailScreen() {
                 }
             });
             setEditingItems(prev => ({ ...prev, [item.id]: false }));
-            AlertService.success(t('common.success'), `${t('common.save')}: ${item.name || 'item'}`);
+            AlertService.success(t('common.success'), `${t('common.save')}: ${item.name || t('common.item')}`);
         } catch (err) {
             console.error(err);
             AlertService.error(t('common.error'), t('common.failed'));
@@ -156,7 +156,7 @@ export default function InventoryCountDetailScreen() {
                         </View>
                         <View>
                             <Text style={styles.infoLabel}>{t('inventoryCount.countType')}</Text>
-                            <Text style={styles.infoValue}>{ticket.type || 'Manual'}</Text>
+                            <Text style={styles.infoValue}>{ticket.type || t('inventoryCount.standardCount')}</Text>
                         </View>
                     </View>
                     <View style={styles.divider} />
@@ -165,9 +165,9 @@ export default function InventoryCountDetailScreen() {
                             <Feather name="calendar" size={16} color={COLORS.primary} />
                         </View>
                         <View>
-                            <Text style={styles.infoLabel}>{t('common.loading')}</Text>
+                            <Text style={styles.infoLabel}>{t('common.createdAt')}</Text>
                             <Text style={styles.infoValue}>
-                                {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A'}
+                                {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : t('common.notAvailable')}
                             </Text>
                         </View>
                     </View>
@@ -200,10 +200,12 @@ export default function InventoryCountDetailScreen() {
                             <Card key={item.id} style={[styles.itemCard, isRevealed && styles.itemCardRevealed]}>
                                 <View style={itemHeaderStyle.itemHeader}>
                                     <View style={styles.itemInfo}>
-                                        <Text style={styles.productName}>{item.name || `Product #${item.productId}`}</Text>
-                                        <View style={styles.skuBadge}>
-                                            <Text style={styles.skuText}>{item.sku || 'N/A'}</Text>
-                                        </View>
+                                        <Text style={styles.productName}>{item.name || `${t('common.product')} #${item.productId}`}</Text>
+                                        {item.sku && (
+                                            <View style={styles.skuBadge}>
+                                                <Text style={styles.skuText}>{t('common.sku')}: {item.sku}</Text>
+                                            </View>
+                                        )}
                                     </View>
 
                                     <View style={[styles.statusBadgeItem, {
@@ -234,7 +236,7 @@ export default function InventoryCountDetailScreen() {
                                                 }}
                                             >
                                                 <Text style={isRevealed ? styles.systemQtyValue : styles.hiddenQtyValue}>
-                                                    {isRevealed ? item.systemQuantity : '??'}
+                                                    {isRevealed ? item.systemQuantity : t('common.notAvailable')}
                                                 </Text>
                                                 {!isRevealed && <Feather name="lock" size={14} color={COLORS.textMuted} />}
                                             </TouchableOpacity>
@@ -282,7 +284,7 @@ export default function InventoryCountDetailScreen() {
                                                 onPress={() => handleEditItem(item.id)}
                                             >
                                                 <Feather name="edit-2" size={13} color={COLORS.primary} />
-                                                <Text style={styles.editBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('profile.editProfile').split(' ')[0]}</Text>
+                                                <Text style={styles.editBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('common.edit')}</Text>
                                             </TouchableOpacity>
                                         )}
                                     </View>
@@ -295,7 +297,7 @@ export default function InventoryCountDetailScreen() {
                                             onPress={() => handleEditItem(item.id)}
                                         >
                                             <Feather name="edit-2" size={14} color={COLORS.primary} />
-                                            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('profile.editProfile').split(' ')[0]}</Text>
+                                            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>{t('common.edit')}</Text>
                                         </TouchableOpacity>
                                     )}
 
@@ -338,7 +340,7 @@ export default function InventoryCountDetailScreen() {
                                                         warehouseId: String(ticket.warehouseId || ''),
                                                         inventoryCountTicketId: String(ticket.id),
                                                         focusedItemId: String(item.productId),
-                                                        focusedItemName: item.name || `Item #${item.productId}`,
+                                                        focusedItemName: item.name || `${t('common.item')} #${item.productId}`,
                                                     },
                                                 } as any);
                                             }}

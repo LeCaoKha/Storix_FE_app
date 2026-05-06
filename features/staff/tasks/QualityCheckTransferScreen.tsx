@@ -160,7 +160,7 @@ export default function QualityCheckTransferScreen() {
     >
       <ScreenHeader
         title={t('transfer.qualityCheck')}
-        subtitle={transfer.referenceCode || `${t('common.item')} #${transfer.id}`}
+        subtitle={transfer.referenceCode || `${t('transfer.transferOrder')} #${transfer.id}`}
       />
 
       <RefreshContainer 
@@ -179,7 +179,7 @@ export default function QualityCheckTransferScreen() {
           {rowList.map((row, index) => (
             <View key={row.productId} style={styles.itemWrap}>
               <Text style={styles.productName}>{row.productName}</Text>
-              <Text style={styles.expectedText}>{t('putaway.toLocation')}: {row.expectedQuantity}</Text>
+              <Text style={styles.expectedText}>{t('common.expectedQty')}: {row.expectedQuantity}</Text>
 
               <View style={styles.inputsRow}>
                 <View style={styles.inputGroup}>

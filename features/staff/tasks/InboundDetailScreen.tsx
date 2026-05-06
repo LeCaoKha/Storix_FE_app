@@ -71,7 +71,7 @@ export default function InboundDetailScreen() {
                 inboundOrderId: String(order?.id || ''),
                 focusedBins: bins.join(','),
                 focusedItemId: String(item.id),
-                focusedItemName: item.name || item.product?.name || `SP #${item.productId}`,
+                focusedItemName: item.name || item.product?.name || `${t('common.product')} #${item.productId}`,
             },
         } as any);
     };
@@ -209,12 +209,12 @@ export default function InboundDetailScreen() {
                 <Card style={styles.infoCard}>
                     <View style={styles.infoRow}>
                         <Feather name="truck" size={16} color={COLORS.textMuted} />
-                        <Text style={styles.infoText}>{t('inbound.supplier')}: <Text style={styles.boldText}>{order.supplier?.name || 'N/A'}</Text></Text>
+                        <Text style={styles.infoText}>{t('inbound.supplier')}: <Text style={styles.boldText}>{order.supplier?.name || t('common.notAvailable')}</Text></Text>
                     </View>
                     {order.referenceCode && (
                         <View style={styles.infoRow}>
                             <Feather name="file-text" size={16} color={COLORS.textMuted} />
-                            <Text style={styles.infoText}>Reference Code: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
+                            <Text style={styles.infoText}>{t('common.referenceCode')}: <Text style={styles.boldText}>{order.referenceCode}</Text></Text>
                         </View>
                     )}
                 </Card>
@@ -238,7 +238,7 @@ export default function InboundDetailScreen() {
                                 return (
                                     <View key={`inbound-recommendation-${item.id}`} style={styles.recommendationItem}>
                                         <Text style={styles.recommendationProduct} numberOfLines={1}>
-                                            {item.name || item.product?.name || `SP #${item.productId}`}
+                                            {item.name || item.product?.name || `${t('common.product')} #${item.productId}`}
                                         </Text>
                                         <Text style={styles.recommendationBin}>{topRecommendation.binIdCode}</Text>
                                     </View>
@@ -257,8 +257,10 @@ export default function InboundDetailScreen() {
                     <Card key={item.id} style={styles.itemCard}>
                         <View style={styles.itemHeader}>
                             <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.name || item.product?.name || `Product #${item.productId}`}</Text>
-                                <Text style={styles.skuText}>SKU: {item.sku || item.product?.sku || 'N/A'}</Text>
+                                <Text style={styles.productName}>{item.name || item.product?.name || `${t('common.product')} #${item.productId}`}</Text>
+                                {(item.sku || item.product?.sku) && (
+                                    <Text style={styles.skuText}>{t('common.sku')}: {item.sku || item.product?.sku}</Text>
+                                )}
                             </View>
                             <View style={[styles.statusBadge, {
                                 backgroundColor: (isCompleted || isItemReceivedEnough(item)) ? COLORS.success + '20' : COLORS.warning + '20'
@@ -297,13 +299,13 @@ export default function InboundDetailScreen() {
 
                                     if (isItemCompleted) {
                                         return hasRecommendation
-                                            ? t('inbound.viewShelfRec') || 'View shelf locations for this product'
-                                            : t('inbound.viewShelf') || 'View shelf locations';
+                                            ? t('inbound.viewShelfRec')
+                                            : t('inbound.viewShelf');
                                     }
 
                                     return hasRecommendation
-                                        ? t('inbound.viewShelfSuggested') || 'View suggested shelf for this product'
-                                        : t('inbound.viewShelfStore') || 'View shelf to store';
+                                        ? t('inbound.viewShelfSuggested')
+                                        : t('inbound.viewShelfStore');
                                 })()}
                             </Text>
                         </TouchableOpacity>

@@ -6,12 +6,13 @@ import {
     useUpdateOutboundRequestStatus,
 } from '@/hooks/outbound-orders.hooks';
 import { useAppBack } from '@/hooks/useAppBack';
+import { api } from '@/services/axios.instance';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
 import type { OutboundOrderItem } from '@/types/outbound-order';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     StyleSheet,
@@ -64,6 +65,43 @@ export default function OutboundOrderDetailScreen() {
     const { data: ticket, isLoading: ticketLoading, error: ticketError, refetch: refetchTicket } = useOutboundTicket(
         type === 'ticket' ? id : undefined
     );
+
+    const [isFifoLoading, setIsFifoLoading] = useState(false);
+    const [fifoBins, setFifoBins] = useState<string[]>([]);
+
+    useEffect(() => {
+        const fetchFifoSuggestions = async () => {
+            if (type !== 'ticket' || !id) {
+                setFifoBins([]);
+                return;
+            }
+
+            setIsFifoLoading(true);
+            try {
+                const response = await api.get(`/api/InventoryOutbound/tickets/${id}/fifo-suggestions`);
+                const items = Array.isArray(response.data) ? response.data : [];
+                const bins = new Set<string>();
+
+                items.forEach((item: any) => {
+                    (item.suggestions || []).forEach((suggestion: any) => {
+                        [suggestion.binCode, suggestion.binIdCode, suggestion.shelfCode]
+                            .map((value) => String(value ?? '').trim())
+                            .filter(Boolean)
+                            .forEach((value) => bins.add(value));
+                    });
+                });
+
+                setFifoBins(Array.from(bins));
+            } catch (error) {
+                console.error('Fetch FIFO suggestions error:', error);
+                setFifoBins([]);
+            } finally {
+                setIsFifoLoading(false);
+            }
+        };
+
+        fetchFifoSuggestions();
+    }, [id, type]);
 
     const handleRefresh = async () => {
         if (type === 'request') await refetchRequest();
@@ -168,6 +206,19 @@ export default function OutboundOrderDetailScreen() {
         } as any);
     };
 
+    const handleOpenWarehouseView = () => {
+        const params =
+            type === 'ticket'
+                ? { outboundOrderId: String(data.id) }
+                : undefined;
+
+        router.push(
+            params
+                ? ({ pathname: '/warehouse-view', params } as any)
+                : '/warehouse-view',
+        );
+    };
+
     // Get items - support both DTO format (items) and raw entity format (outboundOrderItems)
     const items = (data as any).items || (data as any).outboundOrderItems || [];
     const warehouse = (data as any).warehouse;
@@ -227,7 +278,7 @@ export default function OutboundOrderDetailScreen() {
 
                 {/* Warehouse Location Shortcut */}
                 <TouchableOpacity
-                    onPress={() => router.push('/warehouse-view')}
+                    onPress={handleOpenWarehouseView}
                 >
                     <Card style={[styles.card, { flexDirection: 'row', alignItems: 'center' }]}>
                         <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primary + '10', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
@@ -235,9 +286,19 @@ export default function OutboundOrderDetailScreen() {
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.slate800 }}>Sơ đồ kho</Text>
-                            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>Nhấn để xem vị trí trên sơ đồ</Text>
+                            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>
+                                {type === 'ticket' && fifoBins.length > 0
+                                    ? `FIFO đã sẵn sàng: ${fifoBins.length} vị trí`
+                                    : 'Nhấn để xem vị trí trên sơ đồ'}
+                            </Text>
                         </View>
-                        <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+                        <View style={{ alignItems: 'flex-end' }}>
+                            {isFifoLoading && type === 'ticket' ? (
+                                <ActivityIndicator size="small" color={COLORS.primary} />
+                            ) : (
+                                <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
+                            )}
+                        </View>
                     </Card>
                 </TouchableOpacity>
 

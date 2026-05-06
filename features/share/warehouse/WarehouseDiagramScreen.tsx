@@ -1,27 +1,28 @@
 import { RefreshContainer, ScreenHeader } from "@/components";
 import {
-  PathInstructionsModal,
-  ShelfDetailModal,
-  WarehouseGridView,
-  WarehouseLayout,
+    PathInstructionsModal,
+    ShelfDetailModal,
+    WarehouseGridView,
+    WarehouseLayout,
 } from "@/components/staff";
 import { COLORS } from "@/constants/color";
 import {
-  useInboundOrdersByStaff,
-  useInboundStorageRecommendations,
-  useInboundTicket,
+    useInboundOrdersByStaff,
+    useInboundStorageRecommendations,
+    useInboundTicket,
 } from "@/hooks";
 import {
-  useOutboundTicket,
-  useUpdateOutboundTicketItems,
+    useOutboundTicket,
+    useUpdateOutboundTicketItems,
 } from "@/hooks/outbound-orders.hooks";
 import { useProductInventoryLocations, useProducts } from "@/hooks/product.hooks";
 import {
-  useStockCountTicket,
-  useWarehouseInventory,
+    useStockCountTicket,
+    useWarehouseInventory,
 } from "@/hooks/stock-count.hooks";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useWarehouses, useWarehouseStructure } from "@/hooks/warehouse.hooks";
+import { api } from "@/services/axios.instance";
 import { getProductInventoryLocations } from "@/services/product.api";
 import { AlertService } from "@/stores/alert.store";
 import { useAuthStore } from "@/stores/auth.store";
@@ -31,15 +32,36 @@ import type { ProductInventoryLocation } from "@/types/product";
 import { PathResult, Shelf, WarehouseZone } from "@/types/warehouse";
 import { findNearestNode, findShortestPath } from "@/utils/pathfinding";
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
 import React, { useEffect, useMemo, useState } from "react";
+import {
+    ActivityIndicator,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+
+type FifoSuggestion = {
+  binIdCode?: string;
+  binCode?: string;
+  shelfCode?: string;
+  zoneId?: number;
+  availableInBin?: number;
+  suggestedPickQty?: number;
+};
+
+type FifoSuggestionItem = {
+  outboundOrderItemId: number;
+  productId: number;
+  productName?: string;
+  requiredQuantity?: number;
+  isFullyCoverable?: boolean;
+  totalAvailableQuantity?: number;
+  remainingQuantity?: number;
+  suggestions?: FifoSuggestion[];
+};
 
 export default function WarehouseDiagramScreen() {
     const { t } = useTranslation();
@@ -142,6 +164,24 @@ export default function WarehouseDiagramScreen() {
     useOutboundTicket(outboundOrderId);
   const { data: stockCountTicket, refetch: refetchStockCountTicket } =
     useStockCountTicket(inventoryCountTicketId || 0, companyId);
+
+  const {
+    data: outboundFifoSuggestions = [],
+    refetch: refetchOutboundFifoSuggestions,
+  } = useQuery({
+    queryKey: ["outbound-fifo-suggestions", outboundOrderId],
+    queryFn: async () => {
+      if (!outboundOrderId) return [] as FifoSuggestionItem[];
+      const response = await api.get(
+        `/api/InventoryOutbound/tickets/${outboundOrderId}/fifo-suggestions`,
+      );
+      return Array.isArray(response.data)
+        ? (response.data as FifoSuggestionItem[])
+        : [];
+    },
+    enabled: !!outboundOrderId,
+    staleTime: 0,
+  });
 
   const {
     data: structure,
@@ -312,23 +352,11 @@ export default function WarehouseDiagramScreen() {
       setIsFetchingPath(true);
       try {
         console.log(`[PathOptimization] Fetching path with token...`);
-        const response = await fetch(
-          `https://storix-docker.onrender.com/api/InventoryOutbound/tickets/${currentOutboundId}/path-optimization`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              // ĐÍNH KÈM TOKEN VÀO HEADER TẠI ĐÂY
-              Authorization: `Bearer ${token}`,
-            },
-          },
+        const response = await api.get(
+          `/api/InventoryOutbound/tickets/${currentOutboundId}/path-optimization`,
         );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = response.data;
 
         // Extracting path array safely
         const pathArray = data?.payload?.[0]?.fullOptimizedPath;
@@ -415,6 +443,7 @@ export default function WarehouseDiagramScreen() {
       refetchStructure(),
       inboundOrderId ? refetchInboundTicket() : Promise.resolve(),
       outboundOrderId ? refetchOutboundOrder() : Promise.resolve(),
+      outboundOrderId ? refetchOutboundFifoSuggestions() : Promise.resolve(),
       inventoryCountTicketId ? refetchStockCountTicket() : Promise.resolve(),
     ]);
   };
@@ -429,6 +458,41 @@ export default function WarehouseDiagramScreen() {
       .filter((binCode): binCode is string => !!binCode);
     return Array.from(new Set([...routeBins, ...binsFromApi]));
   }, [recommendationItems, routeBins]);
+
+  const outboundFifoBins = useMemo(() => {
+    const bins = new Set<string>();
+
+    outboundFifoSuggestions.forEach((item) => {
+      (item.suggestions || []).forEach((suggestion) => {
+        [suggestion.binCode, suggestion.binIdCode, suggestion.shelfCode]
+          .map((value) => String(value ?? "").trim())
+          .filter(Boolean)
+          .forEach((value) => bins.add(value));
+      });
+    });
+
+    return Array.from(bins);
+  }, [outboundFifoSuggestions]);
+
+  const focusedOutboundFifoBins = useMemo(() => {
+    if (!focusedItemId) return [];
+
+    const matchedItem = outboundFifoSuggestions.find(
+      (item) => item.outboundOrderItemId === focusedItemId,
+    );
+
+    if (!matchedItem) return [];
+
+    const bins = new Set<string>();
+    (matchedItem.suggestions || []).forEach((suggestion) => {
+      [suggestion.binCode, suggestion.binIdCode, suggestion.shelfCode]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+        .forEach((value) => bins.add(value));
+    });
+
+    return Array.from(bins);
+  }, [focusedItemId, outboundFifoSuggestions]);
 
   const inventoryBins = useMemo(() => {
     if (!stockCountTicket) return [];
@@ -747,10 +811,23 @@ export default function WarehouseDiagramScreen() {
   const effectiveHighlightedBins = useMemo(() => {
     if (focusedBinsArray.length > 0) return focusedBinsArray;
     if (focusedItemId) {
+      const outboundFocusBins =
+        focusedOutboundFifoBins.length > 0
+          ? focusedOutboundFifoBins
+          : outboundFifoBins;
+
       return Array.from(
-        new Set([...focusedInventoryHighlightValues, ...(isCounting ? [...inventoryBins, ...suggestedBins] : recommendedBins)]),
+        new Set([
+          ...(isPicking || isCounting ? focusedInventoryHighlightValues : []),
+          ...(isPicking
+            ? outboundFocusBins
+            : isCounting
+              ? [...inventoryBins, ...suggestedBins]
+              : recommendedBins),
+        ]),
       );
     }
+    if (isPicking) return Array.from(new Set([...outboundFifoBins, ...recommendedBins]));
     if (isCounting)
       return Array.from(new Set([...inventoryBins, ...suggestedBins]));
     return recommendedBins;
@@ -758,10 +835,13 @@ export default function WarehouseDiagramScreen() {
     focusedBinsArray,
     focusedItemId,
     focusedInventoryHighlightValues,
+    focusedOutboundFifoBins,
     isCounting,
+    isPicking,
     inventoryBins,
     suggestedBins,
     recommendedBins,
+    outboundFifoBins,
   ]);
 
   const scopedInboundRecommendationItems = useMemo(() => {
@@ -801,6 +881,7 @@ export default function WarehouseDiagramScreen() {
         reason: best.reason,
       });
     });
+
     return preview.slice(0, 4);
   }, [scopedInboundRecommendationItems]);
 
@@ -923,6 +1004,7 @@ export default function WarehouseDiagramScreen() {
       structure.edges,
       startNode.id,
       endNode.id,
+      t,
     );
     if (path) {
       setCurrentPath(path);
@@ -1045,8 +1127,8 @@ export default function WarehouseDiagramScreen() {
 
         if (validItems.length === 0) {
           AlertService.warning(
-            "Invalid data",
-            "No valid items to update (missing productId/binId or quantity).",
+            t('warehouse.invalidData'),
+            t('warehouse.noValidItems'),
           );
           return;
         }
@@ -1081,8 +1163,8 @@ export default function WarehouseDiagramScreen() {
 
         if (validItems.length === 0) {
           AlertService.warning(
-            "Invalid data",
-            "Please select a quantity greater than 0 before confirming.",
+            t('warehouse.invalidData'),
+            t('warehouse.quantityNotSelectedMsg'),
           );
           return;
         }
@@ -1126,9 +1208,9 @@ export default function WarehouseDiagramScreen() {
     } catch (error: any) {
       console.error("[WarehouseDiagramScreen] confirm operation failed", error);
       AlertService.error(
-        "Error",
+        t('common.error'),
         String(error?.response?.data?.message || "").trim() ||
-          "Cannot update item status",
+          t('profile.revertFailedMsg'),
       );
     } finally {
       setIsProcessing(false);
@@ -1414,7 +1496,7 @@ export default function WarehouseDiagramScreen() {
               style={{ backgroundColor: COLORS.primary }}
               onPress={() => setSelectedWarehouseId(undefined)}
             >
-              <Text className="text-sm font-bold text-white">Retry</Text>
+              <Text className="text-sm font-bold text-white">{t('common.retry')}</Text>
             </TouchableOpacity>
           </View>
         ) : structure ? (
@@ -1463,47 +1545,76 @@ export default function WarehouseDiagramScreen() {
                 ) : (
                   <>
                     {recommendationPreview.length > 0 ? (
-                      recommendationPreview.map((entry, index) => (
-                        <View
-                          key={`preview-${index}`}
-                          className="flex-row items-center justify-between py-1.5 border-b"
-                          style={{ borderBottomColor: COLORS.borderLight }}
-                        >
-                          <Text
-                            className="flex-1 mr-2 text-xs font-semibold"
-                            style={{ color: COLORS.text }}
-                            numberOfLines={1}
-                          >
-                            {entry.itemName || `${t('common.item')} ${index + 1}`}
-                          </Text>
-                          <Text
-                            className="text-[11px] border rounded-full px-2.5 py-0.5 font-bold"
-                            style={
-                              isPicking
-                                ? {
-                                    color: COLORS.primary,
-                                    backgroundColor: COLORS.primaryLight,
-                                    borderColor: COLORS.primary + "20",
-                                  }
-                                : {
-                                    color: COLORS.successText,
-                                    backgroundColor: COLORS.successLight,
-                                    borderColor: COLORS.success + "20",
-                                  }
+                      recommendationPreview.map((entry, index) => {
+                        const hasLongReason = (entry.reason?.length ?? 0) > 30;
+                        const bubbleStyle = isPicking
+                          ? {
+                              color: COLORS.primary,
+                              backgroundColor: COLORS.primaryLight,
+                              borderColor: COLORS.primary + "20",
                             }
+                          : {
+                              color: COLORS.successText,
+                              backgroundColor: COLORS.successLight,
+                              borderColor: COLORS.success + "20",
+                            };
+
+                        return (
+                          <View
+                            key={`preview-${index}`}
+                            className="py-2.5 border-b"
+                            style={{ borderBottomColor: COLORS.borderLight }}
                           >
-                            {entry.binIdCode}
-                          </Text>
-                        </View>
-                      ))
+                            <View className="flex-row items-center justify-between mb-1">
+                              <Text
+                                className="flex-1 mr-2 text-xs font-bold text-slate-800"
+                                numberOfLines={1}
+                              >
+                                {entry.itemName || `${t('common.item')} ${index + 1}`}
+                              </Text>
+                              {!hasLongReason && (
+                                <Text
+                                  className="text-[11px] border rounded-full px-2.5 py-0.5 font-bold"
+                                  style={bubbleStyle}
+                                >
+                                  {entry.reason || entry.binIdCode}
+                                </Text>
+                              )}
+                            </View>
+                            
+                            {hasLongReason && (
+                              <View 
+                                className="mt-1.5 p-3 rounded-2xl border"
+                                style={bubbleStyle}
+                              >
+                                <Text 
+                                  className="text-[11px] font-medium leading-[16px]"
+                                  style={{ color: bubbleStyle.color }}
+                                >
+                                  {entry.reason}
+                                </Text>
+                                {entry.binIdCode && (
+                                  <View className="mt-2 pt-2 border-t flex-row items-center opacity-60" style={{ borderTopColor: bubbleStyle.color + '20' }}>
+                                    <Feather name="map-pin" size={10} color={bubbleStyle.color} />
+                                    <Text className="text-[10px] font-bold ml-1" style={{ color: bubbleStyle.color }}>
+                                      {entry.binIdCode}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })
                     ) : (
                       <Text
                         className="text-xs leading-[18px]"
                         style={{ color: COLORS.textMuted }}
                       >
-                        Found {effectiveHighlightedBins.length}{" "}
-                        {isPicking ? "pick" : "suggested"} locations in the
-                        diagram.
+                        {t('warehouse.foundLocations', {
+                          count: effectiveHighlightedBins.length,
+                          type: isPicking ? t('warehouse.pick') : t('warehouse.suggested')
+                        })}
                       </Text>
                     )}
                     {recommendationResolution.firstShelf && (
@@ -1517,7 +1628,11 @@ export default function WarehouseDiagramScreen() {
                         onPress={handleFindPathToRecommended}
                       >
                         <Feather name="navigation" size={14} color="#fff" />
-                        <Text className="text-white text-xs font-bold">
+                        <Text 
+                          className="text-white text-xs font-bold"
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                        >
                           {t('warehouse.findPathToSuggested')}
                         </Text>
                       </TouchableOpacity>
