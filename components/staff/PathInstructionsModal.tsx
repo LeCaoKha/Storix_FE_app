@@ -1,6 +1,7 @@
 import { COLORS } from '@/constants/color';
 import { PathResult } from '@/types/warehouse';
 import { Feather } from '@expo/vector-icons';
+import { useTranslation } from '@/hooks/useTranslation';
 import React from 'react';
 import {
     Modal,
@@ -23,11 +24,14 @@ interface PathInstructionsModalProps {
 export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
   visible,
   pathResult,
-  fromLocation = 'Current location',
+  fromLocation,
   toLocation,
   onClose,
 }) => {
+  const { t } = useTranslation();
   if (!pathResult) return null;
+
+  const displayFrom = fromLocation || t('warehouse.currentLocation');
 
   return (
     <Modal
@@ -43,9 +47,9 @@ export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
             <View style={styles.headerLeft}>
               <Feather name="navigation" size={24} color={COLORS.primary} />
               <View style={styles.headerText}>
-                <Text style={styles.title}>Route Instructions</Text>
+                <Text style={styles.title}>{t('warehouse.routeInstructions')}</Text>
                 <Text style={styles.subtitle}>
-                  {fromLocation} → {toLocation}
+                  {displayFrom} → {toLocation}
                 </Text>
               </View>
             </View>
@@ -59,9 +63,9 @@ export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
             <View style={styles.summaryItem}>
               <Feather name="map-pin" size={18} color={COLORS.primary} />
               <View>
-                <Text style={styles.summaryLabel}>Steps</Text>
+                <Text style={styles.summaryLabel}>{t('warehouse.steps')}</Text>
                 <Text style={styles.summaryValue}>
-                  {pathResult.instructions.length - 2} steps
+                  {t('warehouse.stepsCount', { count: pathResult.instructions.length - 2 })}
                 </Text>
               </View>
             </View>
@@ -69,7 +73,7 @@ export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
             <View style={styles.summaryItem}>
               <Feather name="navigation" size={18} color={COLORS.primary} />
               <View>
-                <Text style={styles.summaryLabel}>Distance</Text>
+                <Text style={styles.summaryLabel}>{t('warehouse.distance')}</Text>
                 <Text style={styles.summaryValue}>
                   ~{pathResult.totalDistance.toFixed(1)}m
                 </Text>
@@ -115,7 +119,7 @@ export const PathInstructionsModal: React.FC<PathInstructionsModalProps> = ({
           {/* Actions */}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.actionButton} onPress={onClose}>
-              <Text style={styles.actionButtonText}>Close</Text>
+              <Text style={styles.actionButtonText}>{t('common.back')}</Text>
             </TouchableOpacity>
           </View>
         </View>

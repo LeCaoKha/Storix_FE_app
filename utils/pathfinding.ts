@@ -7,7 +7,8 @@ export const findShortestPath = (
   nodes: NavigationNode[],
   edges: NavigationEdge[],
   startNodeId: string,
-  endNodeId: string
+  endNodeId: string,
+  t?: (key: string, params?: any) => string
 ): PathResult | null => {
   if (!nodes || !edges || nodes.length === 0 || edges.length === 0) {
     return null;
@@ -89,7 +90,7 @@ export const findShortestPath = (
   const totalDistance = distances.get(endNodeId) || 0;
 
   // Generate instructions
-  const instructions = generateInstructions(pathNodes);
+  const instructions = generateInstructions(pathNodes, t);
 
   return {
     path: pathNodes,
@@ -101,11 +102,12 @@ export const findShortestPath = (
 /**
  * Tạo hướng dẫn di chuyển từ path
  */
-const generateInstructions = (path: NavigationNode[]): string[] => {
-  if (path.length < 2) return ['You are already at the destination'];
+const generateInstructions = (path: NavigationNode[], t?: (key: string, params?: any) => string): string[] => {
+  const translate = t || ((key: string) => key);
+  if (path.length < 2) return [translate('warehouse.arrived')];
 
   const instructions: string[] = [];
-  instructions.push(`Start at position (${path[0].x}, ${path[0].y})`);
+  instructions.push(translate('warehouse.startAtPos', { x: path[0].x, y: path[0].y }));
 
   for (let i = 1; i < path.length; i++) {
     const from = path[i - 1];
@@ -114,11 +116,20 @@ const generateInstructions = (path: NavigationNode[]): string[] => {
       Math.pow(to.x - from.x, 2) + Math.pow(to.y - from.y, 2)
     ).toFixed(1);
 
-    const direction = getDirection(from, to);
-    instructions.push(`${i}. Go ${direction} ${distance}m to (${to.x}, ${to.y})`);
+    const directionKey = getDirection(from, to);
+    instructions.push(translate('warehouse.pathStep', {
+      index: i,
+      direction: translate(`warehouse.${directionKey}`),
+      distance,
+      x: to.x,
+      y: to.y
+    }));
   }
 
-  instructions.push(`Arrived at destination at (${path[path.length - 1].x}, ${path[path.length - 1].y})`);
+  instructions.push(translate('warehouse.arrivedAtPos', {
+    x: path[path.length - 1].x,
+    y: path[path.length - 1].y
+  }));
 
   return instructions;
 };

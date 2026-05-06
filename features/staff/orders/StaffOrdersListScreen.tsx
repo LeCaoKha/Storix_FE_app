@@ -20,7 +20,7 @@ const TABS: { key: TabType; label: string }[] = [
 export default function StaffOrdersListScreen() {
     const router = useRouter();
     const user = useAuthStore((state) => state.user);
-    const { t } = useTranslation();
+    const { t, language } = useTranslation();
     const { data: tickets = [], isLoading, refetch } = useInboundOrdersByStaff(user?.companyId ?? 0, user?.id ?? 0);
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -172,7 +172,7 @@ export default function StaffOrdersListScreen() {
                                     <View style={styles.ticketInfo}>
                                         <Text style={styles.ticketCode}>{ticket.referenceCode || `INB-${ticket.id}`}</Text>
                                         <Text style={styles.ticketDate}>
-                                            {new Date(ticket.createdAt).toLocaleDateString('en-US')}
+                                            {new Date(ticket.createdAt).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}
                                         </Text>
                                     </View>
                                     <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
