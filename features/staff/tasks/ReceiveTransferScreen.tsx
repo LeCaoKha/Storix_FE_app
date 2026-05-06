@@ -108,7 +108,7 @@ export default function ReceiveTransferScreen() {
             <View key={item.id} style={styles.itemContainer}>
                 <View style={styles.itemHeader}>
                     <Text style={styles.productName} numberOfLines={1}>{item.productName}</Text>
-                    <Text style={styles.itemExpected}>{t('transfer.destinationWarehouse')}: {item.quantity} {item.unit || ''}</Text>
+                    <Text style={styles.itemExpected}>{t('transfer.expectedAtDest')}: {item.quantity} {item.unit || ''}</Text>
                 </View>
 
                 <View style={styles.inputsRow}>
@@ -158,7 +158,7 @@ export default function ReceiveTransferScreen() {
                 </Card>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>{t('putaway.placementLocation')}</Text>
+                    <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
                 </View>
                 
                 <View style={styles.list}>
@@ -171,7 +171,7 @@ export default function ReceiveTransferScreen() {
                 </View>
 
                 <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-                    <Text style={styles.sectionTitle}>{t('outbound.productList')}</Text>
+                    <Text style={styles.sectionTitle}>{t('common.note')}</Text>
                 </View>
                 <Card style={styles.card}>
                     <TextInput

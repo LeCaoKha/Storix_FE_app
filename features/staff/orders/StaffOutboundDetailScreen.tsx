@@ -173,7 +173,7 @@ export default function StaffOutboundDetailScreen() {
                         <Card key={item.id} style={cardStyle}>
                             <View style={styles.itemHeader}>
                                 <View style={styles.itemInfo}>
-                                    <Text style={styles.productName}>{item.product?.name || `Product #${item.productId}`}</Text>
+                                    <Text style={styles.productName}>{item.product?.name || `${t('common.product')} #${item.productId}`}</Text>
                                     <View style={styles.skuRow}>
                                         <View style={styles.skuBadge}>
                                             <Text style={styles.skuText}>{t('common.sku')}: {item.product?.sku || t('common.notAvailable')}</Text>

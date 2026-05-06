@@ -393,7 +393,7 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
         <View className="flex-row items-center justify-center gap-1 flex-1">
           <Feather name="layers" size={13} color={COLORS.slate400} />
           <Text className="text-xs text-slate-500 font-semibold">
-            {currentZone?.shelves?.length || 0} {t('warehouse.shelf').toLowerCase() + 's'}
+            {currentZone?.shelves?.length || 0} {t('warehouse.shelves')}
           </Text>
         </View>
       </View>

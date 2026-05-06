@@ -5,7 +5,9 @@ import {
   WarehouseStructure,
   WarehouseZone,
 } from "@/types/warehouse";
+import { resolveShelfAbsolutePosition } from "@/utils/warehouse.utils";
 import { Feather } from "@expo/vector-icons";
+import { useTranslation } from "@/hooks/useTranslation";
 import React, { useCallback, useEffect, useMemo } from "react";
 import {
   Dimensions,
@@ -62,6 +64,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
   optimizedPath = [],
   isCounting = false,
 }) => {
+  const { t } = useTranslation();
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -98,31 +101,6 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     return map;
   }, [optimizedPath]);
 
-  // LƯU Ý SỬA ĐỔI: Dùng shelf.length thay vì shelf.height
-  const resolveShelfAbsolutePosition = useCallback(
-    (shelf: Shelf, zone: WarehouseZone) => {
-      // Fallback an toàn nếu length bị null/undefined (mặc định lấy width)
-      const shelfLength = shelf.length ?? shelf.width;
-      const zoneLength = zone.length ?? zone.height ?? zone.width; // Fallback cho zone nếu thiếu length
-
-      const isRelativeToZone =
-        shelf.x >= -1 &&
-        shelf.y >= -1 &&
-        shelf.x + shelf.width <= zone.width + 1 &&
-        shelf.y + shelfLength <= zoneLength + 1;
-
-      if (isRelativeToZone) {
-        return {
-          x: zone.x + shelf.x,
-          y: zone.y + shelf.y,
-          coordinateMode: "relative" as const,
-        };
-      }
-
-      return { x: shelf.x, y: shelf.y, coordinateMode: "absolute" as const };
-    },
-    [],
-  );
 
   const normalizedZones = useMemo(() => {
     return (structure.zones ?? []).map((zone) => {
@@ -189,7 +167,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         shelves: resolvedShelves,
       };
     });
-  }, [resolveShelfAbsolutePosition, structure.zones]);
+  }, [structure.zones]);
 
   const contentBounds = useMemo(() => {
     let minX = Number.POSITIVE_INFINITY;
@@ -272,7 +250,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       width: Math.max(maxX - minX, 1),
       height: Math.max(maxY - minY, 1),
     };
-  }, [normalizedZones, resolveShelfAbsolutePosition, structure]);
+  }, [normalizedZones, structure]);
 
   const onMapLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -580,8 +558,8 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             {zone.code
               ? zone.code.toLowerCase().includes("zone")
                 ? zone.code
-                : `Zone ${zone.code}`
-              : "Zone"}
+                : `${t('warehouse.zone')} ${zone.code}`
+              : t('warehouse.zone')}
           </SvgText>
         </G>
 
@@ -623,13 +601,71 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         </G>,
       );
     }
-    return <G>{pathLines}</G>;
+
+    const startNode = highlightedPath[0];
+    const endNode = highlightedPath[highlightedPath.length - 1];
+
+    return (
+      <G>
+        {pathLines}
+        {/* Start Marker */}
+        <G>
+          <Rect
+            x={startNode.x - 45}
+            y={startNode.y - 18}
+            width={90}
+            height={36}
+            rx={18}
+            fill="#0EA5E9"
+            stroke="#fff"
+            strokeWidth={2}
+          />
+          <SvgText
+            x={startNode.x}
+            y={startNode.y + 1}
+            fontSize={12}
+            fill="#fff"
+            fontWeight="bold"
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {t('warehouse.start')}
+          </SvgText>
+        </G>
+        {/* End Marker */}
+        <G>
+          <Rect
+            x={endNode.x - 45}
+            y={endNode.y - 18}
+            width={90}
+            height={36}
+            rx={18}
+            fill="#EF4444"
+            stroke="#fff"
+            strokeWidth={2}
+          />
+          <SvgText
+            x={endNode.x}
+            y={endNode.y + 1}
+            fontSize={12}
+            fill="#fff"
+            fontWeight="bold"
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            {t('warehouse.end')}
+          </SvgText>
+        </G>
+      </G>
+    );
   };
 
   const renderOptimizedPath = () => {
     if (!structure.nodes || optimizedPath.length < 2) return null;
 
     const pathLines = [];
+    let startNodeObj: NavigationNode | undefined;
+    let endNodeObj: NavigationNode | undefined;
 
     for (let i = 0; i < optimizedPath.length - 1; i++) {
       const nodeAId = optimizedPath[i];
@@ -637,6 +673,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
 
       const nodeA = structure.nodes?.find((n) => n.id === nodeAId);
       const nodeB = structure.nodes?.find((n) => n.id === nodeBId);
+
+      if (i === 0) startNodeObj = nodeA;
+      if (i === optimizedPath.length - 2) endNodeObj = nodeB;
 
       if (nodeA && nodeB) {
         const currentSegment = [nodeAId, nodeBId].sort().join("|");
@@ -670,7 +709,61 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
       }
     }
 
-    return <G>{pathLines}</G>;
+    return (
+      <G>
+        {pathLines}
+        {startNodeObj && (
+          <G>
+            <Rect
+              x={startNodeObj.x - 45}
+              y={startNodeObj.y - 18}
+              width={90}
+              height={36}
+              rx={18}
+              fill="#0EA5E9"
+              stroke="#fff"
+              strokeWidth={2}
+            />
+            <SvgText
+              x={startNodeObj.x}
+              y={startNodeObj.y + 1}
+              fontSize={12}
+              fill="#fff"
+              fontWeight="bold"
+              textAnchor="middle"
+              alignmentBaseline="middle"
+            >
+              {t('warehouse.start')}
+            </SvgText>
+          </G>
+        )}
+        {endNodeObj && (
+          <G>
+            <Rect
+              x={endNodeObj.x - 45}
+              y={endNodeObj.y - 18}
+              width={90}
+              height={36}
+              rx={18}
+              fill="#9D174D"
+              stroke="#fff"
+              strokeWidth={2}
+            />
+            <SvgText
+              x={endNodeObj.x}
+              y={endNodeObj.y + 1}
+              fontSize={12}
+              fill="#fff"
+              fontWeight="bold"
+              textAnchor="middle"
+              alignmentBaseline="middle"
+            >
+              {t('warehouse.end')}
+            </SvgText>
+          </G>
+        )}
+      </G>
+    );
   };
 
   const mapYMax = (structure as any).length ?? structure.height;
@@ -690,9 +783,9 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
         <Animated.View className="flex-1" onLayout={onMapLayout}>
           <Animated.View style={animatedStyle}>
             <Svg
-              width={structure.width}
-              height={mapYMax}
-              viewBox={`0 0 ${structure.width} ${mapYMax}`}
+              width={contentBounds.width}
+              height={contentBounds.height}
+              viewBox={`${contentBounds.minX} ${contentBounds.minY} ${contentBounds.width} ${contentBounds.height}`}
             >
               <Defs>
                 <Pattern
@@ -785,7 +878,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             className="w-[14px] h-[14px] rounded-[5px]"
             style={{ backgroundColor: COLORS.primary, opacity: 0.3 }}
           />
-          <Text className="text-[13px] font-bold text-slate-500">Zone</Text>
+          <Text className="text-[13px] font-bold text-slate-500">{t("warehouse.zone")}</Text>
         </View>
         <View className="flex-row items-center gap-2">
           <View
@@ -793,12 +886,12 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             style={{ backgroundColor: COLORS.success }}
           />
           <Text className="text-[13px] font-bold text-slate-500">
-            {isCounting ? "Count locations" : "Suggested locations"}
+            {isCounting ? t("warehouse.countLocations") : t("warehouse.suggestedLocations")}
           </Text>
         </View>
         <View className="flex-row items-center gap-2">
           <View className="w-[14px] h-[14px] rounded-[5px] bg-slate-200 border border-slate-300" />
-          <Text className="text-[13px] font-bold text-slate-500">Shelf</Text>
+          <Text className="text-[13px] font-bold text-slate-500">{t("warehouse.shelf")}</Text>
         </View>
         <View className="flex-row items-center gap-2">
           <View
@@ -806,7 +899,7 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
             style={{ backgroundColor: "#EC4899" }}
           />
           <Text className="text-[13px] font-bold text-slate-500">
-            Opt. Path
+            {t("warehouse.optPath")}
           </Text>
         </View>
       </View>

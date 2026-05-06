@@ -109,7 +109,9 @@ export default function StaffTransferDetailScreen() {
             <View style={styles.itemMainInfo}>
                 <View style={styles.itemHeader}>
                     <Text style={styles.productName} numberOfLines={1}>{item.productName || `${t('common.product')} #${item.productId}`}</Text>
-                    <Text style={styles.itemSku}>SKU: {item.sku || 'N/A'}</Text>
+                    {item.sku && (
+                        <Text style={styles.itemSku}>{t('common.sku')}: {item.sku}</Text>
+                    )}
                 </View>
                 <View style={styles.qtyBadge}>
                     <Text style={styles.quantityText}>{item.quantity}</Text>

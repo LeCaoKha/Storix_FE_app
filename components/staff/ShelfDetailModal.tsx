@@ -200,6 +200,7 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
     // getPendingQty removed to break the loop - we only restore once on visible/shelf change
     countDraftByShelfItem,
     getShelfItemDraftKey,
+    getPendingQty,
   ]);
 
   // Sync selectedQuantities to Zustand store when they change
@@ -347,7 +348,7 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
   const handleConfirmPress = useCallback(() => {
     if (isCountMode) {
       if (!ticketId) {
-        AlertService.warning("Missing stock count ticket", "Stock count ticket ID not found to save results.");
+        AlertService.warning(t('warehouse.missingTicket'), t('warehouse.missingTicketMsg'));
         return;
       }
 
@@ -361,13 +362,13 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
       });
 
       if (payload.length === 0) {
-        AlertService.warning("No items", "This shelf has no items to count.");
+        AlertService.warning(t('warehouse.noItemsOnShelf'), t('warehouse.noItemsOnShelfMsg'));
         return;
       }
 
       const invalidItem = payload.find((entry) => !Number.isFinite(entry.countedQuantity));
       if (invalidItem) {
-        AlertService.warning("Missing quantity", "Please enter count quantity for all items on the shelf.");
+        AlertService.warning(t('warehouse.missingQuantity'), t('warehouse.missingQuantityMsg'));
         return;
       }
 
@@ -408,20 +409,20 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
 
           const countDifference = currentShelfCountSummary.totalCounted - currentShelfCountSummary.totalSystem;
           AlertService.success(
-            "Count saved",
+            t('warehouse.countSaved'),
             isStaff
-              ? "Inventory results for this shelf have been saved successfully."
+              ? t('warehouse.countSavedMsg')
               : (countDifference === 0
-                ? "Stock count quantity updated for this shelf."
-                : `Stock count saved for this shelf. Total discrepancy is ${countDifference}.`),
+                ? t('warehouse.countUpdatedMsg')
+                : t('warehouse.countSavedDiscrepancyMsg', { count: countDifference })),
             onClose,
           );
           return;
         } catch (error: any) {
           console.error("[ShelfDetailModal] Failed to save stock count", error);
           AlertService.error(
-            "Stock count error",
-            String(error?.response?.data?.message || "Unable to save stock count results. Please try again.").trim(),
+            t('warehouse.countError'),
+            String(error?.response?.data?.message || t('warehouse.countErrorMsg')).trim(),
           );
         } finally {
           setIsCountProcessing(false);
@@ -435,8 +436,8 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
 
     if (selectedTotalQuantity <= 0) {
       AlertService.warning(
-        "Quantity not selected",
-        "Please enter a quantity greater than 0 before confirming.",
+        t('warehouse.quantityNotSelected'),
+        t('warehouse.quantityNotSelectedMsg'),
       );
       return;
     }
@@ -472,6 +473,7 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
     clearShelfPending,
     recommendedItems,
     isStaff,
+    t,
   ]);
 
   if (!shelf || !zone) return null;
@@ -696,7 +698,7 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                                     className="text-[15px] font-bold text-slate-800 flex-1"
                                     numberOfLines={1}
                                   >
-                                    {item.name || `Product #${item.productId}`}
+                                    {item.name || `${t('common.product')} #${item.productId}`}
                                   </Text>
                                   <View className="px-2 py-[3px] rounded-md" style={{ backgroundColor: COLORS.info + '12' }}>
                                     <Text className="text-[10px] font-extrabold" style={{ color: COLORS.info }}>
