@@ -15,3 +15,4 @@ export const getProductInventoryLocations = async (
     const res = await api.get(`/api/Products/inventory-locations/${userId}/${productId}/warehouse/${warehouseId}`);
     return res.data;
 };
+

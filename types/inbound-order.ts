@@ -152,3 +152,90 @@ export interface UpdateInboundItemPayload {
     quantity: number;
   }[];
 }
+
+// ============== Quality Check Types ==============
+
+export interface QualityCheckItemRequest {
+  inboundOrderItemId: number;
+  productId?: number;
+  receivedQuantity: number;
+  passedQuantity: number;
+  failureReason?: string;
+  notes?: string;
+}
+
+export interface SubmitQualityCheckRequest {
+  inspectedBy: number;
+  items: QualityCheckItemRequest[];
+}
+
+export interface QualityCheckItemDto {
+  qualityCheckId: number;
+  inboundOrderItemId: number;
+  productId: number;
+  productName: string;
+  sku: string;
+  receivedQuantity: number;
+  passedQuantity: number;
+  failedQuantity: number;
+  failureReason?: string;
+  notes?: string;
+  inspectedBy: number;
+  inspectedAt: string;
+}
+
+export interface InboundQualityCheckResult {
+  inboundOrderId: number;
+  items: QualityCheckItemDto[];
+}
+
+// ============== Barcode Scanning Types ==============
+
+export interface BarcodeScanLineDto {
+  productId: number;
+  productName: string;
+  sku: string;
+  expectedQuantity: number;
+  scannedQuantity: number;
+  isComplete: boolean;
+  isOverScanned: boolean;
+}
+
+export interface BarcodeScanSessionDto {
+  sessionId: string;
+  inboundOrderId: number;
+  staffId: number;
+  startedAt: string;
+  isFinalized: boolean;
+  finalizedAt?: string;
+  lines: BarcodeScanLineDto[];
+  allComplete: boolean;
+}
+
+export interface ScanBarcodeRequest {
+  sku: string;
+}
+
+export interface ScanResultDto {
+  success: boolean;
+  warningMessage?: string;
+  updatedLine: BarcodeScanLineDto;
+  session: BarcodeScanSessionDto;
+}
+
+export interface BarcodeQcOverride {
+  productId: number;
+  receivedQuantity: number;
+  passedQuantity: number;
+  failureReason?: string;
+  notes?: string;
+}
+
+export interface FinalizeBarcodeSessionRequest {
+  qcOverrides?: BarcodeQcOverride[];
+}
+
+export interface StartBarcodeSessionRequest {
+  staffId: number;
+}
+

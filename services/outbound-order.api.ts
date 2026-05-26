@@ -146,3 +146,4 @@ export const getOutboundOrdersByStaff = async (companyId: number, staffId: numbe
   const res = await api.get(`/api/InventoryOutbound/get-outbound-orders-for-staff/${companyId}/${staffId}`);
   return res.data as OutboundOrder[];
 };
+

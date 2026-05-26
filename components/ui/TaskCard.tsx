@@ -1,6 +1,6 @@
 import { COLORS } from '@/constants/color';
-import { Task, TaskStatus } from '@/types/order';
 import { useTranslation } from '@/hooks/useTranslation';
+import { Task, TaskStatus } from '@/types/order';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
@@ -44,7 +44,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       case 'inventory_count':
       case 'count': 
         return t('tasks.inventoryCount');
-      case 'transfer': return t('tasks.transfer');
       default: return type;
     }
   };
@@ -95,37 +94,28 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     switch (task.type) {
       case 'inbound':
         router.push({
-          pathname: '/(staff-tabs)/tasks/inbound/[id]',
+          pathname: '/(tabs)/tasks/inbound/[id]',
           params: {
             id: String(task.relatedOrderId || task.id),
-            from: '/(staff-tabs)/tasks',
+            from: '/(tabs)/tasks',
           },
         } as any);
         break;
       case 'outbound':
         router.push({
-          pathname: '/(staff-tabs)/tasks/outbound/[id]',
+          pathname: '/(tabs)/tasks/outbound/[id]',
           params: {
             id: String(task.relatedOrderId || task.id),
-            from: '/(staff-tabs)/tasks',
+            from: '/(tabs)/tasks',
           },
         } as any);
         break;
       case 'count':
         router.push({
-          pathname: '/(staff-tabs)/tasks/count/[id]',
+          pathname: '/(tabs)/tasks/count/[id]',
           params: {
             id: String(task.relatedOrderId || task.id),
-            from: '/(staff-tabs)/tasks',
-          },
-        } as any);
-        break;
-      case 'transfer':
-        router.push({
-          pathname: '/(staff-tabs)/tasks/transfer/[id]',
-          params: {
-            id: String(task.relatedOrderId || task.id),
-            from: '/(staff-tabs)/tasks',
+            from: '/(tabs)/tasks',
           },
         } as any);
         break;

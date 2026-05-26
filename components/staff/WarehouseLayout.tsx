@@ -906,3 +906,4 @@ export const WarehouseLayout: React.FC<WarehouseLayoutProps> = ({
     </View>
   );
 };
+

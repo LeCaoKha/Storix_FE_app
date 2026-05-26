@@ -1,5 +1,6 @@
-import ChangePasswordScreen from '@/features/share/profile/ChangePasswordScreen';
+import ChangePasswordScreen from '@/features/profile/ChangePasswordScreen';
 
 export default function Page() {
     return <ChangePasswordScreen />;
 }
+

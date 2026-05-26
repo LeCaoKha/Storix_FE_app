@@ -1,4 +1,4 @@
-import type { User, UserWarehouseAssignment } from '@/types/auth.types';
+import type { User, UserWarehouseAssignment } from '@/types/auth';
 import { api } from './axios.instance';
 
 export const normalizeWarehouseAssignments = (userProfile: any): UserWarehouseAssignment[] => {
@@ -80,3 +80,4 @@ export const updateProfile = async (userId: number, formData: FormData): Promise
     });
     return res.data;
 };
+

@@ -162,3 +162,4 @@ export const cancelTransferOrder = async (id: number, payload?: CancelTransferOr
     const res = await api.post(`/api/warehouse-transfers/${id}/cancel`, payload || {});
     return normalizeTransferOrder(res.data);
 };
+

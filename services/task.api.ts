@@ -25,6 +25,7 @@ export const getTasks = async (staffId: number, companyId: number, _currentWareh
                 assignedTo: String(staffId),
                 relatedOrderId: String(ticket.id),
                 location: ticket.warehouse?.name,
+                originalStatus: ticket.status,
                 createdAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
                 updatedAt: ticket.createdAt ? new Date(ticket.createdAt) : new Date(),
             }));
@@ -104,10 +105,12 @@ export const getTasks = async (staffId: number, companyId: number, _currentWareh
 function mapInboundStatus(status?: string): TaskStatus {
     switch (status?.toLowerCase()) {
         case 'waiting for payment':
+        case 'waiting_receipt':
             return TaskStatus.PENDING;
-        case 'partially completed':
+        case 'quality_check':
             return TaskStatus.IN_PROGRESS;
         case 'completed':
+        case 'partially completed':
             return TaskStatus.COMPLETED;
         default:
             return TaskStatus.PENDING;
@@ -153,4 +156,5 @@ function mapCountStatus(status?: string): TaskStatus {
             return TaskStatus.PENDING;
     }
 }
+
 

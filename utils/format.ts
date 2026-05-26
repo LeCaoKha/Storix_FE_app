@@ -18,3 +18,4 @@ export const formatVND = (amount: number): string => {
 export const formatNumber = (amount: number): string => {
     return amount.toLocaleString('vi-VN');
 };
+

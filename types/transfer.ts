@@ -95,3 +95,4 @@ export interface RejectTransferOrderRequest {
 export interface CancelTransferOrderRequest {
     reason?: string;
 }
+

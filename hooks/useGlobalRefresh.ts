@@ -16,3 +16,4 @@ export const useGlobalRefresh = (onRefresh: () => void | Promise<void>) => {
     }
   }, [refreshSignal]);
 };
+
