@@ -1,4 +1,4 @@
-import { Button, Card, RefreshContainer, ScreenHeader } from '@/components';
+import { Button, Card, Input, RefreshContainer, ScreenHeader } from '@/components';
 import { COLORS } from '@/constants/color';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
@@ -19,6 +19,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
+    Modal,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -44,6 +46,8 @@ export default function InboundBarcodeScanScreen() {
     const [lastScannedSku, setLastScannedSku] = useState<string | null>(null);
     const [scanError, setScanError] = useState<string | null>(null);
     const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
+    const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
+    const [qcOverridesState, setQcOverridesState] = useState<Record<number, { passedQuantity: number; failureReason: string; notes: string }>>({});
     
     const [permission, requestPermission] = useCameraPermissions();
     const [isCameraActive, setIsCameraActive] = useState(true);
@@ -146,10 +150,84 @@ export default function InboundBarcodeScanScreen() {
     const handleFinalize = async () => {
         if (!session) return;
         
+        const scannedLines = session.lines.filter(line => line.scannedQuantity > 0);
+        if (scannedLines.length === 0) {
+            AlertService.error(t('common.error'), t('inbound.noScannedItemsError') || "Chưa có sản phẩm nào được quét.");
+            return;
+        }
+
+        const initialOverrides: Record<number, { passedQuantity: number; failureReason: string; notes: string }> = {};
+        scannedLines.forEach(line => {
+            const passedDefault = Math.min(line.scannedQuantity, line.expectedQuantity);
+            let defaultReason = '';
+            if (line.scannedQuantity > line.expectedQuantity) {
+                defaultReason = `Quét thừa: ${line.scannedQuantity - line.expectedQuantity} sản phẩm`;
+            } else if (line.scannedQuantity < line.expectedQuantity) {
+                defaultReason = `Giao thiếu: thiếu ${line.expectedQuantity - line.scannedQuantity} sản phẩm`;
+            }
+            initialOverrides[line.productId] = {
+                passedQuantity: passedDefault,
+                failureReason: defaultReason,
+                notes: ''
+            };
+        });
+        setQcOverridesState(initialOverrides);
+        setIsReviewModalVisible(true);
+    };
+
+    const handleSubmitFinalize = async () => {
+        if (!session) return;
+
+        // Validation
+        const invalidItem = session.lines.find(line => {
+            if (line.scannedQuantity <= 0) return false;
+            const override = qcOverridesState[line.productId];
+            if (!override) return false;
+            
+            if (override.passedQuantity > line.scannedQuantity) {
+                return true;
+            }
+            
+            const isShortOrError = (override.passedQuantity < line.scannedQuantity) || (line.scannedQuantity < line.expectedQuantity);
+            if (isShortOrError && !override.failureReason.trim()) {
+                return true;
+            }
+            
+            return false;
+        });
+
+        if (invalidItem) {
+            const override = qcOverridesState[invalidItem.productId];
+            if (override && override.passedQuantity > invalidItem.scannedQuantity) {
+                AlertService.error(t('common.error'), t('inbound.notEnoughPassed') || "Số lượng đạt yêu cầu phải nhỏ hơn hoặc bằng số lượng nhận");
+            } else {
+                AlertService.error(t('common.error'), t('inbound.failureReasonRequired') || "Vui lòng nhập lý do lỗi cho sản phẩm thiếu hụt hoặc quét thừa.");
+            }
+            return;
+        }
+
         setIsSubmitting(true);
         try {
-            await finalizeBarcodeSession(numericId, { qcOverrides: [] });
+            const overrides = Object.entries(qcOverridesState)
+                .map(([productIdStr, state]) => {
+                    const productId = Number(productIdStr);
+                    const line = session.lines.find(l => l.productId === productId);
+                    if (!line || line.scannedQuantity <= 0) return null;
+
+                    return {
+                        productId,
+                        receivedQuantity: line.scannedQuantity,
+                        passedQuantity: state.passedQuantity,
+                        failureReason: state.failureReason.trim() || undefined,
+                        notes: state.notes.trim() || undefined
+                    };
+                })
+                .filter((item): item is NonNullable<typeof item> => item !== null);
+
+            await finalizeBarcodeSession(numericId, { qcOverrides: overrides });
             AlertService.success(t('common.success'), t('inbound.qcSuccess'));
+            
+            setIsReviewModalVisible(false);
             
             // Go to inbound detail and request the detail screen to open warehouse modal
             router.replace({
@@ -394,6 +472,155 @@ export default function InboundBarcodeScanScreen() {
                     disabled={isSubmitting || session.lines.length === 0}
                 />
             </View>
+
+            <Modal
+                visible={isReviewModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setIsReviewModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{t('inbound.qualityCheck')}</Text>
+                            <TouchableOpacity onPress={() => setIsReviewModalVisible(false)}>
+                                <Feather name="x" size={24} color={COLORS.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+                            <Text style={styles.modalSubtitle}>
+                                {t('inbound.qualityCheckSubtitle')}
+                            </Text>
+
+                            {session.lines
+                                .filter(line => line.scannedQuantity > 0)
+                                .map(line => {
+                                    const override = qcOverridesState[line.productId];
+                                    if (!override) return null;
+
+                                    const isError = (override.passedQuantity < line.scannedQuantity) || (line.scannedQuantity < line.expectedQuantity);
+
+                                    return (
+                                        <Card key={`review-line-${line.productId}`} style={styles.reviewCard}>
+                                            <Text style={styles.reviewProductName}>{line.productName}</Text>
+                                            <Text style={styles.reviewProductSku}>{line.sku}</Text>
+                                            
+                                            <View style={styles.reviewQtyRow}>
+                                                <Text style={styles.reviewQtyLabel}>
+                                                    {t('inbound.workflowSummaryExpected')}: <Text style={{fontWeight: '600'}}>{line.expectedQuantity}</Text>
+                                                    {'  |  '}
+                                                    {t('inbound.workflowSummaryReceived')}: <Text style={{fontWeight: '600'}}>{line.scannedQuantity}</Text>
+                                                </Text>
+                                            </View>
+
+                                            <View style={styles.reviewInputGrid}>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.reviewInputLabel}>{t('inbound.passedQty')} *</Text>
+                                                    <TextInput
+                                                        style={styles.reviewQtyInput}
+                                                        value={String(override.passedQuantity)}
+                                                        onChangeText={(val) => {
+                                                            const qty = parseInt(val, 10) || 0;
+                                                            setQcOverridesState(prev => {
+                                                                const current = prev[line.productId];
+                                                                if (!current) return prev;
+                                                                
+                                                                const nextPassed = Math.min(qty, line.scannedQuantity);
+                                                                let nextReason = current.failureReason;
+                                                                
+                                                                if (nextPassed < line.scannedQuantity && !nextReason) {
+                                                                    nextReason = line.scannedQuantity > line.expectedQuantity 
+                                                                        ? `Quét thừa: ${line.scannedQuantity - line.expectedQuantity} sản phẩm`
+                                                                        : 'Hàng lỗi/thiếu hụt thực tế';
+                                                                } else if (nextPassed === line.scannedQuantity && line.scannedQuantity >= line.expectedQuantity) {
+                                                                    nextReason = '';
+                                                                } else if (nextPassed === line.scannedQuantity && line.scannedQuantity < line.expectedQuantity && !nextReason) {
+                                                                    nextReason = `Giao thiếu: thiếu ${line.expectedQuantity - line.scannedQuantity} sản phẩm`;
+                                                                }
+
+                                                                return {
+                                                                    ...prev,
+                                                                    [line.productId]: {
+                                                                        ...current,
+                                                                        passedQuantity: nextPassed,
+                                                                        failureReason: nextReason
+                                                                    }
+                                                                };
+                                                            });
+                                                        }}
+                                                        keyboardType="number-pad"
+                                                    />
+                                                </View>
+                                            </View>
+
+                                            {isError && (
+                                                <View style={styles.reviewFailureSection}>
+                                                    <Text style={styles.reviewInputLabel}>{t('inbound.failureReason')} *</Text>
+                                                    <Input
+                                                        placeholder={t('inbound.failureReasonPlaceholder')}
+                                                        value={override.failureReason}
+                                                        onChangeText={(val) => {
+                                                            setQcOverridesState(prev => ({
+                                                                ...prev,
+                                                                [line.productId]: {
+                                                                    ...prev[line.productId],
+                                                                    failureReason: val
+                                                                }
+                                                            }));
+                                                        }}
+                                                        style={styles.reviewReasonInput}
+                                                        containerStyle={{ marginBottom: 0 }}
+                                                    />
+                                                </View>
+                                            )}
+
+                                            <View style={{ marginTop: 12 }}>
+                                                <Text style={styles.reviewInputLabel}>{t('inbound.notes')}</Text>
+                                                <Input
+                                                    placeholder="..."
+                                                    value={override.notes}
+                                                    onChangeText={(val) => {
+                                                        setQcOverridesState(prev => ({
+                                                            ...prev,
+                                                            [line.productId]: {
+                                                                ...prev[line.productId],
+                                                                notes: val
+                                                            }
+                                                        }));
+                                                    }}
+                                                    style={styles.reviewNotesInput}
+                                                    containerStyle={{ marginBottom: 0 }}
+                                                />
+                                            </View>
+                                        </Card>
+                                    );
+                                })}
+                        </ScrollView>
+
+                        <View style={[styles.modalFooter, { paddingBottom: Math.max(16, insets.bottom) }]}>
+                            <TouchableOpacity 
+                                style={styles.modalCancelBtn} 
+                                onPress={() => setIsReviewModalVisible(false)}
+                                disabled={isSubmitting}
+                            >
+                                <Text style={styles.modalCancelBtnText}>{t('common.cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.modalConfirmBtn, isSubmitting && styles.disabledConfirmBtn]} 
+                                onPress={handleSubmitFinalize}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.modalConfirmBtnText}>{t('common.confirm')}</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -721,5 +948,144 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderTopWidth: 1,
         borderTopColor: COLORS.border,
-    }
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        height: '85%',
+        paddingTop: 16,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.text,
+    },
+    modalSubtitle: {
+        fontSize: 13,
+        color: COLORS.textMuted,
+        marginHorizontal: 20,
+        marginTop: 16,
+        marginBottom: 12,
+    },
+    modalContent: {
+        flex: 1,
+    },
+    reviewCard: {
+        marginHorizontal: 20,
+        marginBottom: 16,
+        padding: 16,
+        backgroundColor: '#F9FAFB',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    reviewProductName: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.text,
+        marginBottom: 2,
+    },
+    reviewProductSku: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        marginBottom: 8,
+    },
+    reviewQtyRow: {
+        marginBottom: 12,
+    },
+    reviewQtyLabel: {
+        fontSize: 13,
+        color: COLORS.text,
+    },
+    reviewInputGrid: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    reviewInputLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+        marginBottom: 6,
+    },
+    reviewQtyInput: {
+        height: 44,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 8,
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        fontSize: 15,
+        color: COLORS.text,
+    },
+    reviewFailureSection: {
+        marginTop: 12,
+        padding: 12,
+        backgroundColor: COLORS.danger + '05',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.danger + '20',
+    },
+    reviewReasonInput: {
+        height: 40,
+        fontSize: 13,
+        backgroundColor: '#fff',
+    },
+    reviewNotesInput: {
+        height: 40,
+        fontSize: 13,
+        backgroundColor: '#fff',
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        gap: 12,
+    },
+    modalCancelBtn: {
+        flex: 1,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: '#fff',
+    },
+    modalCancelBtnText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.textMuted,
+    },
+    modalConfirmBtn: {
+        flex: 2,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 10,
+        backgroundColor: COLORS.primary,
+    },
+    modalConfirmBtnText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    disabledConfirmBtn: {
+        opacity: 0.6,
+    },
 });
