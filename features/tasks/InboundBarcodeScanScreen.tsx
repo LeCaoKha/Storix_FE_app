@@ -152,7 +152,7 @@ export default function InboundBarcodeScanScreen() {
         
         const scannedLines = session.lines.filter(line => line.scannedQuantity > 0);
         if (scannedLines.length === 0) {
-            AlertService.error(t('common.error'), t('inbound.noScannedItemsError') || "Chưa có sản phẩm nào được quét.");
+            AlertService.error(t('common.error'), t('inbound.noScannedItemsError'));
             return;
         }
 
@@ -161,9 +161,9 @@ export default function InboundBarcodeScanScreen() {
             const passedDefault = Math.min(line.scannedQuantity, line.expectedQuantity);
             let defaultReason = '';
             if (line.scannedQuantity > line.expectedQuantity) {
-                defaultReason = `Quét thừa: ${line.scannedQuantity - line.expectedQuantity} sản phẩm`;
+                defaultReason = t('inbound.overScanReason', { count: line.scannedQuantity - line.expectedQuantity });
             } else if (line.scannedQuantity < line.expectedQuantity) {
-                defaultReason = `Giao thiếu: thiếu ${line.expectedQuantity - line.scannedQuantity} sản phẩm`;
+                defaultReason = t('inbound.shortInboundReason', { count: line.expectedQuantity - line.scannedQuantity });
             }
             initialOverrides[line.productId] = {
                 passedQuantity: passedDefault,
@@ -201,7 +201,7 @@ export default function InboundBarcodeScanScreen() {
             if (override && override.passedQuantity > invalidItem.scannedQuantity) {
                 AlertService.error(t('common.error'), t('inbound.notEnoughPassed') || "Số lượng đạt yêu cầu phải nhỏ hơn hoặc bằng số lượng nhận");
             } else {
-                AlertService.error(t('common.error'), t('inbound.failureReasonRequired') || "Vui lòng nhập lý do lỗi cho sản phẩm thiếu hụt hoặc quét thừa.");
+                AlertService.error(t('common.error'), t('inbound.failureReasonRequired'));
             }
             return;
         }
@@ -531,12 +531,12 @@ export default function InboundBarcodeScanScreen() {
                                                                 
                                                                 if (nextPassed < line.scannedQuantity && !nextReason) {
                                                                     nextReason = line.scannedQuantity > line.expectedQuantity 
-                                                                        ? `Quét thừa: ${line.scannedQuantity - line.expectedQuantity} sản phẩm`
-                                                                        : 'Hàng lỗi/thiếu hụt thực tế';
+                                                                        ? t('inbound.overScanReason', { count: line.scannedQuantity - line.expectedQuantity })
+                                                                        : t('inbound.defaultFailureReason');
                                                                 } else if (nextPassed === line.scannedQuantity && line.scannedQuantity >= line.expectedQuantity) {
                                                                     nextReason = '';
                                                                 } else if (nextPassed === line.scannedQuantity && line.scannedQuantity < line.expectedQuantity && !nextReason) {
-                                                                    nextReason = `Giao thiếu: thiếu ${line.expectedQuantity - line.scannedQuantity} sản phẩm`;
+                                                                    nextReason = t('inbound.shortInboundReason', { count: line.expectedQuantity - line.scannedQuantity });
                                                                 }
 
                                                                 return {

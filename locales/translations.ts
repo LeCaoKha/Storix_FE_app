@@ -238,6 +238,11 @@ export const translations = {
       grantPermission: 'Grant Permission',
       scanInput: 'Scan Input',
       useCamera: 'Use Camera',
+      noScannedItemsError: 'No products have been scanned yet.',
+      failureReasonRequired: 'Please enter the failure reason for short or over-scanned items.',
+      overScanReason: 'Over-scan: {{count}} excess item(s)',
+      shortInboundReason: 'Short inbound: missing {{count}} item(s)',
+      defaultFailureReason: 'Damaged / Defective items',
     },
     inventoryCount: {
       ticketTitle: 'Inventory Count',
@@ -667,6 +672,11 @@ export const translations = {
       grantPermission: 'Cấp quyền',
       scanInput: 'Nhập mã quét',
       useCamera: 'Sử dụng Camera',
+      noScannedItemsError: 'Chưa có sản phẩm nào được quét.',
+      failureReasonRequired: 'Vui lòng nhập lý do lỗi cho sản phẩm thiếu hụt hoặc quét thừa.',
+      overScanReason: 'Quét thừa: {{count}} sản phẩm',
+      shortInboundReason: 'Giao thiếu: thiếu {{count}} sản phẩm',
+      defaultFailureReason: 'Hàng lỗi/hỏng thực tế',
     },
     inventoryCount: {
       ticketTitle: 'Phiếu kiểm kê',
