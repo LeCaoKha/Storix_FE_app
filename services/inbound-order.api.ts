@@ -1,25 +1,20 @@
 import type {
+    BarcodeScanSessionDto,
     CreateInboundRequestPayload,
+    FinalizeBarcodeSessionRequest,
     InboundItemStorageRecommendations,
     InboundOrder,
-    UpdateInboundItemPayload,
-    SubmitQualityCheckRequest,
     InboundQualityCheckResult,
-    BarcodeScanSessionDto,
     ScanBarcodeRequest,
     ScanResultDto,
-    FinalizeBarcodeSessionRequest,
-    StartBarcodeSessionRequest
+    StartBarcodeSessionRequest,
+    UpdateInboundItemPayload
 } from '@/types/inbound-order';
 import { api } from './axios.instance';
 
 // Re-export types để tiện sử dụng
 export type {
-    CreateInboundRequestPayload, InboundItemStorageRecommendations, InboundOrder, InboundOrderItem,
-    InboundRequest, UpdateInboundItemPayload, UpdateInboundRequestStatusPayload,
-    SubmitQualityCheckRequest, InboundQualityCheckResult,
-    BarcodeScanSessionDto, ScanBarcodeRequest, ScanResultDto,
-    FinalizeBarcodeSessionRequest, StartBarcodeSessionRequest
+    BarcodeScanSessionDto, CreateInboundRequestPayload, FinalizeBarcodeSessionRequest, InboundItemStorageRecommendations, InboundOrder, InboundOrderItem, InboundQualityCheckResult, InboundRequest, ScanBarcodeRequest, ScanResultDto, StartBarcodeSessionRequest, UpdateInboundItemPayload, UpdateInboundRequestStatusPayload
 } from '@/types/inbound-order';
 
 // ============== API Functions ==============
@@ -200,16 +195,6 @@ export const exportInboundRequest = async (requestId: number, format: 'csv' | 'e
 export const exportInboundTicket = async (orderId: number, format: 'csv' | 'excel') => {
   const endpoint = `/api/InventoryInbound/export/inbound-ticket/${orderId}/${format}`;
   return `${api.defaults.baseURL}${endpoint}`;
-};
-
-/**
- * Nộp kết quả kiểm tra chất lượng (Quality Check)
- */
-export const submitInboundQualityCheck = async (orderId: number, payload: SubmitQualityCheckRequest) => {
-  console.log(`[API] POST /api/InventoryInbound/tickets/${orderId}/quality-check`);
-  console.log('[API] Payload:', JSON.stringify(payload, null, 2));
-  const res = await api.post(`/api/InventoryInbound/tickets/${orderId}/quality-check`, payload);
-  return res.data as InboundQualityCheckResult;
 };
 
 /**

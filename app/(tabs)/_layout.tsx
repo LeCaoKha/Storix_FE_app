@@ -143,13 +143,6 @@ export default function StaffTabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="tasks/inbound/qc/[id]"
-                options={{
-                    href: null,
-                    tabBarStyle: { display: 'none' },
-                }}
-            />
-            <Tabs.Screen
                 name="tasks/inbound/scan/[id]"
                 options={{
                     href: null,

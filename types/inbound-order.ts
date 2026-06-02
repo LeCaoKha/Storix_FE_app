@@ -155,20 +155,6 @@ export interface UpdateInboundItemPayload {
 
 // ============== Quality Check Types ==============
 
-export interface QualityCheckItemRequest {
-  inboundOrderItemId: number;
-  productId?: number;
-  receivedQuantity: number;
-  passedQuantity: number;
-  failureReason?: string;
-  notes?: string;
-}
-
-export interface SubmitQualityCheckRequest {
-  inspectedBy: number;
-  items: QualityCheckItemRequest[];
-}
-
 export interface QualityCheckItemDto {
   qualityCheckId: number;
   inboundOrderItemId: number;

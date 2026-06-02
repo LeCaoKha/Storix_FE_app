@@ -94,7 +94,8 @@ export default function InboundBarcodeScanScreen() {
         try {
             const data = await startBarcodeSession(numericId, { staffId: user.id });
             setSession(data);
-            AlertService.success(t('common.success'), t('inbound.sessionStarted'));
+            // Avoid modal popup on start — give subtle haptic feedback instead
+            try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         } catch (error: any) {
             AlertService.error(t('common.error'), error.response?.data?.message || t('inbound.startSessionError'));
         } finally {
@@ -150,10 +151,10 @@ export default function InboundBarcodeScanScreen() {
             await finalizeBarcodeSession(numericId, { qcOverrides: [] });
             AlertService.success(t('common.success'), t('inbound.qcSuccess'));
             
-            // Go to details
+            // Go to inbound detail and request the detail screen to open warehouse modal
             router.replace({
                 pathname: '/(tabs)/tasks/inbound/[id]',
-                params: { id: String(numericId) },
+                params: { id: String(numericId), openWarehouse: '1' },
             } as any);
         } catch (error: any) {
             AlertService.error(t('common.error'), error.response?.data?.message || t('inbound.finalizeError'));

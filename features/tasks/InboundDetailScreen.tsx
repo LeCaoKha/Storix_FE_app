@@ -4,7 +4,7 @@ import { COLORS } from '@/constants/color';
 import { useInboundOrdersByStaff, useInboundStorageRecommendations, useInboundTicket, useUpdateInboundTicketItems } from '@/hooks';
 import { useAppBack } from '@/hooks/useAppBack';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useWarehouseStructure } from '@/hooks/warehouse.hooks';
+import { useWarehouseStructure, useWarehouses } from '@/hooks/warehouse.hooks';
 import { getInboundQualityCheckResult } from '@/services/inbound-order.api';
 import { AlertService } from '@/stores/alert.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -56,6 +56,8 @@ export default function InboundDetailScreen() {
     const warehouseId = useMemo(() => order?.warehouse?.id || order?.warehouseId, [order]);
     const { refetch: refetchStructure } = useWarehouseStructure(warehouseId);
 
+    const { data: warehouses } = useWarehouses();
+
     const openWarehouseForItem = (item: InboundOrderItem) => {
         const bins = recommendationByItemId
             .get(item.id)
@@ -63,10 +65,21 @@ export default function InboundDetailScreen() {
             ?.map((recommendation) => recommendation.binIdCode)
             .filter((binCode): binCode is string => !!binCode) || [];
 
+        // Resolve warehouseId: prefer order's warehouse, else fallback to first known warehouse
+        const resolvedWarehouseId = order?.warehouse?.id || order?.warehouseId || (warehouses && warehouses.length > 0 ? warehouses[0].id : undefined);
+
+        console.log('[DEBUG] openWarehouseForItem -> routing to warehouse-view', {
+            resolvedWarehouseId,
+            inboundOrderId: order?.id,
+            focusedBins: bins,
+            focusedItemId: item.id,
+            focusedItemName: item.name || item.product?.name,
+        });
+
         router.push({
             pathname: '/warehouse-view',
             params: {
-                warehouseId: String(order?.warehouse?.id || order?.warehouseId || ''),
+                warehouseId: String(resolvedWarehouseId || ''),
                 inboundOrderId: String(order?.id || ''),
                 focusedBins: bins.join(','),
                 focusedItemId: String(item.id),
@@ -75,7 +88,6 @@ export default function InboundDetailScreen() {
         } as any);
     };
 
-    const stagedTickets = useInboundStagingStore((state) => state.tickets);
     const getItemStagedQuantity = useInboundStagingStore((state) => state.getItemStagedQuantity);
     const getItemStagedBins = useInboundStagingStore((state) => state.getItemStagedBins);
     const clearStagedTicket = useInboundStagingStore((state) => state.clearTicket);
@@ -85,26 +97,28 @@ export default function InboundDetailScreen() {
         if (order) {
             console.log(`[DEBUG] Inbound Order #${order.id} Status: "${order.status}"`);
         }
-    }, [order?.id, order?.status]);
+    }, [order]);
 
     const getReceivedQuantity = React.useCallback((item: InboundOrderItem) => {
         if (!order?.id) return Number(item.receivedQuantity || 0);
-        // If status is QUALITY_CHECK, baseReceived is usually 0 (as per my fix)
-        // or whatever has already been put into bins in a previous session.
-        const baseReceived = Number(item.receivedQuantity ?? 0);
+        // When the ticket is in QUALITY_CHECK, the QC result is the source of truth
+        // for how many units can be put away.
+        const qcReceived = Number(qcResults[item.id] ?? 0);
+        const baseReceived = Math.max(Number(item.receivedQuantity ?? 0), qcReceived);
         const stagedReceived = Number(getItemStagedQuantity(order.id, item.id) || 0);
         const total = baseReceived + stagedReceived;
 
-        // Target limit: use QC passed quantity if available, else expected
-        const passedQty = qcResults[item.id];
-        const target = passedQty !== undefined ? passedQty : Math.max(0, Number(item.expectedQuantity ?? 0));
+        const target = qcResults[item.id] !== undefined
+            ? Math.max(0, Number(qcResults[item.id] ?? 0))
+            : Math.max(0, Number(item.expectedQuantity ?? 0));
 
         return target > 0 ? Math.min(total, target) : total;
-    }, [order?.id, getItemStagedQuantity, stagedTickets, qcResults]);
+    }, [order?.id, getItemStagedQuantity, qcResults]);
 
     const isItemReceivedEnough = React.useCallback((item: InboundOrderItem) => {
-        const passedQty = qcResults[item.id];
-        const target = passedQty !== undefined ? passedQty : Math.max(0, Number(item.expectedQuantity ?? 0));
+        const target = qcResults[item.id] !== undefined
+            ? Math.max(0, Number(qcResults[item.id] ?? 0))
+            : Math.max(0, Number(item.expectedQuantity ?? 0));
 
         if (target <= 0) return false;
         const actualReceived = getReceivedQuantity(item);
@@ -157,6 +171,19 @@ export default function InboundDetailScreen() {
 
     const totalRemainingQuantity = Math.max(0, totalExpectedQuantity - totalReceivedQuantity);
 
+    const loadQcResults = React.useCallback(async (orderId: number) => {
+        try {
+            const res = await getInboundQualityCheckResult(companyId, orderId);
+            const map: Record<number, number> = {};
+            res.items.forEach((it) => {
+                map[it.inboundOrderItemId] = it.passedQuantity;
+            });
+            setQcResults(map);
+        } catch (err) {
+            console.error('Error fetching QC results:', err);
+        }
+    }, [companyId]);
+
     const handleRefresh = async () => {
         await Promise.all([
             refetchOrders(),
@@ -174,19 +201,41 @@ export default function InboundDetailScreen() {
                 refetchRecs(),
                 refetchStructure(),
             ]);
-
-            // Fetch QC results if order is in QUALITY_CHECK or Partially Completed status
-            if (order?.id && (order.status === 'QUALITY_CHECK' || order.status === 'Partially Completed')) {
-                getInboundQualityCheckResult(companyId, order.id).then(res => {
-                    const map: Record<number, number> = {};
-                    res.items.forEach(it => {
-                        map[it.inboundOrderItemId] = it.passedQuantity;
-                    });
-                    setQcResults(map);
-                }).catch(err => console.error('Error fetching QC results:', err));
-            }
-        }, [numericId, refetchOrders, refetchTicket, refetchRecs, refetchStructure, order?.id, order?.status, companyId])
+        }, [numericId, refetchOrders, refetchTicket, refetchRecs, refetchStructure])
     );
+
+    React.useEffect(() => {
+        if (!order?.id) {
+            setQcResults({});
+            return;
+        }
+
+        if (order.status === 'QUALITY_CHECK' || order.status === 'Partially Completed') {
+            void loadQcResults(order.id);
+            return;
+        }
+
+        setQcResults({});
+    }, [order?.id, order?.status, loadQcResults]);
+
+    // Auto-open warehouse modal when navigated from scanner with openWarehouse flag
+    const params = useLocalSearchParams<{ openWarehouse?: string }>();
+    React.useEffect(() => {
+        if (!order || !params?.openWarehouse) return;
+
+        // Find first item that still needs putaway
+        const candidate = order.inboundOrderItems?.find((item: InboundOrderItem) => {
+            const target = qcResults[item.id] !== undefined ? qcResults[item.id] : Number(item.expectedQuantity ?? 0);
+            const already = getItemStagedQuantity(order.id, item.id) || 0;
+            return target - already > 0;
+        });
+
+        if (candidate) {
+            // Open warehouse-view focused on this item
+            openWarehouseForItem(candidate);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [order, qcResults, params?.openWarehouse]);
 
     const isCompleted = order?.status === 'Completed' || order?.status === 'Partially Completed';
     const [isConfirming, setIsConfirming] = useState(false);
@@ -234,35 +283,45 @@ export default function InboundDetailScreen() {
         (item: InboundOrderItem) => isItemReceivedEnough(item)
     ) ?? false;
 
+    const confirmCompleteMessage = allItemsReceived
+        ? t('inbound.confirmCompleteMsg')
+        : t('inbound.partialPutawayConfirmMsg');
+
     const handleConfirmComplete = async () => {
         if (!order || !user) return;
 
         AlertService.confirm(
             t('inbound.confirmComplete'),
-            t('inbound.confirmCompleteMsg'),
+            confirmCompleteMessage,
             async () => {
                 setIsConfirming(true);
                 try {
                     const updatedItems = order.inboundOrderItems.map((item: InboundOrderItem) => {
-                        const baseReceived = Math.max(0, Number(item.receivedQuantity || 0));
+                        const baseReceivedFromTicket = Math.max(0, Number(item.receivedQuantity || 0));
+                        const baseReceivedFromQc = qcResults[item.id] !== undefined ? Number(qcResults[item.id]) : undefined;
+                        const baseReceived = baseReceivedFromQc !== undefined ? Math.max(0, baseReceivedFromQc) : baseReceivedFromTicket;
+
                         const stagedBins = getItemStagedBins(order.id, item.id);
                         const locations = Object.entries(stagedBins)
                             .map(([binId, qty]) => ({ binId: String(binId), quantity: Math.max(0, Number(qty || 0)) }))
                             .filter((loc) => loc.quantity > 0);
 
-                        const currentSessionStagedTotal = locations.reduce((sum, loc) => sum + loc.quantity, 0);
-                        const finalReceived = baseReceived + currentSessionStagedTotal;
+                            // The backend treats the incoming `receivedQuantity` as the desired
+                            // total qualified units for the item (i.e., QC passed quantity).
+                            // Staged placements are the locations where those units will be stored.
+                            // Do NOT add staged amounts on top of QC/persisted receivedQuantity here.
+                            const finalReceived = baseReceived;
 
-                        return {
-                            id: item.id,
-                            productId: item.productId || item.product?.id || 0,
-                            expectedQuantity: item.expectedQuantity,
-                            receivedQuantity: finalReceived,
-                            locations: locations.length > 0 ? locations.map(loc => ({
-                                binId: loc.binId,
-                                quantity: loc.quantity
-                            })) : undefined,
-                        };
+                            return {
+                                id: item.id,
+                                productId: item.productId || item.product?.id || 0,
+                                expectedQuantity: item.expectedQuantity,
+                                receivedQuantity: finalReceived,
+                                locations: locations.length > 0 ? locations.map(loc => ({
+                                    binId: loc.binId,
+                                    quantity: loc.quantity
+                                })) : undefined,
+                            };
                     });
 
                     console.log(`[DEBUG] Updating Inbound Ticket #${order.id} with items:`, JSON.stringify(updatedItems, null, 2));
@@ -274,9 +333,7 @@ export default function InboundDetailScreen() {
 
                     clearStagedTicket(order.id);
 
-                    AlertService.success(t('common.success'), t('inbound.successMsg'), () => {
-                        goBack();
-                    });
+                    AlertService.success(t('common.success'), t('inbound.successMsg'));
                 } catch {
                     AlertService.error(t('common.error'), t('common.failed'));
                 } finally {
@@ -522,24 +579,27 @@ export default function InboundDetailScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.confirmBtn,
-                                (isConfirming || !allItemsReceived) && styles.disabledBtn,
-                                !allItemsReceived && { backgroundColor: COLORS.slate300, shadowOpacity: 0, elevation: 0 }
+                                isConfirming && styles.disabledBtn,
                             ]}
                             onPress={handleConfirmComplete}
-                            disabled={isConfirming || !allItemsReceived}
+                            disabled={isConfirming}
                             activeOpacity={0.8}
                         >
                             <Feather
-                                name={allItemsReceived ? "check-circle" : "lock"}
+                                name={allItemsReceived ? "check-circle" : "arrow-right"}
                                 size={20}
-                                color={allItemsReceived ? "#fff" : COLORS.slate500}
+                                color="#fff"
                             />
                             <Text
-                                style={[styles.confirmBtnText, !allItemsReceived && { color: COLORS.slate500 }]}
+                                style={styles.confirmBtnText}
                                 numberOfLines={1}
                                 adjustsFontSizeToFit
                             >
-                                {isConfirming ? t('common.loading') : allItemsReceived ? t('inbound.confirmComplete') : t('inbound.notEnoughQty')}
+                                {isConfirming
+                                    ? t('common.loading')
+                                    : allItemsReceived
+                                        ? t('inbound.confirmComplete')
+                                        : t('inbound.continuePutaway')}
                             </Text>
                         </TouchableOpacity>
                     )}

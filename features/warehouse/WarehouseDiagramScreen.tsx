@@ -131,7 +131,7 @@ export default function WarehouseDiagramScreen() {
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<
     number | undefined
-  >();
+  >(initialWarehouseId);
   const [selectedShelf, setSelectedShelf] = useState<Shelf | null>(null);
   const [selectedZone, setSelectedZone] = useState<WarehouseZone | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -398,6 +398,56 @@ export default function WarehouseDiagramScreen() {
 
     fetchOptimizedPath();
   }, [params.status, params.outboundOrderId, token]); // Added token to dependencies
+
+  // Auto-open shelf modal when navigated with focusedItemId
+  useEffect(() => {
+    console.log('[DEBUG] WarehouseDiagram auto-open effect', { focusedItemId, selectedWarehouseId, hasStructure: !!structure });
+
+    if (!structure || !focusedItemId || !selectedWarehouseId) return;
+
+    // Find storage recommendations for the focused item
+    const recItem = recommendationItems.find((it) => it.inboundOrderItemId === focusedItemId);
+    let targetBinCode: string | undefined;
+    if (recItem && recItem.storageRecommendations && recItem.storageRecommendations.length > 0) {
+      targetBinCode = recItem.storageRecommendations[0].binIdCode || String(recItem.storageRecommendations[0].binId || "");
+    }
+
+    // Try to find shelf that contains the recommended bin, else fallback to first shelf
+    const zones = structure.zones || [];
+    let foundShelf: Shelf | null = null;
+    let foundZone: WarehouseZone | null = null;
+
+    for (const z of zones) {
+      if (!z.shelves) continue;
+      for (const s of z.shelves) {
+        const bins = (s.levels || []).flatMap((l) => l.bins || []);
+        if (targetBinCode) {
+          const match = bins.find((b) => String(b.code) === String(targetBinCode) || String(b.id) === String(targetBinCode));
+          if (match) {
+            foundShelf = s;
+            foundZone = z;
+            break;
+          }
+        }
+      }
+      if (foundShelf) break;
+    }
+
+    if (!foundShelf && zones.length > 0) {
+      const firstZone = zones[0];
+      foundZone = firstZone;
+      foundShelf = firstZone.shelves && firstZone.shelves.length > 0 ? firstZone.shelves[0] : null;
+    }
+
+    if (foundShelf && foundZone) {
+      console.log('[DEBUG] WarehouseDiagram will open shelf modal', { shelfId: foundShelf.id, shelfCode: foundShelf.code, zoneId: foundZone.id });
+      setSelectedZone(foundZone);
+      setSelectedShelf(foundShelf);
+      setModalVisible(true);
+    } else {
+      console.log('[DEBUG] WarehouseDiagram auto-open: no shelf found, skipping modal open', { focusedItemId, targetBinCode });
+    }
+  }, [structure, focusedItemId, recommendationItems, selectedWarehouseId]);
   // ===== END PATH OPTIMIZATION EFFECT =====
 
   const updateOutboundItems = useUpdateOutboundTicketItems();
@@ -434,7 +484,8 @@ export default function WarehouseDiagramScreen() {
       const ticketItem = inboundTicket?.inboundOrderItems?.find(
         (ti) => ti.id === itemId,
       );
-      const baseReceived = Number(ticketItem?.receivedQuantity || 0);
+      const qcReceived = Number(qcResults[itemId] || 0);
+      const baseReceived = Math.max(Number(ticketItem?.receivedQuantity || 0), qcReceived);
       
       let stagedReceived = 0;
       if (inboundStagingTicket?.items?.[itemId]) {
@@ -443,7 +494,7 @@ export default function WarehouseDiagramScreen() {
       
       return baseReceived + Math.max(0, stagedReceived);
     },
-    [inboundStagingTicket, inboundTicket],
+    [inboundStagingTicket, inboundTicket, qcResults],
   );
 
   const handleRefresh = async () => {
@@ -1264,10 +1315,12 @@ export default function WarehouseDiagramScreen() {
           const ticketItem = inboundTicket?.inboundOrderItems?.find(
             (ti) => ti.id === item.inboundOrderItemId,
           );
-          const target = qcResults[item.inboundOrderItemId] !== undefined 
-            ? qcResults[item.inboundOrderItemId] 
+          const target = qcResults[item.inboundOrderItemId] !== undefined
+            ? qcResults[item.inboundOrderItemId]
             : Number(ticketItem?.expectedQuantity ?? 0);
-          return target - getInboundCurrentReceived(item.inboundOrderItemId) > 0;
+          const staged = inboundOrderId ? getItemStagedQuantity(inboundOrderId, item.inboundOrderItemId) : 0;
+          // Show if there remains quantity to place after subtracting already staged amount
+          return target - (staged || 0) > 0;
         })
         .map((item) => {
           const matchedRec = item.storageRecommendations!.find((r) =>
@@ -1285,9 +1338,11 @@ export default function WarehouseDiagramScreen() {
             (ti) => ti.id === item.inboundOrderItemId,
           );
           
-          const finalTarget = qcResults[item.inboundOrderItemId] !== undefined 
-            ? qcResults[item.inboundOrderItemId] 
+          const finalTarget = qcResults[item.inboundOrderItemId] !== undefined
+            ? qcResults[item.inboundOrderItemId]
             : Number(ticketItem?.expectedQuantity ?? 0);
+
+          const staged = inboundOrderId ? getItemStagedQuantity(inboundOrderId, item.inboundOrderItemId) : 0;
 
           return {
             id: item.inboundOrderItemId,
@@ -1300,7 +1355,7 @@ export default function WarehouseDiagramScreen() {
             sku: item.sku,
             targetQuantity: finalTarget,
             recommendedQuantity: Number(matchedRec?.quantity ?? 0),
-            currentQuantity: getInboundCurrentReceived(item.inboundOrderItemId),
+            currentQuantity: staged,
             binCode: matchedBin?.code || firstBin?.code || selectedShelf!.code,
             binId: matchedBin?.id || firstBin?.id || "",
             isRecommended: true,
@@ -1314,11 +1369,11 @@ export default function WarehouseDiagramScreen() {
 
       return (inboundTicket?.inboundOrderItems || [])
         .filter((item) => !focusedItemId || item.id === focusedItemId)
-        .filter(
-          (item) =>
-            (qcResults[item.id] !== undefined ? qcResults[item.id] : (item.expectedQuantity || 0)) - 
-            getInboundCurrentReceived(item.id) > 0,
-        )
+        .filter((item => {
+          const target = qcResults[item.id] !== undefined ? qcResults[item.id] : (item.expectedQuantity || 0);
+          const staged = inboundOrderId ? getItemStagedQuantity(inboundOrderId, item.id) : 0;
+          return target - (staged || 0) > 0;
+        }))
         .map((item) => ({
           id: item.id,
           productId: item.productId || item.product?.id || 0,
@@ -1329,7 +1384,7 @@ export default function WarehouseDiagramScreen() {
             `Item #${item.productId}`,
           sku: item.sku || item.product?.sku,
           targetQuantity: qcResults[item.id] !== undefined ? qcResults[item.id] : (item.expectedQuantity || 0),
-          currentQuantity: getInboundCurrentReceived(item.id),
+          currentQuantity: inboundOrderId ? getItemStagedQuantity(inboundOrderId, item.id) : 0,
           binCode: firstBin?.code || selectedShelf!.code,
           binId: firstBin?.id || "",
           isRecommended: false,
