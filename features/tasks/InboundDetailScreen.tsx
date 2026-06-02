@@ -92,6 +92,7 @@ export default function InboundDetailScreen() {
     const getItemStagedBins = useInboundStagingStore((state) => state.getItemStagedBins);
     const clearStagedTicket = useInboundStagingStore((state) => state.clearTicket);
     const [qcResults, setQcResults] = useState<Record<number, number>>({});
+    const [qcDetails, setQcDetails] = useState<Record<number, { failureReason?: string; notes?: string; failedQuantity?: number }>>({});
 
     React.useEffect(() => {
         if (order) {
@@ -175,10 +176,17 @@ export default function InboundDetailScreen() {
         try {
             const res = await getInboundQualityCheckResult(companyId, orderId);
             const map: Record<number, number> = {};
+            const detailsMap: Record<number, { failureReason?: string; notes?: string; failedQuantity?: number }> = {};
             res.items.forEach((it) => {
                 map[it.inboundOrderItemId] = it.passedQuantity;
+                detailsMap[it.inboundOrderItemId] = {
+                    failureReason: it.failureReason,
+                    notes: it.notes,
+                    failedQuantity: it.failedQuantity
+                };
             });
             setQcResults(map);
+            setQcDetails(detailsMap);
         } catch (err) {
             console.error('Error fetching QC results:', err);
         }
@@ -207,15 +215,17 @@ export default function InboundDetailScreen() {
     React.useEffect(() => {
         if (!order?.id) {
             setQcResults({});
+            setQcDetails({});
             return;
         }
 
-        if (order.status === 'QUALITY_CHECK' || order.status === 'Partially Completed') {
+        if (order.status === 'QUALITY_CHECK' || order.status === 'Partially Completed' || order.status === 'Completed') {
             void loadQcResults(order.id);
             return;
         }
 
         setQcResults({});
+        setQcDetails({});
     }, [order?.id, order?.status, loadQcResults]);
 
     // Auto-open warehouse modal when navigated from scanner with openWarehouse flag
@@ -551,6 +561,47 @@ export default function InboundDetailScreen() {
                                 })()}
                             </Text>
                         </TouchableOpacity>
+
+                        {/* Hiển thị lý do lỗi & ghi chú QC (nếu có) */}
+                        {(() => {
+                            const detail = qcDetails[item.id];
+                            if (!detail) return null;
+
+                            const hasReason = !!detail.failureReason;
+                            const hasNote = !!detail.notes;
+                            const hasFailedQty = Number(detail.failedQuantity ?? 0) > 0;
+
+                            if (!hasReason && !hasNote && !hasFailedQty) return null;
+
+                            return (
+                                <View style={styles.reviewQCDetailContainer}>
+                                    {hasFailedQty && (
+                                        <View style={styles.reviewQCDetailRow}>
+                                            <Feather name="alert-triangle" size={14} color={COLORS.danger} />
+                                            <Text style={styles.reviewQCDetailText}>
+                                                <Text style={{ fontWeight: '700', color: COLORS.danger }}>{t('inbound.failedQty')}:</Text> {detail.failedQuantity}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {hasReason && (
+                                        <View style={styles.reviewQCDetailRow}>
+                                            <Feather name="info" size={14} color={COLORS.textMuted} />
+                                            <Text style={styles.reviewQCDetailText}>
+                                                <Text style={{ fontWeight: '700' }}>{t('inbound.failureReason')}:</Text> {detail.failureReason}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {hasNote && (
+                                        <View style={styles.reviewQCDetailRow}>
+                                            <Feather name="edit-3" size={14} color={COLORS.textMuted} />
+                                            <Text style={styles.reviewQCDetailText}>
+                                                <Text style={{ fontWeight: '700' }}>{t('inbound.notes')}:</Text> {detail.notes}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        })()}
                     </Card>
                 ))}
             </RefreshContainer>
@@ -1153,6 +1204,23 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 999,
+    },
+    reviewQCDetailContainer: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        gap: 6,
+    },
+    reviewQCDetailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    reviewQCDetailText: {
+        fontSize: 12,
+        color: COLORS.text,
+        flex: 1,
     },
 });
 
