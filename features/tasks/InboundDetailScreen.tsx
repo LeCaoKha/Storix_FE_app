@@ -254,6 +254,20 @@ export default function InboundDetailScreen() {
     const isCompleted = order?.status === 'Completed' || order?.status === 'Partially Completed';
     const [isConfirming, setIsConfirming] = useState(false);
 
+    // All items that passed QC must be fully put away (computed before early returns to comply with hook rules)
+    const allPutawayCompleted = useMemo(() => {
+        if (!order?.inboundOrderItems) return false;
+        return order.inboundOrderItems.every((item: InboundOrderItem) => {
+            const passed = qcResults[item.id] !== undefined ? Number(qcResults[item.id] ?? 0) : 0;
+            if (passed <= 0) return true; // If no items passed QC, it doesn't need putaway
+
+            const stagedBins = getItemStagedBins(order.id, item.id);
+            const stagedQty = Object.values(stagedBins || {}).reduce((subSum: number, qty) => subSum + Math.max(0, Number(qty || 0)), 0);
+
+            return stagedQty >= passed;
+        });
+    }, [order?.inboundOrderItems, order?.id, qcResults, getItemStagedBins]);
+
     const getStatusInfo = (status?: string) => {
         switch (status) {
             case 'Waiting for payment':
@@ -293,11 +307,13 @@ export default function InboundDetailScreen() {
         );
     }
 
+    const isQualityCheck = order?.status === 'QUALITY_CHECK';
+
     const allItemsReceived = order?.inboundOrderItems?.every(
         (item: InboundOrderItem) => isItemReceivedEnough(item)
     ) ?? false;
 
-    const confirmCompleteMessage = allItemsReceived
+    const confirmCompleteMessage = (isQualityCheck ? allPutawayCompleted : allItemsReceived)
         ? t('inbound.confirmCompleteMsg')
         : t('inbound.partialPutawayConfirmMsg');
 
@@ -540,120 +556,136 @@ export default function InboundDetailScreen() {
                     <Text style={styles.sectionSubtitle}>{order.inboundOrderItems.length} {t('common.items')}</Text>
                 </View>
 
-                {order.inboundOrderItems.map((item: InboundOrderItem) => (
-                    <Card key={item.id} style={styles.itemCard}>
-                        <View style={styles.itemHeader}>
-                            <View style={styles.itemInfo}>
-                                <Text style={styles.productName}>{item.name || item.product?.name || `${t('common.product')} #${item.productId}`}</Text>
-                                {(item.sku || item.product?.sku) && (
-                                    <Text style={styles.skuText}>{t('common.sku')}: {item.sku || item.product?.sku}</Text>
-                                )}
-                            </View>
-                            <View style={[styles.statusBadge, {
-                                backgroundColor: (isCompleted || isItemReceivedEnough(item)) ? COLORS.success + '20' : COLORS.warning + '20'
-                            }]}>
-                                <Text style={[styles.statusBadgeText, {
-                                    color: (isCompleted || isItemReceivedEnough(item)) ? COLORS.success : COLORS.warning
-                                }]}>
-                                    {(isCompleted || isItemReceivedEnough(item)) ? t('common.done') : t('common.pending')}
-                                </Text>
-                            </View>
-                        </View>
+                {order.inboundOrderItems.map((item: InboundOrderItem) => {
+                    const passedQty = qcResults[item.id] !== undefined ? Number(qcResults[item.id] ?? 0) : 0;
+                    const stagedBins = getItemStagedBins(order.id, item.id);
+                    const stagedQty = Object.values(stagedBins || {}).reduce((subSum: number, qty) => subSum + Math.max(0, Number(qty || 0)), 0);
+                    const isPutawayDone = passedQty > 0 ? stagedQty >= passedQty : true;
 
-                        <View style={styles.counterRow}>
-                            <Text style={styles.qtyLabel}>{t('inbound.receivedQty')}</Text>
-                            <View style={styles.qtyDisplay}>
-                                <Text style={[
-                                    styles.qtyValue,
-                                    isCompleted && { color: COLORS.success },
-                                    isItemReceivedEnough(item) && !isCompleted && { color: COLORS.success }
-                                ]}>
-                                    {getReceivedQuantity(item)}
-                                </Text>
-                                <Text style={styles.qtyTotal}>
-                                    / {qcResults[item.id] !== undefined ? qcResults[item.id] : (item.expectedQuantity || 0)}
-                                </Text>
-                            </View>
-                        </View>
+                    // Decide what status is displayed
+                    const isItemDone = isCompleted ? true : (isQualityCheck ? isPutawayDone : isItemReceivedEnough(item));
 
-                        <TouchableOpacity
-                            style={[
-                                styles.itemActionButton,
-                                // disable visually when item hasn't been scanned/received yet
-                                getReceivedQuantity(item) <= 0 && styles.disabledActionButton,
-                            ]}
-                            onPress={() => {
-                                const itemScanned = getReceivedQuantity(item) > 0;
-                                if (!itemScanned) {
-                                    // block putaway if not scanned
-                                    AlertService.error(t('common.error'), t('inbound.scanToVerifyMsg'));
-                                    return;
-                                }
+                    // Decide what quantities are displayed
+                    const qtyValue = isQualityCheck ? stagedQty : getReceivedQuantity(item);
+                    const qtyTotal = isQualityCheck ? passedQty : (qcResults[item.id] !== undefined ? qcResults[item.id] : (item.expectedQuantity || 0));
 
-                                openWarehouseForItem(item);
-                            }}
-                        >
-                            <Feather name="map-pin" size={14} color={COLORS.primary} />
-                            <Text style={[styles.itemActionText, getReceivedQuantity(item) <= 0 && styles.disabledActionText]}>
-                                {(() => {
-                                    const hasRecommendation = (recommendationByItemId.get(item.id)?.storageRecommendations?.length ?? 0) > 0;
-                                    const isItemCompleted = isCompleted || isItemReceivedEnough(item);
+                    // Decide what label is displayed
+                    const qtyLabelText = isQualityCheck ? t('inbound.putawayQty') : t('inbound.receivedQty');
 
-                                    if (isItemCompleted) {
-                                        return hasRecommendation
-                                            ? t('inbound.viewShelfRec')
-                                            : t('inbound.viewShelf');
-                                    }
-
-                                    return hasRecommendation
-                                        ? t('inbound.viewShelfSuggested')
-                                        : t('inbound.viewShelfStore');
-                                })()}
-                            </Text>
-                        </TouchableOpacity>
-
-                        {/* Hiển thị lý do lỗi & ghi chú QC (nếu có) */}
-                        {(() => {
-                            const detail = qcDetails[item.id];
-                            if (!detail) return null;
-
-                            const hasReason = !!detail.failureReason;
-                            const hasNote = !!detail.notes;
-                            const hasFailedQty = Number(detail.failedQuantity ?? 0) > 0;
-
-                            if (!hasReason && !hasNote && !hasFailedQty) return null;
-
-                            return (
-                                <View style={styles.reviewQCDetailContainer}>
-                                    {hasFailedQty && (
-                                        <View style={styles.reviewQCDetailRow}>
-                                            <Feather name="alert-triangle" size={14} color={COLORS.danger} />
-                                            <Text style={styles.reviewQCDetailText}>
-                                                <Text style={{ fontWeight: '700', color: COLORS.danger }}>{t('inbound.failedQty')}:</Text> {detail.failedQuantity}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {hasReason && (
-                                        <View style={styles.reviewQCDetailRow}>
-                                            <Feather name="info" size={14} color={COLORS.textMuted} />
-                                            <Text style={styles.reviewQCDetailText}>
-                                                <Text style={{ fontWeight: '700' }}>{t('inbound.failureReason')}:</Text> {detail.failureReason}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {hasNote && (
-                                        <View style={styles.reviewQCDetailRow}>
-                                            <Feather name="edit-3" size={14} color={COLORS.textMuted} />
-                                            <Text style={styles.reviewQCDetailText}>
-                                                <Text style={{ fontWeight: '700' }}>{t('inbound.notes')}:</Text> {detail.notes}
-                                            </Text>
-                                        </View>
+                    return (
+                        <Card key={item.id} style={styles.itemCard}>
+                            <View style={styles.itemHeader}>
+                                <View style={styles.itemInfo}>
+                                    <Text style={styles.productName}>{item.name || item.product?.name || `${t('common.product')} #${item.productId}`}</Text>
+                                    {(item.sku || item.product?.sku) && (
+                                        <Text style={styles.skuText}>{t('common.sku')}: {item.sku || item.product?.sku}</Text>
                                     )}
                                 </View>
-                            );
-                        })()}
-                    </Card>
-                ))}
+                                <View style={[styles.statusBadge, {
+                                    backgroundColor: isItemDone ? COLORS.success + '20' : COLORS.warning + '20'
+                                }]}>
+                                    <Text style={[styles.statusBadgeText, {
+                                        color: isItemDone ? COLORS.success : COLORS.warning
+                                    }]}>
+                                        {isItemDone ? t('common.done') : t('common.pending')}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.counterRow}>
+                                <Text style={styles.qtyLabel}>{qtyLabelText}</Text>
+                                <View style={styles.qtyDisplay}>
+                                    <Text style={[
+                                        styles.qtyValue,
+                                        isCompleted && { color: COLORS.success },
+                                        isItemDone && !isCompleted && { color: COLORS.success }
+                                    ]}>
+                                        {qtyValue}
+                                    </Text>
+                                    <Text style={styles.qtyTotal}>
+                                        / {qtyTotal}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.itemActionButton,
+                                    // disable visually when item hasn't been scanned/received yet (or has 0 QC passed qty in quality check phase)
+                                    (isQualityCheck ? passedQty <= 0 : getReceivedQuantity(item) <= 0) && styles.disabledActionButton,
+                                ]}
+                                onPress={() => {
+                                    const itemScanned = isQualityCheck ? passedQty > 0 : getReceivedQuantity(item) > 0;
+                                    if (!itemScanned) {
+                                        // block putaway if not scanned
+                                        AlertService.error(t('common.error'), t('inbound.scanToVerifyMsg'));
+                                        return;
+                                    }
+
+                                    openWarehouseForItem(item);
+                                }}
+                            >
+                                <Feather name="map-pin" size={14} color={COLORS.primary} />
+                                <Text style={[styles.itemActionText, (isQualityCheck ? passedQty <= 0 : getReceivedQuantity(item) <= 0) && styles.disabledActionText]}>
+                                    {(() => {
+                                        const hasRecommendation = (recommendationByItemId.get(item.id)?.storageRecommendations?.length ?? 0) > 0;
+
+                                        if (isItemDone) {
+                                            return hasRecommendation
+                                                ? t('inbound.viewShelfRec')
+                                                : t('inbound.viewShelf');
+                                        }
+
+                                        return hasRecommendation
+                                            ? t('inbound.viewShelfSuggested')
+                                            : t('inbound.viewShelfStore');
+                                    })()}
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Hiển thị lý do lỗi & ghi chú QC (nếu có) */}
+                            {(() => {
+                                const detail = qcDetails[item.id];
+                                if (!detail) return null;
+
+                                const hasReason = !!detail.failureReason;
+                                const hasNote = !!detail.notes;
+                                const hasFailedQty = Number(detail.failedQuantity ?? 0) > 0;
+
+                                if (!hasReason && !hasNote && !hasFailedQty) return null;
+
+                                return (
+                                    <View style={styles.reviewQCDetailContainer}>
+                                        {hasFailedQty && (
+                                            <View style={styles.reviewQCDetailRow}>
+                                                <Feather name="alert-triangle" size={14} color={COLORS.danger} />
+                                                <Text style={styles.reviewQCDetailText}>
+                                                    <Text style={{ fontWeight: '700', color: COLORS.danger }}>{t('inbound.failedQty')}:</Text> {detail.failedQuantity}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        {hasReason && (
+                                            <View style={styles.reviewQCDetailRow}>
+                                                <Feather name="info" size={14} color={COLORS.textMuted} />
+                                                <Text style={styles.reviewQCDetailText}>
+                                                    <Text style={{ fontWeight: '700' }}>{t('inbound.failureReason')}:</Text> {detail.failureReason}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        {hasNote && (
+                                            <View style={styles.reviewQCDetailRow}>
+                                                <Feather name="edit-3" size={14} color={COLORS.textMuted} />
+                                                <Text style={styles.reviewQCDetailText}>
+                                                    <Text style={{ fontWeight: '700' }}>{t('inbound.notes')}:</Text> {detail.notes}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                );
+                            })()}
+                        </Card>
+                    );
+                })}
             </RefreshContainer>
 
             {isCompleted ? (
@@ -680,14 +712,14 @@ export default function InboundDetailScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.confirmBtn,
-                                isConfirming && styles.disabledBtn,
+                                (isConfirming || (isQualityCheck && !allPutawayCompleted)) && styles.disabledBtn,
                             ]}
                             onPress={handleConfirmComplete}
-                            disabled={isConfirming}
+                            disabled={isConfirming || (isQualityCheck && !allPutawayCompleted)}
                             activeOpacity={0.8}
                         >
                             <Feather
-                                name={allItemsReceived ? "check-circle" : "arrow-right"}
+                                name={(isQualityCheck ? allPutawayCompleted : allItemsReceived) ? "check-circle" : "arrow-right"}
                                 size={20}
                                 color="#fff"
                             />
@@ -698,7 +730,7 @@ export default function InboundDetailScreen() {
                             >
                                 {isConfirming
                                     ? t('common.loading')
-                                    : allItemsReceived
+                                    : (isQualityCheck ? allPutawayCompleted : allItemsReceived)
                                         ? t('inbound.confirmComplete')
                                         : t('inbound.continuePutaway')}
                             </Text>
