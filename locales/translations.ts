@@ -99,6 +99,8 @@ export const translations = {
       staff: 'Staff',
       user: 'User',
       revertFailedMsg: 'Failed to revert status',
+      viewMore: 'Read more',
+      viewLess: 'Show less',
     },
     tasks: {
       title: 'Task List',
@@ -483,6 +485,8 @@ export const translations = {
       referenceCode: 'Mã tham chiếu',
       note: 'Ghi chú',
       retry: 'Thử lại',
+      viewMore: 'Xem thêm',
+      viewLess: 'Rút gọn',
     },
     tabs: {
       tasks: 'Nhiệm vụ',

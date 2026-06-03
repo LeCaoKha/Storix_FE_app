@@ -30,6 +30,14 @@ export const WarehouseRecommendationCard: React.FC<WarehouseRecommendationCardPr
     handleFindPathToRecommended,
 }) => {
     const { t } = useTranslation();
+    const [expandedIndices, setExpandedIndices] = React.useState<Record<number, boolean>>({});
+
+    const toggleExpanded = (index: number) => {
+        setExpandedIndices(prev => ({
+            ...prev,
+            [index]: !prev[index]
+        }));
+    };
 
     return (
         <View
@@ -117,12 +125,21 @@ export const WarehouseRecommendationCard: React.FC<WarehouseRecommendationCardPr
                                             className="mt-1.5 p-3 rounded-2xl border"
                                             style={bubbleStyle}
                                         >
-                                            <Text
-                                                className="text-[11px] font-medium leading-[16px]"
-                                                style={{ color: bubbleStyle.color }}
+                                            <TouchableOpacity
+                                                onPress={() => toggleExpanded(index)}
+                                                activeOpacity={0.7}
                                             >
-                                                {entry.reason}
-                                            </Text>
+                                                <Text
+                                                    className="text-[11px] font-medium leading-[16px]"
+                                                    style={{ color: bubbleStyle.color }}
+                                                    numberOfLines={expandedIndices[index] ? undefined : 2}
+                                                >
+                                                    {entry.reason}
+                                                </Text>
+                                                <Text className="font-bold underline text-[10px] mt-1.5" style={{ color: bubbleStyle.color }}>
+                                                    {expandedIndices[index] ? t('common.viewLess') : t('common.viewMore')}
+                                                </Text>
+                                            </TouchableOpacity>
                                             {entry.binIdCode && (
                                                 <View className="mt-2 pt-2 border-t flex-row items-center opacity-60" style={{ borderTopColor: bubbleStyle.color + '20' }}>
                                                     <Feather name="map-pin" size={10} color={bubbleStyle.color} />
