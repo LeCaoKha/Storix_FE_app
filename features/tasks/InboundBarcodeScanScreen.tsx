@@ -31,6 +31,47 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+function localizeBackendMessage(message: string, t: (key: string, options?: any) => string): string {
+    if (!message) return '';
+
+    // 1. Over-scan warning
+    const overScanRegex = /Over-scan detected for SKU '(.*?)': expected (\d+), now scanned (\d+)/i;
+    const overScanMatch = message.match(overScanRegex);
+    if (overScanMatch) {
+        return t('inbound.overScanWarning', {
+            sku: overScanMatch[1],
+            expected: overScanMatch[2],
+            scanned: overScanMatch[3]
+        });
+    }
+
+    // 2. SKU not found in InboundOrder error
+    const skuNotFoundRegex = /SKU '(.*?)' was not found in InboundOrder/i;
+    const skuNotFoundMatch = message.match(skuNotFoundRegex);
+    if (skuNotFoundMatch) {
+        return t('inbound.scanNotInOrderDetail', {
+            sku: skuNotFoundMatch[1]
+        });
+    }
+
+    // 3. Active session exists error
+    if (message.includes('An active barcode scan session already exists')) {
+        return t('inbound.activeSessionExists');
+    }
+
+    // 4. Cannot finalize: no scan lines found
+    if (message.includes('Cannot finalize: no scan lines found')) {
+        return t('inbound.noScanLinesForFinalize');
+    }
+
+    // 5. Start session status error
+    if (message.includes('A barcode scan session can only be started when')) {
+        return t('inbound.startSessionStatusError');
+    }
+
+    return message;
+}
+
 export default function InboundBarcodeScanScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -101,7 +142,9 @@ export default function InboundBarcodeScanScreen() {
             // Avoid modal popup on start — give subtle haptic feedback instead
             try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         } catch (error: any) {
-            AlertService.error(t('common.error'), error.response?.data?.message || t('inbound.startSessionError'));
+            const rawMsg = error.response?.data?.message;
+            const msg = rawMsg ? localizeBackendMessage(rawMsg, t) : t('inbound.startSessionError');
+            AlertService.error(t('common.error'), msg);
         } finally {
             setIsLoading(false);
         }
@@ -135,11 +178,12 @@ export default function InboundBarcodeScanScreen() {
             setTimeout(() => setIsCooldown(false), 1000);
 
             if (result.warningMessage) {
-                AlertService.warning(t('common.warning'), result.warningMessage);
+                AlertService.warning(t('common.warning'), localizeBackendMessage(result.warningMessage, t));
             }
         } catch (error: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            const msg = error.response?.data?.message || t('inbound.scanError');
+            const rawMsg = error.response?.data?.message;
+            const msg = rawMsg ? localizeBackendMessage(rawMsg, t) : t('inbound.scanError');
             setScanError(msg);
             AlertService.error(t('common.error'), msg);
         } finally {
@@ -229,13 +273,15 @@ export default function InboundBarcodeScanScreen() {
             
             setIsReviewModalVisible(false);
             
-            // Go to inbound detail and request the detail screen to open warehouse modal
+            // Go to inbound detail screen (user will manually tap on putaway)
             router.replace({
                 pathname: '/(tabs)/tasks/inbound/[id]',
-                params: { id: String(numericId), openWarehouse: '1' },
+                params: { id: String(numericId) },
             } as any);
         } catch (error: any) {
-            AlertService.error(t('common.error'), error.response?.data?.message || t('inbound.finalizeError'));
+            const rawMsg = error.response?.data?.message;
+            const msg = rawMsg ? localizeBackendMessage(rawMsg, t) : t('inbound.finalizeError');
+            AlertService.error(t('common.error'), msg);
         } finally {
             setIsSubmitting(false);
         }

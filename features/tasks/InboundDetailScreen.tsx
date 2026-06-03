@@ -241,6 +241,10 @@ export default function InboundDetailScreen() {
         });
 
         if (candidate) {
+            // Clear the openWarehouse flag so that this effect does not re-trigger
+            // when returning to InboundDetailScreen from the warehouse view.
+            router.setParams({ openWarehouse: '' });
+
             // Open warehouse-view focused on this item
             openWarehouseForItem(candidate);
         }
@@ -299,6 +303,52 @@ export default function InboundDetailScreen() {
 
     const handleConfirmComplete = async () => {
         if (!order || !user) return;
+
+        // Check if there are any QC passed quantities
+        const totalPassed = order.inboundOrderItems?.reduce((sum: number, item) => sum + (qcResults[item.id] !== undefined ? Number(qcResults[item.id] ?? 0) : 0), 0) ?? 0;
+
+        if (totalPassed > 0) {
+            // 1. Check if they have put ANY items in bins at all
+            const totalAllocatedAll = order.inboundOrderItems?.reduce((sum: number, item) => {
+                const stagedBins = getItemStagedBins(order.id, item.id);
+                const stagedQty = Object.values(stagedBins || {}).reduce((subSum: number, qty) => subSum + Math.max(0, Number(qty || 0)), 0);
+                return sum + stagedQty;
+            }, 0) ?? 0;
+
+            if (totalAllocatedAll === 0) {
+                AlertService.error(
+                    t('common.error'),
+                    t('inbound.noItemsPutawayError')
+                );
+                return;
+            }
+
+            // 2. Check if all received/QC-passed items have been fully put away to bins
+            const missingPutawayItem = order.inboundOrderItems?.find((item: InboundOrderItem) => {
+                const passedQty = Number(qcResults[item.id] ?? 0);
+                if (passedQty <= 0) return false;
+
+                const stagedBins = getItemStagedBins(order.id, item.id);
+                const stagedQty = Object.values(stagedBins || {}).reduce((subSum: number, qty) => subSum + Math.max(0, Number(qty || 0)), 0);
+
+                return stagedQty < passedQty;
+            });
+
+            if (missingPutawayItem) {
+                const passed = Number(qcResults[missingPutawayItem.id] ?? 0);
+                const stagedBins = getItemStagedBins(order.id, missingPutawayItem.id);
+                const stagedQty = Object.values(stagedBins || {}).reduce((subSum: number, qty) => subSum + Math.max(0, Number(qty || 0)), 0);
+
+                AlertService.error(
+                    t('common.error'),
+                    t('inbound.putawayMissingError', {
+                        name: missingPutawayItem.name || missingPutawayItem.product?.name || `#${missingPutawayItem.productId}`,
+                        missing: passed - stagedQty
+                    })
+                );
+                return;
+            }
+        }
 
         AlertService.confirm(
             t('inbound.confirmComplete'),
