@@ -88,9 +88,20 @@ export default function InboundDetailScreen() {
         } as any);
     };
 
-    const getItemStagedQuantity = useInboundStagingStore((state) => state.getItemStagedQuantity);
-    const getItemStagedBins = useInboundStagingStore((state) => state.getItemStagedBins);
+    const orderId = order?.id;
+    const stagingTicket = useInboundStagingStore((state) =>
+        orderId ? state.tickets[orderId] : undefined
+    );
     const clearStagedTicket = useInboundStagingStore((state) => state.clearTicket);
+
+    const getItemStagedQuantity = React.useCallback((_ticketId: number, itemId: number) => {
+        return stagingTicket?.items?.[itemId]?.total || 0;
+    }, [stagingTicket]);
+
+    const getItemStagedBins = React.useCallback((_ticketId: number, itemId: number) => {
+        return stagingTicket?.items?.[itemId]?.bins || {};
+    }, [stagingTicket]);
+
     const [qcResults, setQcResults] = useState<Record<number, number>>({});
     const [qcDetails, setQcDetails] = useState<Record<number, { failureReason?: string; notes?: string; failedQuantity?: number }>>({});
 
@@ -719,7 +730,7 @@ export default function InboundDetailScreen() {
                             activeOpacity={0.8}
                         >
                             <Feather
-                                name={(isQualityCheck ? allPutawayCompleted : allItemsReceived) ? "check-circle" : "arrow-right"}
+                                name="check-circle"
                                 size={20}
                                 color="#fff"
                             />
@@ -730,9 +741,7 @@ export default function InboundDetailScreen() {
                             >
                                 {isConfirming
                                     ? t('common.loading')
-                                    : (isQualityCheck ? allPutawayCompleted : allItemsReceived)
-                                        ? t('inbound.confirmComplete')
-                                        : t('inbound.continuePutaway')}
+                                    : t('inbound.confirmComplete')}
                             </Text>
                         </TouchableOpacity>
                     )}
