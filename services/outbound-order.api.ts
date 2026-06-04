@@ -1,17 +1,25 @@
 import type {
+    ConfirmOutboundPayload,
     CreateOutboundRequestPayload,
+    FifoSuggestionItem,
+    HandoverItemPayload,
     InventoryAvailability,
     OutboundOrder,
+    PathOptimizationResponse,
     UpdateOutboundItemPayload,
-    ConfirmOutboundPayload,
 } from '@/types/outbound-order';
 import { api } from './axios.instance';
 
 // Re-export types để tiện sử dụng
 export type {
-    ConfirmOutboundPayload, CreateOutboundRequestPayload, CreateOutboundTicketPayload, InventoryAvailability, OutboundOrder,
-    OutboundOrderItem,
-    OutboundRequest, UpdateOutboundItemPayload, UpdateOutboundRequestStatusPayload, UpdateOutboundStatusPayload
+    ConfirmOutboundPayload, CreateOutboundRequestPayload, CreateOutboundTicketPayload,
+    FifoSuggestion, FifoSuggestionItem, FifoSummary,
+    HandoverItemPayload, HandoverLocation,
+    InventoryAvailability, OutboundOrder,
+    OutboundOrderItem, OutboundOrderStatus,
+    OutboundRequest, PathOptimizationItem, PathOptimizationPayload, PathOptimizationResponse,
+    TicketStatus,
+    UpdateOutboundItemPayload, UpdateOutboundRequestStatusPayload, UpdateOutboundStatusPayload
 } from '@/types/outbound-order';
 
 // ============== API Functions ==============
@@ -147,3 +155,29 @@ export const getOutboundOrdersByStaff = async (companyId: number, staffId: numbe
   return res.data as OutboundOrder[];
 };
 
+/**
+ * Lấy gợi ý vị trí lấy hàng theo FIFO cho phiếu xuất
+ */
+export const getFifoSuggestions = async (ticketId: number): Promise<FifoSuggestionItem[]> => {
+  const res = await api.get(`/api/InventoryOutbound/tickets/${ticketId}/fifo-suggestions`);
+  return Array.isArray(res.data) ? (res.data as FifoSuggestionItem[]) : [];
+};
+
+/**
+ * Lấy đường đi tối ưu hóa (Path Optimization) cho phiếu xuất
+ */
+export const getPathOptimization = async (ticketId: number): Promise<PathOptimizationResponse> => {
+  const res = await api.get(`/api/InventoryOutbound/tickets/${ticketId}/path-optimization`);
+  return res.data as PathOptimizationResponse;
+};
+
+/**
+ * Cập nhật items khi bàn giao (Handover) – bao gồm vị trí và batch FIFO
+ */
+export const updateOutboundHandoverItems = async (
+  ticketId: number,
+  items: HandoverItemPayload[]
+): Promise<OutboundOrder> => {
+  const res = await api.put(`/api/InventoryOutbound/tickets/${ticketId}/items`, items);
+  return res.data as OutboundOrder;
+};

@@ -17,7 +17,9 @@ import {
     useInboundTicket,
 } from "@/hooks";
 import {
+    useFifoSuggestions,
     useOutboundTicket,
+    usePathOptimization,
     useUpdateOutboundTicketItems,
 } from "@/hooks/outbound-order.hooks";
 import { useProductInventoryLocations, useProducts } from "@/hooks/product.hooks";
@@ -27,18 +29,17 @@ import {
 } from "@/hooks/stock-count.hooks";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useWarehouses, useWarehouseStructure } from "@/hooks/warehouse.hooks";
-import { api } from "@/services/axios.instance";
 import { getInboundQualityCheckResult } from "@/services/inbound-order.api";
 import { getProductInventoryLocations } from "@/services/product.api";
 import { AlertService } from "@/stores/alert.store";
 import { useAuthStore } from "@/stores/auth.store";
 import { useInboundStagingStore } from "@/stores/inbound-staging.store";
 import { usePendingQuantitiesStore } from "@/stores/pending-quantities.store";
+import type { FifoSuggestionItem, PathOptimizationResponse } from "@/types/outbound-order";
 import type { ProductInventoryLocation } from "@/types/product";
 import { PathResult, Shelf, WarehouseZone } from "@/types/warehouse";
 import { findNearestNode, findShortestPath } from "@/utils/pathfinding";
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -49,25 +50,6 @@ import {
     View,
 } from "react-native";
 
-type FifoSuggestion = {
-  binIdCode?: string;
-  binCode?: string;
-  shelfCode?: string;
-  zoneId?: number;
-  availableInBin?: number;
-  suggestedPickQty?: number;
-};
-
-type FifoSuggestionItem = {
-  outboundOrderItemId: number;
-  productId: number;
-  productName?: string;
-  requiredQuantity?: number;
-  isFullyCoverable?: boolean;
-  totalAvailableQuantity?: number;
-  remainingQuantity?: number;
-  suggestions?: FifoSuggestion[];
-};
 
 export default function WarehouseDiagramScreen() {
     const { t } = useTranslation();
@@ -102,7 +84,6 @@ export default function WarehouseDiagramScreen() {
     inboundOrderId || outboundOrderId || inventoryCountTicketId;
 
   const [optimizedPath, setOptimizedPath] = useState<string[]>([]);
-  const [isFetchingPath, setIsFetchingPath] = useState(false);
 
   const routeBins = useMemo(
     () =>
@@ -145,11 +126,8 @@ export default function WarehouseDiagramScreen() {
     Record<number, ProductInventoryLocation[]>
   >({});
 
-  // Get token and user from auth store
+  // Get user from auth store
   const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.token); // LẤY TOKEN Ở ĐÂY
-
-  console.log("token day: ", token);
 
   const isStaff = user?.roleId === 4;
   const companyId = user?.companyId ?? 0;
@@ -175,20 +153,8 @@ export default function WarehouseDiagramScreen() {
   const {
     data: outboundFifoSuggestions = [],
     refetch: refetchOutboundFifoSuggestions,
-  } = useQuery({
-    queryKey: ["outbound-fifo-suggestions", outboundOrderId],
-    queryFn: async () => {
-      if (!outboundOrderId) return [] as FifoSuggestionItem[];
-      const response = await api.get(
-        `/api/InventoryOutbound/tickets/${outboundOrderId}/fifo-suggestions`,
-      );
-      return Array.isArray(response.data)
-        ? (response.data as FifoSuggestionItem[])
-        : [];
-    },
-    enabled: !!outboundOrderId,
-    staleTime: 0,
-  });
+  } = useFifoSuggestions(outboundOrderId);
+
 
   const {
     data: structure,
@@ -348,56 +314,23 @@ export default function WarehouseDiagramScreen() {
     return Array.from(new Set(values.filter((value): value is string => !!value)));
   }, [focusedProductLocations]);
 
-  // ===== PATH OPTIMIZATION FETCH EFFECT =====
+  // ===== PATH OPTIMIZATION (dùng hook chuẩn) =====
+  const isPathOptMode = params.status === "path_optimization" && !!outboundOrderId;
+  const { data: pathOptData, isLoading: isFetchingPath } = usePathOptimization(
+    isPathOptMode ? outboundOrderId : undefined,
+  );
+
   useEffect(() => {
-    const fetchOptimizedPath = async () => {
-      const currentStatus = params.status;
-      const currentOutboundId = params.outboundOrderId;
-
-      if (currentStatus !== "path_optimization" || !currentOutboundId) return;
-
-      setIsFetchingPath(true);
-      try {
-        console.log(`[PathOptimization] Fetching path with token...`);
-        const response = await api.get(
-          `/api/InventoryOutbound/tickets/${currentOutboundId}/path-optimization`,
-        );
-
-        const data = response.data;
-
-        // Extracting path array safely
-        const pathArray = data?.payload?.[0]?.fullOptimizedPath;
-
-        if (pathArray && Array.isArray(pathArray) && pathArray.length > 0) {
-          console.log(
-            "[PathOptimization] Path extracted successfully. Nodes:",
-            pathArray.length,
-          );
-          setOptimizedPath(pathArray);
-          setViewMode("map");
-          AlertService.success(
-            t('warehouse.pathFound'),
-            t('warehouse.pathFoundMsg'),
-          );
-        } else {
-          AlertService.warning(
-            t('warehouse.pathNotFound'),
-            t('warehouse.pathNotFoundMsg'),
-          );
-        }
-      } catch (err) {
-        console.error("[PathOptimization] Error fetching path:", err);
-        // AlertService.error(
-        //   t('common.error'),
-        //   "Failed to connect to path optimization service.",
-        // );
-      } finally {
-        setIsFetchingPath(false);
-      }
-    };
-
-    fetchOptimizedPath();
-  }, [params.status, params.outboundOrderId, token]); // Added token to dependencies
+    if (!pathOptData) return;
+    const pathArray = (pathOptData as PathOptimizationResponse)?.payload?.[0]?.fullOptimizedPath;
+    if (pathArray && Array.isArray(pathArray) && pathArray.length > 0) {
+      setOptimizedPath(pathArray);
+      setViewMode("map");
+      AlertService.success(t('warehouse.pathFound'), t('warehouse.pathFoundMsg'));
+    } else if (isPathOptMode) {
+      AlertService.warning(t('warehouse.pathNotFound'), t('warehouse.pathNotFoundMsg'));
+    }
+  }, [pathOptData]);
 
   // Auto-open shelf modal when navigated with focusedItemId
   useEffect(() => {

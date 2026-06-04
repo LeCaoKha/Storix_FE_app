@@ -8,7 +8,10 @@ import {
 import { getBottomSafePadding } from "@/components/ui/safeArea";
 import { COLORS } from "@/constants/color";
 import {
+  useFifoSuggestions,
   useOutboundTicket,
+  usePathOptimization,
+  useUpdateOutboundHandoverItems,
   useUpdateOutboundTicketItems,
   useUpdateOutboundTicketStatus
 } from "@/hooks";
@@ -16,10 +19,9 @@ import { useAppBack } from "@/hooks/useAppBack";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useWarehouseStructure } from "@/hooks/warehouse.hooks";
 import { useProductInventoryLocations, useProducts } from "@/hooks/product.hooks";
-import { api } from "@/services/axios.instance";
 import { AlertService } from "@/stores/alert.store";
 import { useAuthStore } from "@/stores/auth.store";
-import type { OutboundOrderItem } from "@/types/outbound-order";
+import type { FifoSummary, HandoverItemPayload, OutboundOrderItem, TicketStatus } from "@/types/outbound-order";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -35,17 +37,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// BE Status Flow (Staff allowed transitions):
-// Created → Picking → QualityCheck → (IssueReported | Packing) → Packing → LoadHandover
-// Manager confirms LoadHandover → Completed
-type TicketStatus =
-  | "Created"
-  | "Picking"
-  | "QualityCheck"
-  | "IssueReported"
-  | "Packing"
-  | "LoadHandover"
-  | "Completed";
 
 export default function OutboundDetailScreen() {
   const router = useRouter();
@@ -192,10 +183,38 @@ export default function OutboundDetailScreen() {
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isFifoLoading, setIsFifoLoading] = useState(false);
-  const [fifoBins, setFifoBins] = useState<string[]>([]);
-  const [fifoSuggestionsMap, setFifoSuggestionsMap] = useState<Record<number, any[]>>({});
-  const [fifoSummaryMap, setFifoSummaryMap] = useState<Record<number, { requiredQuantity: number; totalAvailableQuantity: number; remainingQuantity: number }>>({});
+
+  // ——— FIFO Suggestions (dùng hook chuẩn) ———
+  const { data: fifoData = [], isLoading: isFifoLoading } = useFifoSuggestions(numericId);
+
+  const fifoSuggestionsMap = React.useMemo(() => {
+    const map: Record<number, any[]> = {};
+    fifoData.forEach((item) => { map[Number(item.productId)] = item.suggestions ?? []; });
+    return map;
+  }, [fifoData]);
+
+  const fifoSummaryMap = React.useMemo(() => {
+    const map: Record<number, FifoSummary> = {};
+    fifoData.forEach((item) => {
+      map[Number(item.productId)] = {
+        requiredQuantity: Number(item.requiredQuantity ?? 0),
+        totalAvailableQuantity: Number(item.totalAvailableQuantity ?? 0),
+        remainingQuantity: Number(item.remainingQuantity ?? 0),
+      };
+    });
+    return map;
+  }, [fifoData]);
+
+  // ——— Path Optimization (dùng hook chuẩn) ———
+  const { data: pathOptData } = usePathOptimization(numericId);
+
+  const itemsToPick = React.useMemo(() => {
+    return pathOptData?.payload?.[0]?.itemsToPick ?? [];
+  }, [pathOptData]);
+
+  // Mutation bàn giao (Handover)
+  const handoverItems = useUpdateOutboundHandoverItems();
+
 
   const locationLabelIndex = React.useMemo(() => {
     const index = new Map<
@@ -231,9 +250,6 @@ export default function OutboundDetailScreen() {
     return index;
   }, [warehouseStructure]);
 
-  // ===== ADDED CODE START =====
-  const [itemsToPick, setItemsToPick] = useState<any[]>([]);
-
   const getLocationLabels = (suggestion: any) => {
     const locationKeyCandidates = [
       suggestion?.binCode,
@@ -264,69 +280,8 @@ export default function OutboundDetailScreen() {
     };
   };
 
-  // Thêm cái useEffect này để log itemsToPick mỗi khi nó thay đổi
-  useEffect(() => {
-    if (itemsToPick && itemsToPick.length > 0) {
-      console.log("========== LOG ITEMSTOPICK ==========");
-      console.log(JSON.stringify(itemsToPick, null, 2));
-      console.log("=====================================");
-    }
-  }, [itemsToPick]);
-  // ===== ADDED CODE END =====
 
-  useEffect(() => {
-    const fetchFifoSuggestions = async () => {
-      if (!numericId) {
-        setFifoBins([]);
-        return;
-      }
 
-      setIsFifoLoading(true);
-      try {
-        const response = await api.get(`/api/InventoryOutbound/tickets/${numericId}/fifo-suggestions`);
-        const data = response.data;
-
-        console.log(`\n--- GỌI API FIFO SUGGESTIONS CHO TICKET ID: ${numericId} ---`);
-        console.log("-> Dữ liệu JSON bóc từ Response (FIFO):");
-        console.log(JSON.stringify(data, null, 2));
-        console.log("------------------------------------------------------------\n");
-        const bins = new Set<string>();
-        const map: Record<number, any[]> = {};
-        const summaryMap: Record<number, { requiredQuantity: number; totalAvailableQuantity: number; remainingQuantity: number }> = {};
-
-        (Array.isArray(data) ? data : []).forEach((item: any) => {
-          const productId = Number(item.productId || item.product?.id || 0);
-          const suggestions = item.suggestions || [];
-          map[productId] = suggestions;
-          summaryMap[productId] = {
-            requiredQuantity: Number(item.requiredQuantity || 0),
-            totalAvailableQuantity: Number(item.totalAvailableQuantity || 0),
-            remainingQuantity: Number(item.remainingQuantity || 0),
-          };
-
-          suggestions.forEach((suggestion: any) => {
-            [suggestion.binCode, suggestion.binIdCode, suggestion.shelfCode]
-              .map((value) => String(value ?? '').trim())
-              .filter(Boolean)
-              .forEach((value) => bins.add(value));
-          });
-        });
-
-        setFifoBins(Array.from(bins));
-        setFifoSuggestionsMap(map);
-        setFifoSummaryMap(summaryMap);
-      } catch (error) {
-        console.error('Fetch FIFO suggestions error:', error);
-        setFifoBins([]);
-        setFifoSuggestionsMap({});
-        setFifoSummaryMap({});
-      } finally {
-        setIsFifoLoading(false);
-      }
-    };
-
-    fetchFifoSuggestions();
-  }, [numericId]);
 
   const rawStatus = order?.status as string;
   const currentStatus =
@@ -362,45 +317,6 @@ export default function OutboundDetailScreen() {
       });
     }
   }, [order]);
-
-  // ===== ADDED CODE START =====
-  // FEATURE 1: FETCH PATH OPTIMIZATION ON LOAD
-  useEffect(() => {
-    const fetchPathOptimization = async () => {
-      if (!numericId) return;
-      try {
-        console.log(
-          `\n--- GỌI API PATH OPTIMIZATION CHO TICKET ID: ${numericId} ---`,
-        );
-
-        const response = await api.get(`/api/InventoryOutbound/tickets/${numericId}/path-optimization`);
-
-        console.log("-> Mã trạng thái HTTP (Status):", response.status);
-
-        const responseData = response.data;
-
-        console.log("-> Dữ liệu JSON bóc từ Response:");
-        console.log(JSON.stringify(responseData, null, 2));
-        console.log(
-          "------------------------------------------------------------\n",
-        );
-
-        const payloadData = responseData?.payload?.[0];
-
-        if (payloadData && payloadData.status === "success") {
-          setItemsToPick(payloadData.itemsToPick || []);
-        }
-      } catch (err) {
-        console.error(
-          "-> Lỗi mạng hoặc code lúc fetch path optimization:",
-          err,
-        );
-      }
-    };
-
-    fetchPathOptimization();
-  }, [numericId]);
-  // ===== ADDED CODE END =====
 
   const sortedItems = React.useMemo(() => {
     const orderItems = order?.items || order?.outboundOrderItems;
@@ -505,60 +421,49 @@ export default function OutboundDetailScreen() {
     }
   };
 
-  // ===== ADDED CODE START =====
-  // FEATURE 2: HANDLE PACKING -> HANDOVER
+  // ===== FEATURE 2: HANDLE PACKING -> HANDOVER =====
   const handleHandover = async () => {
     if (!numericId || !itemsToPick || itemsToPick.length === 0) return;
 
-    try {
-      const orderItems = order?.items || order?.outboundOrderItems || [];
-      const payload = orderItems.map((item: any) => {
-        const uiQuantity = Number(localQuantities[item.id]) || 0;
-        let remainingQty = uiQuantity;
-        const mappedLocations: any[] = [];
+    const orderItems = order?.items || order?.outboundOrderItems || [];
+    const payload: HandoverItemPayload[] = orderItems.map((item: any) => {
+      const uiQuantity = Number(localQuantities[item.id]) || 0;
+      let remainingQty = uiQuantity;
+      const mappedLocations: HandoverItemPayload['locations'] = [];
 
-        // Prioritize optimized path suggestions if available
-        const optimizedItem = itemsToPick.find(it => it.productId === item.productId);
-        const suggestions = optimizedItem?.locationData?.rawFifoSuggestions || fifoSuggestionsMap[item.productId] || [];
+      const optimizedItem = itemsToPick.find((it) => it.productId === item.productId);
+      const suggestions =
+        optimizedItem?.locationData?.rawFifoSuggestions ||
+        fifoSuggestionsMap[item.productId] ||
+        [];
 
-        for (const suggestion of suggestions) {
-          if (remainingQty <= 0) break;
-
-          const qtyForThisBin = Math.min(
-            remainingQty,
-            suggestion.suggestedPickQty || suggestion.availableInBin || 0,
-          );
-
-          if (qtyForThisBin > 0) {
-            mappedLocations.push({
-              binId: suggestion.binIdCode || suggestion.binCode || suggestion.binId,
-              quantity: qtyForThisBin,
-              batchId: suggestion.batchId, // Crucial for FIFO tracking
-            });
-            remainingQty -= qtyForThisBin;
-          }
+      for (const suggestion of suggestions) {
+        if (remainingQty <= 0) break;
+        const qtyForThisBin = Math.min(
+          remainingQty,
+          suggestion.suggestedPickQty || suggestion.availableInBin || 0,
+        );
+        if (qtyForThisBin > 0) {
+          mappedLocations.push({
+            binId: suggestion.binIdCode || suggestion.binCode || suggestion.binId,
+            quantity: qtyForThisBin,
+            batchId: suggestion.batchId,
+          });
+          remainingQty -= qtyForThisBin;
         }
+      }
 
-        return {
-          id: item.id,
-          productId: item.productId,
-          expectedQuantity: item.quantity,
-          receivedQuantity: uiQuantity,
-          locations: mappedLocations,
-        };
-      });
+      return {
+        id: item.id,
+        productId: item.productId,
+        expectedQuantity: item.quantity,
+        receivedQuantity: uiQuantity,
+        locations: mappedLocations,
+      };
+    });
 
-      console.log("========== HANDOVER PAYLOAD ==========");
-      console.log(JSON.stringify(payload, null, 2));
-      console.log("======================================");
-
-      await api.put(`/api/InventoryOutbound/tickets/${numericId}/items`, payload);
-    } catch (err) {
-      console.log("Handover API error:", err);
-      throw err; // Quăng lỗi lên cho hàm handleTransition bắt
-    }
+    await handoverItems.mutateAsync({ ticketId: numericId, items: payload });
   };
-  // ===== ADDED CODE END =====
 
   const handleTransition = async () => {
     if (!order || !user || !nextAction) return;

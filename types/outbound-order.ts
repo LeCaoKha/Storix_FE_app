@@ -136,3 +136,72 @@ export interface InventoryAvailability {
   productId: number;
   availableQuantity: number;
 }
+
+// TicketStatus alias – dùng chung với OutboundOrderStatus
+export type TicketStatus = OutboundOrderStatus;
+
+// ============== FIFO Suggestion Types ==============
+
+export interface FifoSuggestion {
+  binIdCode?: string;
+  binCode?: string;
+  shelfCode?: string;
+  zoneId?: number;
+  availableInBin?: number;
+  suggestedPickQty?: number;
+  batchId?: number;
+}
+
+export interface FifoSuggestionItem {
+  outboundOrderItemId: number;
+  productId: number;
+  productName?: string;
+  requiredQuantity?: number;
+  isFullyCoverable?: boolean;
+  totalAvailableQuantity?: number;
+  remainingQuantity?: number;
+  suggestions?: FifoSuggestion[];
+}
+
+export interface FifoSummary {
+  requiredQuantity: number;
+  totalAvailableQuantity: number;
+  remainingQuantity: number;
+}
+
+// ============== Path Optimization Types ==============
+
+export interface PathOptimizationLocation {
+  rawFifoSuggestions?: FifoSuggestion[];
+}
+
+export interface PathOptimizationItem {
+  productId: number;
+  locationData?: PathOptimizationLocation;
+}
+
+export interface PathOptimizationPayload {
+  status: string;
+  itemsToPick?: PathOptimizationItem[];
+  fullOptimizedPath?: string[];
+}
+
+export interface PathOptimizationResponse {
+  payload?: PathOptimizationPayload[];
+}
+
+// ============== Handover Payload Types ==============
+
+export interface HandoverLocation {
+  binId: string | undefined;
+  quantity: number;
+  batchId?: number;
+}
+
+export interface HandoverItemPayload {
+  id: number;
+  productId: number;
+  expectedQuantity: number;
+  receivedQuantity: number;
+  locations: HandoverLocation[];
+}

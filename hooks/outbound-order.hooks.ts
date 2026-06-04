@@ -6,13 +6,18 @@ import {
     createOutboundTicket,
     getAllOutboundRequests,
     getAllOutboundTickets,
+    getFifoSuggestions,
     getInventoryAvailability,
     getOutboundOrdersByStaff,
+    getPathOptimization,
+    updateOutboundHandoverItems,
     updateOutboundRequestStatus,
     updateOutboundTicketItems,
     updateOutboundTicketStatus,
     type OutboundOrder as ApiOutboundOrder,
     type CreateOutboundRequestPayload,
+    type FifoSuggestionItem,
+    type HandoverItemPayload,
     type UpdateOutboundItemPayload
 } from '@/services/outbound-order.api';
 import { useAuthStore } from '@/stores/auth.store';
@@ -321,5 +326,46 @@ export const useOutboundTasksByStaff = (companyId: number, staffId: number) => {
     queryFn: () => getOutboundOrdersByStaff(companyId, staffId),
     enabled: !!companyId && !!staffId,
     staleTime: 0,
+  });
+};
+
+/**
+ * Hook lấy gợi ý vị trí FIFO cho phiếu xuất – dùng bởi Staff khi lấy hàng
+ */
+export const useFifoSuggestions = (ticketId: number | undefined) => {
+  return useQuery({
+    queryKey: ['outbound-fifo-suggestions', ticketId],
+    queryFn: () => getFifoSuggestions(ticketId!),
+    enabled: !!ticketId,
+    staleTime: 0,
+  });
+};
+
+/**
+ * Hook lấy đường đi tối ưu hóa cho phiếu xuất – dùng bởi Staff trên màn hình sơ đồ kho
+ */
+export const usePathOptimization = (ticketId: number | undefined) => {
+  return useQuery({
+    queryKey: ['outbound-path-optimization', ticketId],
+    queryFn: () => getPathOptimization(ticketId!),
+    enabled: !!ticketId,
+    staleTime: 0,
+  });
+};
+
+/**
+ * Hook cập nhật items khi bàn giao (Handover) – bao gồm vị trí FIFO và batch info
+ */
+export const useUpdateOutboundHandoverItems = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ ticketId, items }: { ticketId: number; items: HandoverItemPayload[] }) =>
+      updateOutboundHandoverItems(ticketId, items),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: outboundOrderKeys.all });
+      queryClient.invalidateQueries({ queryKey: outboundOrderKeys.ticketDetail(variables.ticketId) });
+      queryClient.invalidateQueries({ queryKey: ['outbound-fifo-suggestions', variables.ticketId] });
+    },
   });
 };
