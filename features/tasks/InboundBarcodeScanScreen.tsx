@@ -120,6 +120,7 @@ export default function InboundBarcodeScanScreen() {
         } catch (error: any) {
             if (error.response?.status === 404) {
                 // Session not started
+                setSession(null);
             } else {
                 console.error('Load session error:', error);
             }
@@ -130,8 +131,19 @@ export default function InboundBarcodeScanScreen() {
 
     // Load or Start Session
     useEffect(() => {
+        // Reset states when changing inbound order ID to avoid leaking state from previous orders
+        setSession(null);
+        setSkuInput('');
+        setLastScannedSku(null);
+        setScanError(null);
+        setHighlightedProductId(null);
+        setIsReviewModalVisible(false);
+        setQcOverridesState({});
+        setIsCooldown(false);
+        setIsScanning(false);
+
         void loadSession();
-    }, [loadSession]);
+    }, [numericId, loadSession]);
 
     const handleStartSession = async () => {
         if (!user) return;
