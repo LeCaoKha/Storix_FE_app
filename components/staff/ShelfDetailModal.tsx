@@ -22,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { BinSelectionView } from "./BinSelectionView";
+import { ShelfCountItemRow, ShelfOperationItemRow } from "./warehouse";
 
 export interface ShelfActionItem {
   id: number;
@@ -160,13 +161,16 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
     }
   }, [visible, shelf, recommendedItems]);
 
-  // Restore draft quantities
+  const hasRestored = React.useRef(false);
   React.useEffect(() => {
     if (!visible) {
+      hasRestored.current = false;
       setSelectedQuantities({});
       setCountQuantities({});
       return;
     }
+
+    if (hasRestored.current) return;
 
     if (isCountMode) {
       const restoredCounts: Record<number, string> = {};
@@ -177,27 +181,30 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
       });
       setCountQuantities(restoredCounts);
       setSelectedQuantities({});
+      hasRestored.current = true;
       return;
     }
 
-    const restoredQuantities: Record<number, number> = {};
-    recommendedItems.forEach((item) => {
-      if (ticketId && shelfId) {
-        restoredQuantities[item.id] = getPendingQty(ticketId, item.id, shelfId);
-      } else {
-        restoredQuantities[item.id] = 0;
-      }
-    });
-    setSelectedQuantities(restoredQuantities);
-    setCountQuantities({});
+    if (recommendedItems.length > 0) {
+      const restoredQuantities: Record<number, number> = {};
+      recommendedItems.forEach((item) => {
+        if (ticketId && shelfId) {
+          restoredQuantities[item.id] = getPendingQty(ticketId, item.id, shelfId);
+        } else {
+          restoredQuantities[item.id] = 0;
+        }
+      });
+      setSelectedQuantities(restoredQuantities);
+      setCountQuantities({});
+      hasRestored.current = true;
+    }
   }, [
     visible,
     isCountMode,
-    countItems,
-    recommendedItems,
-    ticketId,
     shelfId,
-    // getPendingQty removed to break the loop - we only restore once on visible/shelf change
+    ticketId,
+    recommendedItems,
+    countItems,
     countDraftByShelfItem,
     getShelfItemDraftKey,
     getPendingQty,
@@ -671,10 +678,8 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                       </View>
                     </View>
 
-                    {(isCountMode ? countItems : recommendedItems).map((item: any) => {
-                      if (isCountMode) {
+                    {isCountMode ? countItems.map((item: any) => {
                         const rawCount = countQuantities[item.id] ?? (item.countedQuantity != null ? String(item.countedQuantity) : "");
-                        const countValue = rawCount === "" ? "" : rawCount;
                         const systemQty = Math.max(
                           0,
                           Number(
@@ -683,80 +688,19 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                               : item.systemQuantity || 0,
                           ),
                         );
-                        const parsedCount = countValue === "" ? 0 : Number(countValue);
-                        const diff = parsedCount - systemQty;
-
                         return (
-                          <View
+                          <ShelfCountItemRow
                             key={item.id}
-                            className="bg-slate-50 rounded-[14px] p-3.5 border-[1.5px] border-slate-200 gap-2.5"
-                          >
-                            <View className="flex-row items-start">
-                              <View className="flex-1 gap-1.5">
-                                <View className="flex-row items-center gap-2 flex-wrap">
-                                  <Text
-                                    className="text-[15px] font-bold text-slate-800 flex-1"
-                                    numberOfLines={1}
-                                  >
-                                    {item.name || `${t('common.product')} #${item.productId}`}
-                                  </Text>
-                                  <View className="px-2 py-[3px] rounded-md" style={{ backgroundColor: COLORS.info + '12' }}>
-                                    <Text className="text-[10px] font-extrabold" style={{ color: COLORS.info }}>
-                                      {t('warehouse.count')}
-                                    </Text>
-                                  </View>
-                                </View>
-                                <View className="flex-row items-center gap-1.5 flex-wrap">
-                                  {item.sku && (
-                                    <Text className="text-[11px] text-slate-400 font-semibold bg-slate-100 px-2 py-[3px] rounded-md">
-                                      {item.sku}
-                                    </Text>
-                                  )}
-                                  {!isStaff && (
-                                    <View className="flex-row items-center gap-1 px-2 py-[3px] rounded-md border" style={{ backgroundColor: COLORS.info + '08', borderColor: COLORS.info + '20' }}>
-                                      <Feather name="box" size={10} color={COLORS.info} />
-                                      <Text className="text-[11px] font-bold" style={{ color: COLORS.info }}>
-                                        {t('warehouse.system')} {systemQty}
-                                      </Text>
-                                    </View>
-                                  )}
-                                </View>
-                              </View>
-                            </View>
-
-                            <View className="flex-row items-center justify-between pt-1 gap-3">
-                              <View className="flex-1 gap-0.5">
-                                <Text className="text-xs font-bold text-slate-600">
-                                  {t('warehouse.enterActualCount')}
-                                </Text>
-                                <Text className="text-[11px] text-slate-400 font-medium">
-                                  {countValue === "" ? t('warehouse.quantityNotEntered') : (isStaff ? t('warehouse.quantityEntered') : t('warehouse.discrepancy', { count: diff }))}
-                                </Text>
-                              </View>
-
-                                <TextInput
-                                className="w-[92px] h-10 rounded-lg bg-white border-[1.5px] border-slate-200 px-3 py-0 text-[18px] font-extrabold text-slate-700 text-center"
-                                style={[{ includeFontPadding: false, lineHeight: 20 }, countValue !== "" && { borderColor: COLORS.info + '40', backgroundColor: COLORS.info + '08', color: COLORS.info }]}
-                                value={countValue}
-                                onChangeText={(text) => {
-                                  const cleaned = text.replace(/[^0-9]/g, "");
-                                  setCountQuantities((prev) => ({ ...prev, [item.id]: cleaned }));
-                                }}
-                                keyboardType="number-pad"
-                                inputMode="numeric"
-                                returnKeyType="done"
-                                textAlign="center"
-                                textAlignVertical="center"
-                                maxLength={5}
-                                  selectTextOnFocus={false}
-                                  autoCorrect={false}
-                                  autoCapitalize="none"
-                              />
-                            </View>
-                          </View>
+                            item={item}
+                            countValue={rawCount}
+                            systemQty={systemQty}
+                            isStaff={isStaff}
+                            onCountChange={(cleaned) => {
+                              setCountQuantities((prev) => ({ ...prev, [item.id]: cleaned }));
+                            }}
+                          />
                         );
-                      }
-
+                    }) : itemsWithSelectedBin.map((item: any) => {
                       const targetRemaining = Math.max(
                         0,
                         Number(item.targetQuantity || 0) - Number(item.currentQuantity || 0),
@@ -766,291 +710,40 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
                         0,
                         Math.min(Number(selectedQuantities[item.id] ?? 0), maxAllowedByBin),
                       );
-                      const targetQty = Math.max(
-                        0,
-                        Number(item.targetQuantity || 0),
-                      );
-                      const done = Number(item.currentQuantity || 0);
-
-                      // Logic fix: projectedDone is what's already in other bins + what's being entered now
-                      const projectedDone = Math.min(done + qty, targetQty);
-
-                      // Logic fix: projectedRemaining is what's still left to reach the target
-                      const projectedRemaining = Math.max(
-                        0,
-                        targetQty - projectedDone,
-                      );
-
-                      const progress =
-                        targetQty > 0
-                          ? Math.min(projectedDone / targetQty, 1)
-                          : 0;
-                      const activeBinCode = selectedBin?.code ?? item.binCode;
-
-                      const handleResetItem = () => {
-                        AlertService.confirm(
-                          t('common.undo') + '?',
-                          t('warehouse.reset') + ` item "${item.name}"?`,
-                          () => {
-                            const { clearItem } =
-                              useInboundStagingStore.getState();
-                            if (ticketId) clearItem(ticketId, item.id);
-                            AlertService.success(
-                              t('common.success'),
-                              t('warehouse.reset'),
-                            );
-                          },
-                        );
-                      };
-
+                      
                       return (
-                        <View
+                        <ShelfOperationItemRow
                           key={item.id}
-                          className="bg-slate-50 rounded-[14px] p-3.5 border-[1.5px] border-slate-200 gap-2.5"
-                        >
-                          {/* Item info */}
-                          <View className="flex-row items-start">
-                            <View className="flex-1 gap-1.5">
-                              <View className="flex-row items-center gap-2 flex-wrap">
-                                <Text
-                                  className="text-[15px] font-bold text-slate-800 flex-1"
-                                  numberOfLines={1}
-                                >
-                                  {item.name}
-                                </Text>
-                                <View className="flex-row items-center gap-1.5">
-                                  {item.isRecommended && (
-                                    <View
-                                      className="flex-row items-center gap-1 px-1.5 py-[3px] rounded-md"
-                                      style={{ backgroundColor: accentLight }}
-                                    >
-                                      <Feather
-                                        name="star"
-                                        size={9}
-                                        color={accentColor}
-                                      />
-                                      <Text
-                                        className="text-[10px] font-extrabold"
-                                        style={{ color: accentColor }}
-                                      >
-                                        {t('warehouse.recommended')}
-                                      </Text>
-                                    </View>
-                                  )}
-                                  {projectedDone > 0 && (
-                                    <TouchableOpacity
-                                      onPress={handleResetItem}
-                                      activeOpacity={0.6}
-                                    >
-                                      <View
-                                        className="flex-row items-center gap-1 px-1.5 py-[3px] rounded-md"
-                                        style={{
-                                          backgroundColor: COLORS.danger + "10",
-                                        }}
-                                      >
-                                        <Feather
-                                          name="rotate-ccw"
-                                          size={9}
-                                          color={COLORS.danger}
-                                        />
-                                        <Text
-                                          className="text-[10px] font-extrabold"
-                                          style={{ color: COLORS.danger }}
-                                        >
-                                          {t('warehouse.reset')}
-                                        </Text>
-                                      </View>
-                                    </TouchableOpacity>
-                                  )}
-                                </View>
-                              </View>
-                              <View className="flex-row items-center gap-1.5 flex-wrap">
-                                {item.sku && (
-                                  <Text className="text-[11px] text-slate-400 font-semibold bg-slate-100 px-2 py-[3px] rounded-md">
-                                    {item.sku}
-                                  </Text>
-                                )}
-                                <View
-                                  className="flex-row items-center gap-1 px-2 py-[3px] rounded-md border"
-                                  style={{
-                                    backgroundColor: accentLight,
-                                    borderColor: accentColor + "30",
-                                  }}
-                                >
-                                  <Feather
-                                    name="map-pin"
-                                    size={10}
-                                    color={accentColor}
-                                  />
-                                  <Text
-                                    className="text-[11px] font-bold"
-                                    style={{ color: accentColor }}
-                                  >
-                                    {activeBinCode}
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                          </View>
-
-                          {/* Progress bar */}
-                          <View className="flex-row items-center gap-2.5">
-                            <View className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                              <View
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${progress * 100}%` as any,
-                                  backgroundColor: accentColor,
-                                }}
-                              />
-                            </View>
-                            <Text className="text-[11px] font-bold text-slate-500 min-w-[36px] text-right">
-                              {projectedDone}/{item.targetQuantity}
-                            </Text>
-                          </View>
-
-                          {/* Quantity controls */}
-                          <View className="flex-row items-center justify-between pt-1">
-                            <View className="flex-1 gap-0.5">
-                              <Text className="text-xs font-bold text-slate-600">
-                                {isInbound
-                                  ? t('warehouse.willInboundToBin')
-                                  : t('warehouse.willOutboundFromBin')}
-                              </Text>
-
-
-                              <Text className="text-[11px] text-slate-400 font-medium">
-                                {isInbound && selectedBinRemainingVolume != null && getProductUnitVolume(item) > 0 ? (
-                                  <>
-                                    <Text className="text-slate-400" style={maxAllowedByBin === 0 ? { color: COLORS.danger } : {}}>
-                                      {maxAllowedByBin === 0 ? t('warehouse.binFull') : t('warehouse.maxCapacity', { count: maxAllowedByBin })}
-                                    </Text>
-                                    {" · "}
-                                  </>
-                                ) : isInbound && (getProductUnitVolume(item) <= 0 || !selectedBin) ? (
-                                  <>
-                                    <Text className="text-amber-500 font-bold">
-                                      {t('warehouse.dimensionsMissing')}
-                                    </Text>
-                                    {" · "}
-                                  </>
-                                ) : null}
-                                <Text className="text-slate-400">
-                                  {t('warehouse.remaining')}
-                                </Text>{" "}
-                                <Text
-                                  className="font-bold"
-                                  style={{
-                                    color:
-                                      projectedRemaining > 0
-                                        ? COLORS.warning
-                                        : COLORS.slate700,
-                                  }}
-                                >
-                                  {projectedRemaining}
-                                </Text>
-                                {" · "}
-                                <Text className="text-slate-400">
-                                  {t('warehouse.totalDone')}
-                                </Text>{" "}
-                                <Text
-                                  className="font-bold"
-                                  style={{
-                                    color:
-                                      progress >= 1
-                                        ? COLORS.success
-                                        : accentColor,
-                                  }}
-                                >
-                                  {projectedDone}/{item.targetQuantity}
-                                </Text>
-                              </Text>
-                            </View>
-
-                            <View className="flex-row items-center gap-2">
-                              <TouchableOpacity
-                                className={`w-9 h-9 rounded-lg bg-slate-100 items-center justify-center border-[1.5px] border-slate-200 ${qty === 0 ? "opacity-40" : ""}`}
-                                onPress={() =>
-                                  updateItemQuantity(
-                                    item.id,
-                                    false,
-                                    maxAllowedByBin,
-                                  )
-                                }
-                                activeOpacity={0.7}
-                                disabled={qty === 0}
-                              >
-                                <Feather
-                                  name="minus"
-                                  size={16}
-                                  color={
-                                    qty === 0 ? COLORS.slate300 : accentColor
-                                  }
-                                />
-                              </TouchableOpacity>
-
-                              <TextInput
-                                className="w-[54px] h-9 rounded-lg bg-white border-[1.5px] border-slate-200 px-2 py-0 text-[18px] font-extrabold text-slate-700 text-center"
-                                style={[
-                                  { includeFontPadding: false, lineHeight: 20 },
-                                  qty > 0 && {
-                                    borderColor: accentColor + "40",
-                                    backgroundColor: accentLight,
-                                    color: accentColor,
-                                  },
-                                ]}
-                                value={String(qty)}
-                                onChangeText={(text) =>
-                                  updateItemQuantityFromInput(
-                                    item.id,
-                                    text,
-                                    maxAllowedByBin,
-                                  )
-                                }
-                                keyboardType="number-pad"
-                                inputMode="numeric"
-                                returnKeyType="done"
-                                textAlign="center"
-                                textAlignVertical="center"
-                                maxLength={4}
-                                selectTextOnFocus
-                              />
-
-                              <TouchableOpacity
-                                className={`w-9 h-9 rounded-lg bg-slate-100 items-center justify-center border-[1.5px] border-slate-200 ${qty >= maxAllowedByBin ? "opacity-40" : ""}`}
-                                onPress={() =>
-                                  updateItemQuantity(
-                                    item.id,
-                                    true,
-                                    maxAllowedByBin,
-                                  )
-                                }
-                                activeOpacity={0.7}
-                                disabled={qty >= maxAllowedByBin}
-                              >
-                                <Feather
-                                  name="plus"
-                                  size={16}
-                                  color={
-                                    qty >= maxAllowedByBin
-                                      ? COLORS.slate300
-                                      : accentColor
-                                  }
-                                />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        </View>
+                          item={item}
+                          qty={qty}
+                          maxAllowed={maxAllowedByBin}
+                          accentColor={accentColor}
+                          accentLight={accentLight}
+                          activeBinCode={selectedBin?.code ?? item.binCode}
+                          isRecommended={item.isRecommended}
+                          onUpdateQty={(increment) => updateItemQuantity(item.id, increment, maxAllowedByBin)}
+                          onManualQtyChange={(value) => updateItemQuantityFromInput(item.id, value, maxAllowedByBin)}
+                          onReset={() => {
+                            AlertService.confirm(
+                              t('common.undo') + '?',
+                              t('warehouse.reset') + ` item "${item.name}"?`,
+                              () => {
+                                const { clearItem } = useInboundStagingStore.getState();
+                                if (ticketId) clearItem(ticketId, item.id);
+                                AlertService.success(t('common.success'), t('warehouse.reset'));
+                              }
+                            );
+                          }}
+                        />
                       );
                     })}
                   </View>
                 </>
               ) : (
-                /* No items state */
                 <View className="items-center py-12 px-8 gap-2.5">
                   <View className="w-16 h-16 rounded-[20px] bg-slate-100 items-center justify-center mb-1">
                     <Feather
-                      name="check-circle"
+                      name="box"
                       size={32}
                       color={COLORS.slate300}
                     />
@@ -1131,3 +824,5 @@ export const ShelfDetailModal: React.FC<ShelfDetailModalProps> = ({
     </Modal>
   );
 };
+
+export default ShelfDetailModal;

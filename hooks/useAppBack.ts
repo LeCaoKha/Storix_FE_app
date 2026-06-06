@@ -3,24 +3,13 @@ import { useRouter, useSegments } from 'expo-router';
 import { useCallback } from 'react';
 
 const resolveFallbackFromSegments = (segments: string[]) => {
-    if (segments.includes('(manager-tabs)')) {
-        if (segments.includes('transfers')) return '/(manager-tabs)/transfers';
-        if (segments.includes('requisitions')) return '/(manager-tabs)/requisitions';
-        if (segments.includes('(orders-inbound)') || segments.includes('(orders-outbound)') || segments.includes('orders')) {
-            return '/(manager-tabs)/orders';
-        }
-        if (segments.includes('profile')) return '/(manager-tabs)/profile';
+    if (segments.includes('(tabs)')) {
+        if (segments.includes('tasks')) return '/(tabs)/tasks';
+        if (segments.includes('orders')) return '/(tabs)/orders';
+        if (segments.includes('profile')) return '/(tabs)/profile';
+        if (segments.includes('warehouse')) return '/(tabs)/warehouse';
 
-        return '/(manager-tabs)/requisitions';
-    }
-
-    if (segments.includes('(staff-tabs)')) {
-        if (segments.includes('tasks')) return '/(staff-tabs)/tasks';
-        if (segments.includes('orders')) return '/(staff-tabs)/orders';
-        if (segments.includes('profile')) return '/(staff-tabs)/profile';
-        if (segments.includes('warehouse')) return '/(staff-tabs)/warehouse';
-
-        return '/(staff-tabs)/tasks';
+        return '/(tabs)/tasks';
     }
 
     if (segments.includes('profile')) {

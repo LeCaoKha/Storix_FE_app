@@ -142,3 +142,4 @@ export const useWarehouseStructure = (warehouseId?: number) => {
     staleTime: 5 * 60 * 1000, // Cache 5 phút vì warehouse structure ít thay đổi
   });
 };
+

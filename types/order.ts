@@ -12,6 +12,7 @@ export interface Task {
   location?: string;
   createdAt: Date;
   updatedAt: Date;
+  originalStatus?: string;
 }
 
 export enum TaskType {

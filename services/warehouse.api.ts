@@ -1,4 +1,4 @@
-import { UserWarehouseAssignment } from "@/types/auth.types";
+import { UserWarehouseAssignment } from "@/types/auth";
 import { WarehouseStructure, WarehouseSummary } from "@/types/warehouse";
 import { api } from "./axios.instance";
 import { getInboundOrdersByStaff } from "./inbound-order.api";
@@ -226,3 +226,4 @@ export const getWarehouseStructure = async (
     throw error;
   }
 };
+

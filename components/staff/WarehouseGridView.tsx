@@ -426,3 +426,4 @@ export const WarehouseGridView: React.FC<WarehouseGridViewProps> = ({
     </View>
   );
 };
+

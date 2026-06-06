@@ -1,15 +1,20 @@
 import type {
+    BarcodeScanSessionDto,
     CreateInboundRequestPayload,
+    FinalizeBarcodeSessionRequest,
     InboundItemStorageRecommendations,
     InboundOrder,
+    InboundQualityCheckResult,
+    ScanBarcodeRequest,
+    ScanResultDto,
+    StartBarcodeSessionRequest,
     UpdateInboundItemPayload
 } from '@/types/inbound-order';
 import { api } from './axios.instance';
 
 // Re-export types để tiện sử dụng
 export type {
-    CreateInboundRequestPayload, InboundItemStorageRecommendations, InboundOrder, InboundOrderItem,
-    InboundRequest, UpdateInboundItemPayload, UpdateInboundRequestStatusPayload
+    BarcodeScanSessionDto, CreateInboundRequestPayload, FinalizeBarcodeSessionRequest, InboundItemStorageRecommendations, InboundOrder, InboundOrderItem, InboundQualityCheckResult, InboundRequest, ScanBarcodeRequest, ScanResultDto, StartBarcodeSessionRequest, UpdateInboundItemPayload, UpdateInboundRequestStatusPayload
 } from '@/types/inbound-order';
 
 // ============== API Functions ==============
@@ -56,6 +61,8 @@ export const updateInboundTicketItems = async (
   ticketId: number,
   items: UpdateInboundItemPayload[]
 ) => {
+  console.log(`[API] PUT /api/InventoryInbound/update-tickets/${ticketId}/items`);
+  console.log('[API] Payload:', JSON.stringify(items, null, 2));
   const res = await api.put(`/api/InventoryInbound/update-tickets/${ticketId}/items`, items);
   return res.data as InboundOrder;
 };
@@ -189,3 +196,54 @@ export const exportInboundTicket = async (orderId: number, format: 'csv' | 'exce
   const endpoint = `/api/InventoryInbound/export/inbound-ticket/${orderId}/${format}`;
   return `${api.defaults.baseURL}${endpoint}`;
 };
+
+/**
+ * Lấy kết quả kiểm tra chất lượng của đơn hàng
+ */
+export const getInboundQualityCheckResult = async (companyId: number, orderId: number) => {
+  const res = await api.get(`/api/InventoryInbound/tickets/${companyId}/${orderId}/quality-check`);
+  return res.data as InboundQualityCheckResult;
+};
+
+// ============== Barcode Scanning APIs ==============
+
+/**
+ * Bắt đầu phiên quét mã vạch
+ */
+export const startBarcodeSession = async (orderId: number, payload: StartBarcodeSessionRequest) => {
+  const res = await api.post(`/api/inbound-barcode/${orderId}/session/start`, payload);
+  return res.data as BarcodeScanSessionDto;
+};
+
+/**
+ * Lấy thông tin phiên quét hiện tại
+ */
+export const getBarcodeSession = async (orderId: number) => {
+  const res = await api.get(`/api/inbound-barcode/${orderId}/session`);
+  return res.data as BarcodeScanSessionDto;
+};
+
+/**
+ * Quét một mã vạch (SKU)
+ */
+export const scanBarcode = async (orderId: number, payload: ScanBarcodeRequest) => {
+  const res = await api.post(`/api/inbound-barcode/${orderId}/session/scan`, payload);
+  return res.data as ScanResultDto;
+};
+
+/**
+ * Hoàn tất phiên quét và chuyển sang QC
+ */
+export const finalizeBarcodeSession = async (orderId: number, payload: FinalizeBarcodeSessionRequest) => {
+  const res = await api.post(`/api/inbound-barcode/${orderId}/session/finalize`, payload);
+  return res.data as any; // Returns InboundQualityCheckResultDto shape
+};
+
+/**
+ * Hủy phiên quét hiện tại
+ */
+export const discardBarcodeSession = async (orderId: number) => {
+  const res = await api.delete(`/api/inbound-barcode/${orderId}/session`);
+  return res.data;
+};
+
