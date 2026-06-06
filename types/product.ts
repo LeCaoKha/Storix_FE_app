@@ -87,3 +87,4 @@ export interface ProductInventoryLocation {
     quantity: number;
     updatedAt?: string | null;
 }
+

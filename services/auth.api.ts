@@ -1,4 +1,4 @@
-import { LoginResponse } from '@/types/auth.types';
+import { LoginResponse } from '@/types/auth';
 import { api } from './axios.instance';
 
 export const loginRequest = async (email: string, password: string): Promise<LoginResponse> => {
@@ -37,3 +37,4 @@ export const logoutRequest = async (refreshToken: string | null): Promise<void> 
         console.warn('[LOGOUT] API call failed, but clearing local session anyway:', error);
     }
 };
+

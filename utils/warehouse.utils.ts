@@ -63,3 +63,4 @@ export const normalizeWarehouseStructure = (structure: WarehouseStructure): Ware
     nodes: normalizedNodes,
   };
 };
+

@@ -5,11 +5,9 @@ export * from './auth.hooks';
 export * from './user.hooks';
 
 // Order hooks
-export * from './inbound-orders.hooks';
-export * from './outbound-orders.hooks';
+export * from './inbound-order.hooks';
+export * from './outbound-order.hooks';
 
-// Requisition hooks
-export * from './requisition.hooks';
 
 // Product hooks
 export * from './product.hooks';
@@ -17,10 +15,9 @@ export * from './product.hooks';
 // Task hooks
 export * from './task.hooks';
 
-// Supplier hooks
-export * from './suppliers.hooks';
 
 // Warehouse hooks
 export * from './warehouse.hooks';
+
 
 

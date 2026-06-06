@@ -15,3 +15,4 @@ export const useRefreshStore = create<RefreshState>((set) => ({
   refreshSignal: 0,
   triggerRefresh: () => set((state) => ({ refreshSignal: state.refreshSignal + 1 })),
 }));
+

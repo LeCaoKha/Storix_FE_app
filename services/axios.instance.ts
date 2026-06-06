@@ -102,11 +102,19 @@ api.interceptors.response.use(
     if (isWarehouseStructureSchemaMismatch) {
       console.warn(`[AXIOS WARN] ${requestUrl}`, logPayload);
     } else {
-      console.error(`[AXIOS ERROR] ${requestUrl}`, logPayload);
+      // Reduce noise for expected client errors (404 for missing sessions, 401 on auth)
+      const isExpectedNotFound = status === 404 && (requestUrl.includes('/inbound-barcode') || requestUrl.includes('/session'));
+      const isAuthError = status === 401;
+
+      if (isExpectedNotFound || isAuthError) {
+        console.warn(`[AXIOS WARN] ${requestUrl}`, logPayload);
+      } else {
+        console.error(`[AXIOS ERROR] ${requestUrl}`, logPayload);
+      }
 
       if (
-        requestUrl.includes("/api/InventoryInbound/update-tickets/") &&
-        requestUrl.includes("/items")
+        requestUrl.includes('/api/InventoryInbound/update-tickets/') &&
+        requestUrl.includes('/items')
       ) {
         try {
           const rawData = error.config?.data;
@@ -173,3 +181,4 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+

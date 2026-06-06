@@ -23,3 +23,4 @@ export const useProductInventoryLocations = (productId?: number, warehouseId?: n
         staleTime: 0,
     });
 };
+
